@@ -235,12 +235,15 @@ describe('profile runtime resolver', () => {
     const bin = join(root, 'bin');
     const claude = await writeExecutable(bin, 'claude');
     const codex = await writeExecutable(bin, 'codex');
+    const antigravity = await writeExecutable(bin, 'agy');
     const oldPath = process.env.PATH;
     const oldClaude = process.env.LARK_CHANNEL_CLAUDE_BIN;
     const oldCodex = process.env.LARK_CHANNEL_CODEX_BIN;
+    const oldAntigravity = process.env.LARK_CHANNEL_ANTIGRAVITY_BIN;
     process.env.PATH = bin;
     delete process.env.LARK_CHANNEL_CLAUDE_BIN;
     delete process.env.LARK_CHANNEL_CODEX_BIN;
+    process.env.LARK_CHANNEL_ANTIGRAVITY_BIN = antigravity;
 
     try {
       let error: Error | undefined;
@@ -262,7 +265,9 @@ describe('profile runtime resolver', () => {
       expect(message).toContain(claude);
       expect(message).toContain('codex');
       expect(message).toContain(codex);
-      expect(message).toContain('--agent <claude|codex>');
+      expect(message).toContain('antigravity');
+      expect(message).toContain(antigravity);
+      expect(message).toContain('--agent <claude|codex|antigravity>');
     } finally {
       process.env.PATH = oldPath;
       if (oldClaude === undefined) {
@@ -275,6 +280,11 @@ describe('profile runtime resolver', () => {
       } else {
         process.env.LARK_CHANNEL_CODEX_BIN = oldCodex;
       }
+      if (oldAntigravity === undefined) {
+        delete process.env.LARK_CHANNEL_ANTIGRAVITY_BIN;
+      } else {
+        process.env.LARK_CHANNEL_ANTIGRAVITY_BIN = oldAntigravity;
+      }
     }
   });
 
@@ -283,12 +293,15 @@ describe('profile runtime resolver', () => {
     const bin = join(root, 'bin');
     const codex = await writeExecutable(bin, 'codex');
     await writeExecutable(bin, 'claude');
+    const antigravity = await writeExecutable(bin, 'agy');
     const oldPath = process.env.PATH;
     const oldClaude = process.env.LARK_CHANNEL_CLAUDE_BIN;
     const oldCodex = process.env.LARK_CHANNEL_CODEX_BIN;
+    const oldAntigravity = process.env.LARK_CHANNEL_ANTIGRAVITY_BIN;
     process.env.PATH = bin;
     delete process.env.LARK_CHANNEL_CLAUDE_BIN;
     delete process.env.LARK_CHANNEL_CODEX_BIN;
+    process.env.LARK_CHANNEL_ANTIGRAVITY_BIN = antigravity;
 
     try {
       const runtime = await withTty(true, true, () =>
@@ -296,7 +309,7 @@ describe('profile runtime resolver', () => {
           config: join(root, 'config.json'),
           allowBootstrap: true,
           selectAgent: (detected) => {
-            expect(detected.map((agent) => agent.kind)).toEqual(['claude', 'codex']);
+            expect(detected.map((agent) => agent.kind)).toEqual(['claude', 'codex', 'antigravity']);
             return 'codex';
           },
         }),
@@ -316,6 +329,11 @@ describe('profile runtime resolver', () => {
         delete process.env.LARK_CHANNEL_CODEX_BIN;
       } else {
         process.env.LARK_CHANNEL_CODEX_BIN = oldCodex;
+      }
+      if (oldAntigravity === undefined) {
+        delete process.env.LARK_CHANNEL_ANTIGRAVITY_BIN;
+      } else {
+        process.env.LARK_CHANNEL_ANTIGRAVITY_BIN = oldAntigravity;
       }
     }
   });

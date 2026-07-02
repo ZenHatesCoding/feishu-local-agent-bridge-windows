@@ -13,7 +13,7 @@ import {
   type PermissionSource,
 } from './permissions';
 
-export type AgentKind = 'claude' | 'codex';
+export type AgentKind = 'claude' | 'codex' | 'antigravity';
 export type SandboxMode = CodexSandboxMode;
 export type { AccessMode, PermissionConfig, PermissionSource };
 
@@ -42,6 +42,17 @@ export interface CodexConfig {
   inheritCodexHome?: boolean;
   ignoreUserConfig?: boolean;
   ignoreRules?: boolean;
+}
+
+export interface AntigravityConfig {
+  binaryPath: string;
+  realpath?: string;
+  version?: string;
+  project?: string;
+  model?: string;
+  printTimeout?: string;
+  dangerouslySkipPermissions?: boolean;
+  sandbox?: boolean;
 }
 
 export interface AttachmentConfig {
@@ -90,6 +101,7 @@ export interface ProfileConfig {
   permissions: PermissionConfig;
   permissionSource?: PermissionSource;
   codex?: CodexConfig;
+  antigravity?: AntigravityConfig;
   attachments: AttachmentConfig;
   comments: CommentConfig;
   larkCli: LarkCliConfig;
@@ -116,6 +128,7 @@ export interface CreateDefaultProfileConfigInput {
   sandbox?: Partial<SandboxConfig>;
   permissions?: Partial<PermissionConfig>;
   codex?: CodexConfig;
+  antigravity?: AntigravityConfig;
   secrets?: SecretsConfig;
 }
 
@@ -150,6 +163,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     sandbox?: Partial<SandboxConfig>;
     permissions?: Partial<PermissionConfig>;
     codex?: CodexConfig & { flags?: unknown };
+    antigravity?: AntigravityConfig;
     attachments?: Partial<AttachmentConfig>;
     comments?: unknown;
     larkCli?: unknown;
@@ -158,12 +172,15 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
   if (raw.schemaVersion !== 2) {
     throw new Error('profile schemaVersion must be 2');
   }
-  if (raw.agentKind !== 'claude' && raw.agentKind !== 'codex') {
-    throw new Error('agentKind must be claude or codex');
+  if (raw.agentKind !== 'claude' && raw.agentKind !== 'codex' && raw.agentKind !== 'antigravity') {
+    throw new Error('agentKind must be claude, codex, or antigravity');
   }
   const accounts = normalizeAccounts(raw.accounts);
   if (raw.agentKind === 'codex' && !raw.codex) {
     throw new Error('codex profile requires codex configuration');
+  }
+  if (raw.agentKind === 'antigravity' && !raw.antigravity) {
+    throw new Error('antigravity profile requires antigravity configuration');
   }
 
   const preferences = normalizePreferences(raw.preferences);
@@ -192,6 +209,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     permissions,
     permissionSource,
     ...(raw.codex ? { codex: normalizeCodex(raw.codex) } : {}),
+    ...(raw.antigravity ? { antigravity: normalizeAntigravity(raw.antigravity) } : {}),
     attachments: {
       maxCount: numberOr(raw.attachments?.maxCount, 10),
       maxBytes: numberOr(raw.attachments?.maxBytes, 100 * 1024 * 1024),
@@ -283,6 +301,23 @@ function normalizeCodex(input: CodexConfig & { flags?: unknown }): CodexConfig {
     ignoreRules: input.ignoreRules !== false,
   };
   return codex;
+}
+
+function normalizeAntigravity(input: AntigravityConfig): AntigravityConfig {
+  return {
+    binaryPath: input.binaryPath,
+    ...(typeof input.realpath === 'string' ? { realpath: input.realpath } : {}),
+    ...(typeof input.version === 'string' ? { version: input.version } : {}),
+    ...(typeof input.project === 'string' && input.project.trim()
+      ? { project: input.project.trim() }
+      : {}),
+    ...(typeof input.model === 'string' && input.model.trim() ? { model: input.model.trim() } : {}),
+    ...(typeof input.printTimeout === 'string' && input.printTimeout.trim()
+      ? { printTimeout: input.printTimeout.trim() }
+      : {}),
+    dangerouslySkipPermissions: input.dangerouslySkipPermissions === true,
+    sandbox: input.sandbox === true,
+  };
 }
 
 function normalizeComments(_input: unknown): CommentConfig {

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute } from 'node:path';
 import type { LarkChannel, NormalizedMessage } from '@larksuite/channel';
-import { claudeCapability, codexCapability } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability } from '../agent/capability';
 import type { AgentAdapter } from '../agent/types';
 import type { ActiveRuns } from '../bot/active-runs';
 import {
@@ -145,7 +145,7 @@ type Handler = (args: string, ctx: CommandContext) => Promise<void>;
 
 interface ResumeCandidate {
   scopeId: string;
-  agentId: 'claude' | 'codex';
+  agentId: 'claude' | 'codex' | 'antigravity';
   cwdRealpath: string;
   policyFingerprint: string;
   sessionId?: string;
@@ -580,6 +580,11 @@ async function handleResume(args: string, ctx: CommandContext): Promise<void> {
     return;
   }
 
+  if (ctx.controls.profileConfig.agentKind === 'antigravity') {
+    await reply(ctx, 'Antigravity bridge currently uses stateless `agy --print` mode, so /resume is not available yet.');
+    return;
+  }
+
   const sessions = await listClaudeResumeHistory(ctx, cwd, limit);
   const currentSession = ctx.sessions.getRaw(ctx.scope);
   const identity = ctx.sessionCatalogIdentity;
@@ -628,6 +633,10 @@ async function applyResume(sessionId: string, ctx: CommandContext): Promise<void
       await reply(ctx, '当前上下文不可恢复这个会话，请先用 `/resume` 重新生成恢复候选。');
       return;
     }
+    if (ctx.sessionCatalogIdentity.agentId === 'antigravity') {
+      await reply(ctx, 'Antigravity bridge currently uses stateless `agy --print` mode, so /resume is not available yet.');
+      return;
+    }
     const expected = entry?.sessionId;
     if (expected !== sessionId) {
       await reply(ctx, '当前上下文不可恢复这个会话，请重新选择当前工作区和权限策略下的会话。');
@@ -643,6 +652,11 @@ async function applyResume(sessionId: string, ctx: CommandContext): Promise<void
 
   if (ctx.controls.profileConfig.agentKind === 'codex') {
     await reply(ctx, '当前上下文没有可恢复的 Codex thread，请先在当前工作区完成一次运行。');
+    return;
+  }
+
+  if (ctx.controls.profileConfig.agentKind === 'antigravity') {
+    await reply(ctx, 'Antigravity bridge currently uses stateless `agy --print` mode, so /resume is not available yet.');
     return;
   }
 
@@ -688,7 +702,8 @@ function consumeResumeCandidate(
     candidate.cwdRealpath !== identity.cwdRealpath ||
     candidate.policyFingerprint !== identity.policyFingerprint ||
     (identity.agentId === 'claude' && !candidate.sessionId) ||
-    (identity.agentId === 'codex' && !candidate.threadId)
+    (identity.agentId === 'codex' && !candidate.threadId) ||
+    identity.agentId === 'antigravity'
   ) {
     return undefined;
   }
@@ -1118,6 +1133,8 @@ async function handleDoctor(args: string, ctx: CommandContext): Promise<void> {
   const capability =
     ctx.controls.profileConfig.agentKind === 'codex'
       ? codexCapability(ctx.controls.profileConfig)
+      : ctx.controls.profileConfig.agentKind === 'antigravity'
+        ? antigravityCapability(ctx.controls.profileConfig)
       : claudeCapability(ctx.controls.profileConfig);
   const policy = evaluateRunPolicy({
     scope: {

@@ -40,7 +40,15 @@ export function buildLauncherCmd(inputs: LauncherInputs): string {
   return [
     '@echo off',
     `set "LARK_CHANNEL_HOME=${inputs.channelHome}"`,
-    `set "PATH=${inputs.envPath}"`,
+    'set "HERMES_HOME="',
+    'set "HERMES_GIT_BASH_PATH="',
+    ...(process.env.LARK_CHANNEL_ANTIGRAVITY_BIN
+      ? [`set "LARK_CHANNEL_ANTIGRAVITY_BIN=${process.env.LARK_CHANNEL_ANTIGRAVITY_BIN}"`]
+      : []),
+    ...(process.env.LARK_CHANNEL_DISABLE_PROXY
+      ? [`set "LARK_CHANNEL_DISABLE_PROXY=${process.env.LARK_CHANNEL_DISABLE_PROXY}"`]
+      : []),
+    `set "PATH=${dirname(inputs.channelHome)}\\bin;${inputs.envPath}"`,
     `"${inputs.nodePath}" "${inputs.bridgeEntryPath}" run --profile "${inputs.profile}" >> "${daemonStdoutPath(inputs.profile)}" 2>> "${daemonStderrPath(inputs.profile)}"`,
     '',
   ].join('\r\n');

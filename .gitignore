@@ -15,6 +15,12 @@ coverage/
 .vscode/
 
 # Local maintenance scripts and unreleased changelog are not part of the package
-scripts/
 CHANGELOG.md
 tests-smoke/
+
+# Local bridge runtime state and secrets
+.lark-channel/
+.lark-cli/
+.gemini/
+AppData/
+workspace/

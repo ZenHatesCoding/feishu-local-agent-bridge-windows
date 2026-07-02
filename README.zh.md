@@ -1,5 +1,12 @@
 # lark-channel-bridge
 
+> 个人 vibecoding fork 说明：这是我和 Codex 一起改出来的 Windows 个人适配版，
+> 不是假装自己是原项目作者，也不是面向所有人的正式发行版。本仓库基于
+> [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge)
+> / `lark-channel-bridge`，保留原 MIT 许可证，并增加本地 Google Antigravity
+> (`agy`) 桥接 profile 和 Windows 辅助脚本，用于一套个人飞书/Lark 环境。
+> 见 [docs/ANTIGRAVITY_WINDOWS_BRIDGE.md](./docs/ANTIGRAVITY_WINDOWS_BRIDGE.md)。
+
 把飞书 / Lark 消息和本地 Claude Code 或 Codex CLI 打通的轻量 bot。用一条命令启动，扫码绑定 PersonalAgent 应用，然后在飞书里和本机编程助手对话，让它读图、处理文件、改代码。
 
 [English README](./README.md)

@@ -214,7 +214,7 @@ function normalizeEntry(input: unknown): SessionCatalogEntry | undefined {
   if (
     typeof raw.key !== 'string' ||
     typeof raw.scopeId !== 'string' ||
-    (raw.agentId !== 'claude' && raw.agentId !== 'codex') ||
+    (raw.agentId !== 'claude' && raw.agentId !== 'codex' && raw.agentId !== 'antigravity') ||
     typeof raw.cwdRealpath !== 'string' ||
     typeof raw.policyFingerprint !== 'string' ||
     (raw.status !== 'active' && raw.status !== 'archived') ||
@@ -248,6 +248,7 @@ function matchesIdentity(entry: SessionCatalogEntry, input: SessionCatalogIdenti
 
 function isValidAgentEntry(entry: SessionCatalogEntry): boolean {
   if (entry.agentId === 'claude') return Boolean(entry.sessionId) && !entry.threadId;
+  if (entry.agentId === 'antigravity') return !entry.sessionId && !entry.threadId;
   return Boolean(entry.threadId) && !entry.sessionId;
 }
 
@@ -255,6 +256,12 @@ function assertAgentIdentity(input: UpsertSessionCatalogInput): void {
   if (input.agentId === 'claude') {
     if (!input.sessionId || input.threadId) {
       throw new Error('Claude catalog entries require sessionId and must not include threadId');
+    }
+    return;
+  }
+  if (input.agentId === 'antigravity') {
+    if (input.sessionId || input.threadId) {
+      throw new Error('Antigravity catalog entries must not include sessionId or threadId');
     }
     return;
   }

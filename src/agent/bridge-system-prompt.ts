@@ -144,5 +144,15 @@ export function prefixBridgeSystemPrompt(
   prompt: string,
   identity: AgentBotIdentity | undefined,
 ): string {
-  return `${buildBridgeSystemPrompt(identity)}\n\n## user_message\n\n${prompt}`;
+  return `${buildBridgeSystemPrompt(identity)}\n\n${FILE_SENDING_PROMPT}\n\n## user_message\n\n${prompt}`;
 }
+
+const FILE_SENDING_PROMPT = `## Sending files and images
+
+When the user asks you to create and send a file, first create the local file in the current working directory, then send it with the current profile's lark-cli:
+
+- Send to the current chat: \`lark-cli im +messages-send --chat-id <bridge_context.chatId> --file <local_path>\`
+- Reply to the current message: \`lark-cli im +messages-reply --message-id <bridge_context.messageId> --file <local_path>\`
+- Send an image with \`--image <local_path>\`; send normal text or Markdown with \`--text\` / \`--markdown\`.
+
+Prefer replying to the current message unless the user explicitly asks to send to the chat. After the command succeeds, briefly say that the file was sent.`;

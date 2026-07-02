@@ -5,7 +5,7 @@ import type {
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
-import { claudeCapability, codexCapability } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability } from '../agent/capability';
 import {
   buildAgentPrompt,
   type BridgePromptInteractiveCard,
@@ -257,7 +257,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
     // event-handling thread.
     httpTimeoutMs: 30_000,
     // Route WS + REST through HTTPS_PROXY / HTTP_PROXY when set (no-op otherwise).
-    respectProxyEnv: true,
+    respectProxyEnv: process.env.LARK_CHANNEL_DISABLE_PROXY !== '1',
   };
 
   const channel = createLarkChannel(opts);
@@ -770,6 +770,8 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   const capability =
     controls.profileConfig.agentKind === 'codex'
       ? codexCapability(controls.profileConfig)
+      : controls.profileConfig.agentKind === 'antigravity'
+        ? antigravityCapability(controls.profileConfig)
       : claudeCapability(controls.profileConfig);
   const flow = await startRunFlow({
     scopeId: scope,
