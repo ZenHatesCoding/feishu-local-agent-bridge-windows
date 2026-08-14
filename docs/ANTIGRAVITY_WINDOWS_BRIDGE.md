@@ -1,25 +1,28 @@
 # Antigravity Windows Feishu Bridge Notes
 
-This repository is a Windows-oriented personal vibecoding adaptation of `lark-channel-bridge`, built together with Codex and based on the upstream project by `zarazhangrui`.
+This deployment branch is a Windows-oriented personal-use adaptation of
+`lark-channel-bridge`, based on the upstream project by `zarazhangrui`.
 
 The upstream project is MIT licensed. Keep the original `LICENSE` file and copyright notice when redistributing this fork.
 
 ## What This Fork Adds
 
 - Adds an `antigravity` agent adapter that calls the local `agy` CLI.
-- Keeps Antigravity bridge state isolated under `C:\antigravity-bridge\.lark-channel`.
+- Keeps Antigravity bridge state isolated inside this clone's `.lark-channel`.
 - Adds Windows helper scripts for foreground debugging and background service management.
 - Adds a local `lark-cli` wrapper so Antigravity can send Feishu files/images without being confused by Hermes environment variables.
 - Avoids proxy leakage with `LARK_CHANNEL_DISABLE_PROXY=1`.
 - Reports Antigravity stderr back to Feishu when `agy` exits with no stdout, avoiding confusing `(no content)` replies.
 
-## Windows Paths Used On This Machine
+## Install on a new computer
 
-```text
-C:\antigravity-bridge
-C:\antigravity-bridge\workspace
-C:\antigravity-bridge\.lark-channel
-C:\Users\ZhenpingXing\AppData\Local\agy\bin\agy.exe
+Prerequisites: Git, Node.js 20.12 or newer, and a signed-in Antigravity CLI.
+
+```powershell
+git clone --branch bridge/antigravity --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git antigravity-feishu-bridge
+cd .\antigravity-feishu-bridge
+corepack enable
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-antigravity-bridge.ps1
 ```
 
 ## Antigravity Commands
@@ -27,26 +30,25 @@ C:\Users\ZhenpingXing\AppData\Local\agy\bin\agy.exe
 Foreground debug:
 
 ```powershell
-cd C:\antigravity-bridge
 powershell -ExecutionPolicy Bypass -File .\scripts\run-antigravity-bridge.ps1
 ```
 
 Background start:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\antigravity-bridge\scripts\start-antigravity-bridge-service.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\start-antigravity-bridge-service.ps1
 ```
 
 Stop:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\antigravity-bridge\scripts\stop-antigravity-bridge-service.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\stop-antigravity-bridge-service.ps1
 ```
 
 Status:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\antigravity-bridge\scripts\status-antigravity-bridge.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\status-antigravity-bridge.ps1
 ```
 
 On this Windows setup, background service commands may need to be run from an Administrator PowerShell because they create/control Windows Task Scheduler entries.
