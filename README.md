@@ -4,8 +4,10 @@
 > together with Codex, not an attempt to present itself as the original project.
 > It is based on [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge)
 > / `lark-channel-bridge`, keeps the original MIT license, and adds a local Google
-> Antigravity (`agy`) bridge profile plus Windows helper scripts for one Feishu/Lark setup.
-> See [docs/ANTIGRAVITY_WINDOWS_BRIDGE.md](./docs/ANTIGRAVITY_WINDOWS_BRIDGE.md).
+> Antigravity (`agy`) and DeepSeek Harness bridge profiles plus Windows helper
+> scripts for Feishu/Lark setups. See
+> [Antigravity notes](./docs/ANTIGRAVITY_WINDOWS_BRIDGE.md) and
+> [DeepSeek Harness notes](./docs/DEEPSEEK_HARNESS_WINDOWS_BRIDGE.md).
 
 A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
 

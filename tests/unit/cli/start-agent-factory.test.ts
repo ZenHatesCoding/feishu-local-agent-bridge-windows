@@ -84,7 +84,7 @@ describe('start runtime agent factory', () => {
     );
 
     expect(agent.id).toBe('antigravity');
-    expect(agent.displayName).toBe('Antigravity CLI');
+    expect(agent.displayName).toBe('DeepSeek Harness');
   });
 
   it('seeds a default Antigravity binary when bootstrapping a new Antigravity profile', () => {
