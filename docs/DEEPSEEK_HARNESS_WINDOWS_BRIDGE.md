@@ -10,7 +10,7 @@ Hermes installations.
 Prerequisites: Git and Node.js 22 or newer. In PowerShell:
 
 ```powershell
-git clone --branch bridge/deepseek-harness --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git deepseek-feishu-bridge
+git clone --branch deepseek-harness --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git deepseek-feishu-bridge
 cd .\deepseek-feishu-bridge
 corepack enable
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-deepseek-bridge.ps1

@@ -14,10 +14,10 @@ For a new computer, clone the deployment branch instead of `main`:
 
 ```powershell
 # DeepSeek Harness
-git clone --branch bridge/deepseek-harness --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git deepseek-feishu-bridge
+git clone --branch deepseek-harness --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git deepseek-feishu-bridge
 
 # Google Antigravity
-git clone --branch bridge/antigravity --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git antigravity-feishu-bridge
+git clone --branch antigravity --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git antigravity-feishu-bridge
 ```
 
 The clone-specific setup instructions are in [the branch guide](./docs/BRANCHES.md).
