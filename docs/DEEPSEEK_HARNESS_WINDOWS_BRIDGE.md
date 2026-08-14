@@ -2,8 +2,8 @@
 
 This branch runs DeepSeek Harness in its official one-shot headless mode. It is
 intended to be cloned on a Windows computer as a self-contained Feishu bridge.
-Its state lives inside the clone, so it does not modify Codex, Antigravity, or
-Hermes installations.
+Its state lives inside the clone and remains isolated from other local bridge
+installations.
 
 ## Install on a new computer
 
