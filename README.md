@@ -1,29 +1,29 @@
-# Feishu Local Agent Bridge for Windows
+# Antigravity Feishu Bridge for Windows
 
 > Personal vibecoding fork note: this is a Windows personal-use adaptation built
 > together with Codex, not an attempt to present itself as the original project.
 > It is based on [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge)
-> / `lark-channel-bridge`, keeps the original MIT license, and packages local
-> Windows deployment branches for Google Antigravity (`agy`) and DeepSeek
-> Harness. Select the branch that matches the agent you want to bridge; see
-> [branch guide](./docs/BRANCHES.md).
+> / `lark-channel-bridge`, keeps the original MIT license, and adds a Windows
+> deployment workflow for the local Google Antigravity (`agy`) CLI.
 
-## Windows deployment branches
+## Install on a new computer
 
-For a new computer, clone the deployment branch instead of `main`:
+Clone this branch, install its dependencies, then bind a Feishu app:
 
 ```powershell
-# Google Antigravity
 git clone --branch antigravity --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git antigravity-feishu-bridge
-
-# DeepSeek Harness
-git clone --branch deepseek-harness --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git deepseek-feishu-bridge
+cd .\antigravity-feishu-bridge
+corepack enable
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-antigravity-bridge.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run-antigravity-bridge.ps1
 ```
 
-The clone-specific setup instructions are in [the branch guide](./docs/BRANCHES.md).
-`main` is a shared development baseline, not a deployment target.
+The final command opens the Feishu QR-code flow. Detailed Windows notes are in
+[docs/ANTIGRAVITY_WINDOWS_BRIDGE.md](./docs/ANTIGRAVITY_WINDOWS_BRIDGE.md).
 
-A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
+A lightweight bot that bridges Feishu / Lark messenger with your local
+Antigravity CLI. Run one command, scan a QR code to bind a PersonalAgent app,
+and talk to your local coding agent from chat.
 
 [中文 README](./README.zh.md)
 
