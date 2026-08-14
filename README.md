@@ -1,13 +1,27 @@
-# lark-channel-bridge
+# Feishu Local Agent Bridge for Windows
 
 > Personal vibecoding fork note: this is a Windows personal-use adaptation built
 > together with Codex, not an attempt to present itself as the original project.
 > It is based on [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge)
-> / `lark-channel-bridge`, keeps the original MIT license, and adds a local Google
-> Antigravity (`agy`) and DeepSeek Harness bridge profiles plus Windows helper
-> scripts for Feishu/Lark setups. See
-> [Antigravity notes](./docs/ANTIGRAVITY_WINDOWS_BRIDGE.md) and
-> [DeepSeek Harness notes](./docs/DEEPSEEK_HARNESS_WINDOWS_BRIDGE.md).
+> / `lark-channel-bridge`, keeps the original MIT license, and packages local
+> Windows deployment branches for Google Antigravity (`agy`) and DeepSeek
+> Harness. Select the branch that matches the agent you want to bridge; see
+> [branch guide](./docs/BRANCHES.md).
+
+## Windows deployment branches
+
+For a new computer, clone the deployment branch instead of `main`:
+
+```powershell
+# DeepSeek Harness
+git clone --branch bridge/deepseek-harness --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git deepseek-feishu-bridge
+
+# Google Antigravity
+git clone --branch bridge/antigravity --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git antigravity-feishu-bridge
+```
+
+The clone-specific setup instructions are in [the branch guide](./docs/BRANCHES.md).
+`main` is a shared development baseline, not a deployment target.
 
 A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
 
