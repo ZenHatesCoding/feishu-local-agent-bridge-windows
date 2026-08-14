@@ -1,11 +1,26 @@
-# lark-channel-bridge
+# Feishu Local Agent Bridge for Windows
 
 > Personal vibecoding fork note: this is a Windows personal-use adaptation built
 > together with Codex, not an attempt to present itself as the original project.
 > It is based on [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge)
-> / `lark-channel-bridge`, keeps the original MIT license, and adds a local Google
-> Antigravity (`agy`) bridge profile plus Windows helper scripts for one Feishu/Lark setup.
-> See [docs/ANTIGRAVITY_WINDOWS_BRIDGE.md](./docs/ANTIGRAVITY_WINDOWS_BRIDGE.md).
+> / `lark-channel-bridge`, keeps the original MIT license. This repository
+> packages two Windows deployment branches: Google Antigravity and DeepSeek
+> Harness.
+
+## Pick one branch
+
+Use `main` only as the project entry point. For a new computer, clone one of
+these deployment branches:
+
+```powershell
+# Google Antigravity
+git clone --branch antigravity --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git antigravity-feishu-bridge
+
+# DeepSeek Harness
+git clone --branch deepseek-harness --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git deepseek-feishu-bridge
+```
+
+Follow the short setup guide in [docs/BRANCHES.md](./docs/BRANCHES.md).
 
 A lightweight bot that bridges Feishu / Lark messenger with your local Claude Code or Codex CLI. Run one command, scan a QR code to bind a PersonalAgent app, and talk to your local coding agent from chat.
 
