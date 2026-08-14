@@ -19,7 +19,7 @@ The upstream project is MIT licensed. Keep the original `LICENSE` file and copyr
 Prerequisites: Git, Node.js 20.12 or newer, and a signed-in Antigravity CLI.
 
 ```powershell
-git clone --branch bridge/antigravity --single-branch https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git antigravity-feishu-bridge
+git clone --branch antigravity --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git antigravity-feishu-bridge
 cd .\antigravity-feishu-bridge
 corepack enable
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-antigravity-bridge.ps1
