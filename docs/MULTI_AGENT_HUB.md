@@ -15,7 +15,9 @@ does not replace, stop, migrate, or rewrite any existing bridge installation.
 - Hub bind default: loopback only (`127.0.0.1:17321`).
 - Hub storage: a separate append-only JSONL ledger.
 - Activation requires all four `LARK_COLLAB_*` variables in a bridge process.
-- No Hermes files, virtual environment, gateway, or command shim are touched.
+- Hermes source, virtual environment, configuration, sessions, memories, and
+  command shims are untouched. The pilot installs one additive Hook under
+  `HERMES_HOME\\hooks`; the stop script removes only that Hook.
 
 Removing this worktree or unsetting the four variables is a complete rollback.
 

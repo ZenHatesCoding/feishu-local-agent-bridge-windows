@@ -1,0 +1,5 @@
+name: feishu-collaboration-hub
+description: Injects authorized Feishu task context into Hermes and records final results.
+events:
+  - agent:start
+  - agent:end
