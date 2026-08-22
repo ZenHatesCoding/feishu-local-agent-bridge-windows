@@ -24,6 +24,7 @@ import {
   runServiceUnregister,
 } from './commands/service';
 import { runStart } from './commands/start';
+import { runCollaborationAction, runCollaborationHub } from './commands/hub';
 
 const program = new Command();
 
@@ -31,6 +32,38 @@ program
   .name('lark-channel-bridge')
   .description('Bridge Feishu/Lark messenger with local CLI coding agents')
   .version(pkg.version, '-v, --version');
+
+const hub = program
+  .command('hub')
+  .description('Run the experimental Feishu multi-agent collaboration control plane');
+
+hub
+  .command('run')
+  .description('Run the collaboration hub in the foreground')
+  .requiredOption('-c, --config <path>', 'path to collaboration hub config')
+  .action(async (opts: { config: string }) => {
+    await runCollaborationHub(opts);
+  });
+
+for (const action of ['handoff', 'ask', 'return', 'complete'] as const) {
+  hub
+    .command(action)
+    .description(`Submit a structured collaboration ${action} action`)
+    .requiredOption('--task <id>', 'collaboration task id')
+    .requiredOption('--actor <agent>', 'calling agent id')
+    .option('--target <agent>', 'target agent id (required for handoff and ask)')
+    .requiredOption('--content <text>', 'objective, question, result, or summary')
+    .option('--idempotency-key <key>', 'stable retry key; generated when omitted')
+    .action(async (opts: {
+      task: string;
+      actor: string;
+      target?: string;
+      content: string;
+      idempotencyKey?: string;
+    }) => {
+      await runCollaborationAction(action, opts);
+    });
+}
 
 // === process-level commands (work directly on bridge processes) ===
 

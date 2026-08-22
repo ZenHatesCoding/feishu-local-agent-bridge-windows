@@ -1,5 +1,9 @@
 # lark-channel-bridge
 
+> Experimental branch: the opt-in Feishu multi-agent control plane is documented
+> in [docs/MULTI_AGENT_HUB.md](./docs/MULTI_AGENT_HUB.md). It is disabled by
+> default and does not replace existing bridge processes.
+
 > Personal vibecoding fork note: this is a Windows personal-use adaptation built
 > together with Codex, not an attempt to present itself as the original project.
 > It is based on [`zarazhangrui/lark-coding-agent-bridge`](https://github.com/zarazhangrui/lark-coding-agent-bridge)

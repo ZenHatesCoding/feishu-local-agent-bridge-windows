@@ -69,6 +69,10 @@ import {
   CotPublisher,
   finalAnswerOnlyState,
 } from './cot';
+import {
+  bridgeCollaborationFromEnv,
+  type BridgeCollaborationAdapter,
+} from '../collab/bridge-adapter';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -186,6 +190,8 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
   // so /config bumps take effect for the next run.
   const pool = new ProcessPool(() => getMaxConcurrentRuns(controls.cfg));
   const executor = new RunExecutor({ agent, pool, activeRuns });
+  const collaboration = bridgeCollaborationFromEnv();
+  const collaborationPrompts = new Map<string, string>();
 
   // Resolve the App Secret to plaintext. The config field can be a literal
   // string, a "${VAR}" template, or a {source, id} SecretRef referencing
@@ -309,6 +315,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           activePolicyFingerprints,
           scope,
           mode,
+          collaborationPrompts,
         });
       } catch (err) {
         log.fail('flush', err);
@@ -339,6 +346,8 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           logThreadModeOverride,
           executor,
           pool,
+          collaboration,
+          collaborationPrompts,
         }),
       ).catch((err) => log.fail('intake', err));
     },
@@ -536,6 +545,8 @@ interface IntakeDeps {
   logThreadModeOverride: LogThreadModeOverride;
   executor: RunExecutor;
   pool: ProcessPool;
+  collaboration?: BridgeCollaborationAdapter;
+  collaborationPrompts: Map<string, string>;
 }
 
 type LogThreadModeOverride = (input: {
@@ -559,6 +570,8 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     logThreadModeOverride,
     executor,
     pool,
+    collaboration,
+    collaborationPrompts,
   } = deps;
   const preview = msg.content.length > 80 ? `${msg.content.slice(0, 80)}…` : msg.content;
   // Resolve scope (and underlying chat mode) once at intake — every
@@ -652,6 +665,18 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     return;
   }
 
+  if (collaboration) {
+    const decision = await collaboration.intake(msg);
+    log.info('collab', decision.respond ? 'routed' : 'recorded-only', {
+      scope,
+      taskId: decision.taskId,
+      dispatchId: decision.dispatchId,
+      reason: decision.reason,
+    });
+    if (!decision.respond) return;
+    if (decision.promptContext) collaborationPrompts.set(msg.messageId, decision.promptContext);
+  }
+
   const size = pending.push(scope, msg);
   log.info('intake', 'queued', { scope, queueSize: size, debounceMs: DEBOUNCE_MS });
 }
@@ -670,6 +695,7 @@ interface RunBatchDeps {
   activePolicyFingerprints: Map<string, string>;
   scope: string;
   mode: ChatMode;
+  collaborationPrompts?: Map<string, string>;
 }
 
 async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
@@ -687,6 +713,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     activePolicyFingerprints,
     scope,
     mode,
+    collaborationPrompts,
   } = deps;
   if (batch.length === 0) return;
   const firstMsg = batch[0];
@@ -738,7 +765,18 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     }
   }
 
-  const prompt = buildPrompt(batch, attachments, quotes, channel.botIdentity);
+  const collaborationContext = [...batch]
+    .reverse()
+    .map((message) => collaborationPrompts?.get(message.messageId))
+    .find((value): value is string => Boolean(value));
+  for (const message of batch) collaborationPrompts?.delete(message.messageId);
+  const prompt = buildPrompt(
+    batch,
+    attachments,
+    quotes,
+    channel.botIdentity,
+    collaborationContext,
+  );
   log.info('prompt', 'built', { promptChars: prompt.length, quotes: quotes.length });
 
   // For topic groups: thread the reply so it lands in the same topic as the
@@ -1380,6 +1418,7 @@ function buildPrompt(
   attachments: LocalAttachment[],
   quotes: QuotedContext[] = [],
   botIdentity?: { openId: string; name?: string },
+  collaborationContext?: string,
 ): string {
   const first = batch[0];
   if (!first) return '';
@@ -1406,7 +1445,7 @@ function buildPrompt(
   const senderType = senderTypeOf(first);
   const mentions = mergeMentions(batch);
 
-  return buildAgentPrompt({
+  const prompt = buildAgentPrompt({
     context: {
       chatId: first.chatId,
       chatType: first.chatType,
@@ -1425,6 +1464,7 @@ function buildPrompt(
     interactiveCards: batch.map(toPromptInteractiveCard).filter(isDefined),
     attachments: attachments.map(toPromptAttachment),
   });
+  return collaborationContext ? `${collaborationContext}\n\n${prompt}` : prompt;
 }
 
 /**

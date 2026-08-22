@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 17321
+  },
+  "ledgerPath": "../data/collaboration.jsonl",
+  "tokenEnv": "LARK_COLLAB_HUB_TOKEN",
+  "leaseMinutes": 30,
+  "maxHops": 8,
+  "agents": [
+    { "id": "world", "displayName": "World", "aliases": ["codex"] },
+    { "id": "justice", "displayName": "Justice", "aliases": ["antigravity"] },
+    { "id": "chariot", "displayName": "Chariot", "aliases": ["deepseek"] },
+    { "id": "fool", "displayName": "Fool", "aliases": ["hermes"] }
+  ]
+}
