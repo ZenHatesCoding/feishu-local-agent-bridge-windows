@@ -63,6 +63,17 @@ export class BridgeCollaborationAdapter {
     return this.acceptDispatch(msg, result.task.id, dispatch);
   }
 
+  async recordResult(taskId: string, content: string, runId: string): Promise<void> {
+    if (!content.trim()) return;
+    await this.client.submit({
+      type: 'return',
+      idempotencyKey: `agent-result:${this.agentId}:${runId}`,
+      taskId,
+      actorAgentId: this.agentId,
+      content,
+    });
+  }
+
   private async waitForDispatch(taskId: string): Promise<Dispatch | undefined> {
     for (let attempt = 0; attempt < 5; attempt++) {
       const pending = await this.client.dispatches(this.agentId);

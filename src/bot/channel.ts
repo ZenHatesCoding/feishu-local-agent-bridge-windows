@@ -191,7 +191,11 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
   const pool = new ProcessPool(() => getMaxConcurrentRuns(controls.cfg));
   const executor = new RunExecutor({ agent, pool, activeRuns });
   const collaboration = bridgeCollaborationFromEnv();
-  const collaborationPrompts = new Map<string, string>();
+  const collaborationRuns = new Map<string, {
+    promptContext: string;
+    taskId: string;
+    dispatchId?: string;
+  }>();
 
   // Resolve the App Secret to plaintext. The config field can be a literal
   // string, a "${VAR}" template, or a {source, id} SecretRef referencing
@@ -315,7 +319,8 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           activePolicyFingerprints,
           scope,
           mode,
-          collaborationPrompts,
+          collaboration,
+          collaborationRuns,
         });
       } catch (err) {
         log.fail('flush', err);
@@ -347,7 +352,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           executor,
           pool,
           collaboration,
-          collaborationPrompts,
+          collaborationRuns,
         }),
       ).catch((err) => log.fail('intake', err));
     },
@@ -546,7 +551,11 @@ interface IntakeDeps {
   executor: RunExecutor;
   pool: ProcessPool;
   collaboration?: BridgeCollaborationAdapter;
-  collaborationPrompts: Map<string, string>;
+  collaborationRuns: Map<string, {
+    promptContext: string;
+    taskId: string;
+    dispatchId?: string;
+  }>;
 }
 
 type LogThreadModeOverride = (input: {
@@ -571,7 +580,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     executor,
     pool,
     collaboration,
-    collaborationPrompts,
+    collaborationRuns,
   } = deps;
   const preview = msg.content.length > 80 ? `${msg.content.slice(0, 80)}…` : msg.content;
   // Resolve scope (and underlying chat mode) once at intake — every
@@ -674,7 +683,13 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
       reason: decision.reason,
     });
     if (!decision.respond) return;
-    if (decision.promptContext) collaborationPrompts.set(msg.messageId, decision.promptContext);
+    if (decision.promptContext && decision.taskId) {
+      collaborationRuns.set(msg.messageId, {
+        promptContext: decision.promptContext,
+        taskId: decision.taskId,
+        ...(decision.dispatchId ? { dispatchId: decision.dispatchId } : {}),
+      });
+    }
   }
 
   const size = pending.push(scope, msg);
@@ -695,7 +710,12 @@ interface RunBatchDeps {
   activePolicyFingerprints: Map<string, string>;
   scope: string;
   mode: ChatMode;
-  collaborationPrompts?: Map<string, string>;
+  collaboration?: BridgeCollaborationAdapter;
+  collaborationRuns?: Map<string, {
+    promptContext: string;
+    taskId: string;
+    dispatchId?: string;
+  }>;
 }
 
 async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
@@ -713,7 +733,8 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     activePolicyFingerprints,
     scope,
     mode,
-    collaborationPrompts,
+    collaboration,
+    collaborationRuns,
   } = deps;
   if (batch.length === 0) return;
   const firstMsg = batch[0];
@@ -765,17 +786,17 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     }
   }
 
-  const collaborationContext = [...batch]
+  const collaborationRun = [...batch]
     .reverse()
-    .map((message) => collaborationPrompts?.get(message.messageId))
-    .find((value): value is string => Boolean(value));
-  for (const message of batch) collaborationPrompts?.delete(message.messageId);
+    .map((message) => collaborationRuns?.get(message.messageId))
+    .find((value): value is NonNullable<typeof value> => Boolean(value));
+  for (const message of batch) collaborationRuns?.delete(message.messageId);
   const prompt = buildPrompt(
     batch,
     attachments,
     quotes,
     channel.botIdentity,
-    collaborationContext,
+    collaborationRun?.promptContext,
   );
   log.info('prompt', 'built', { promptChars: prompt.length, quotes: quotes.length });
 
@@ -914,6 +935,19 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   // never let that outbound API call block agent event draining.
   const reactionPromise =
     cotEnabled || replyMode === 'card' ? undefined : addWorkingReaction(channel, lastMsg.messageId);
+  let collaborationFinalState: RunState | undefined;
+
+  const recordCollaborationResult = async (state: RunState): Promise<void> => {
+    if (!collaboration || !collaborationRun || state.terminal !== 'done') return;
+    const body = renderText(finalAnswerOnlyState(state));
+    if (!body.trim()) return;
+    await collaboration.recordResult(collaborationRun.taskId, body, execution.runId);
+    log.info('collab', 'result-recorded', {
+      taskId: collaborationRun.taskId,
+      dispatchId: collaborationRun.dispatchId,
+      chars: body.length,
+    });
+  };
 
   try {
     if (cotEnabled) {
@@ -957,6 +991,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           sendOpts,
           cardRenderOptions,
         });
+        await recordCollaborationResult(finalState);
         return;
       }
       log.warn('cot', 'fallback-existing-reply', { reason: 'create-disabled' });
@@ -980,7 +1015,10 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
             await cardCtrl.update(renderCard(filterForPrefs(state), cardRenderOptions));
           }
         },
-      );
+      ).then((state) => {
+        collaborationFinalState = state;
+        return state;
+      });
       const streamDone = channel.stream(
         chatId,
         {
@@ -1025,7 +1063,10 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
             await markdownCtrl.setContent(renderText(filterForPrefs(state)));
           }
         },
-      );
+      ).then((state) => {
+        collaborationFinalState = state;
+        return state;
+      });
       const streamDone = channel.stream(
         chatId,
         {
@@ -1062,6 +1103,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         recordSession,
         async () => {},
       );
+      collaborationFinalState = finalState;
       await sendFinalReply({
         channel,
         chatId,
@@ -1072,6 +1114,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         cardRenderOptions,
       });
     }
+    if (collaborationFinalState) await recordCollaborationResult(collaborationFinalState);
   } catch (err) {
     log.fail('stream', err);
   } finally {

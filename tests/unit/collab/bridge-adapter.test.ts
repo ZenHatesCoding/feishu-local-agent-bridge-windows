@@ -53,7 +53,7 @@ function message(input: {
 
 describe('BridgeCollaborationAdapter', () => {
   it('injects shared context for a human assignment', async () => {
-    const { client } = await fixture();
+    const { hub, client } = await fixture();
     const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');
     const decision = await adapter.intake(message({
       id: 'human-1', senderType: 'user', senderId: 'user', content: 'Analyze deeply',
@@ -61,6 +61,9 @@ describe('BridgeCollaborationAdapter', () => {
     expect(decision).toMatchObject({ managed: true, respond: true });
     expect(decision.promptContext).toContain('collaboration_context');
     expect(decision.promptContext).toContain('Analyze deeply');
+    await adapter.recordResult(decision.taskId!, 'World accepted architecture A', 'run-1');
+    expect(JSON.stringify(hub.getContext(decision.taskId!, 'world')))
+      .toContain('World accepted architecture A');
   });
 
   it('requires a structured dispatch before accepting an agent mention', async () => {
