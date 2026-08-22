@@ -3,6 +3,8 @@
 > Experimental branch: the opt-in Feishu multi-agent control plane is documented
 > in [docs/MULTI_AGENT_HUB.md](./docs/MULTI_AGENT_HUB.md). It is disabled by
 > default and does not replace existing bridge processes.
+> The user-facing product goal and acceptance criteria are defined in
+> [docs/PRODUCT_VISION.zh-CN.md](./docs/PRODUCT_VISION.zh-CN.md).
 
 > Personal vibecoding fork note: this is a Windows personal-use adaptation built
 > together with Codex, not an attempt to present itself as the original project.

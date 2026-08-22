@@ -1,5 +1,8 @@
 # Feishu Multi-Agent Collaboration Hub (Experimental)
 
+> Product north star: [飞书多 Agent 协作：产品目标](./PRODUCT_VISION.zh-CN.md).
+> Architecture and implementation decisions must preserve that user experience.
+
 This branch develops a control plane for sequential collaboration between the
 World, Justice, Chariot, and Fool bridge bots. It is deliberately opt-in and
 does not replace, stop, migrate, or rewrite any existing bridge installation.
