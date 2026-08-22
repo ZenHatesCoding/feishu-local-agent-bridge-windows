@@ -8,6 +8,13 @@
   "tokenEnv": "LARK_COLLAB_HUB_TOKEN",
   "leaseMinutes": 30,
   "maxHops": 8,
+  "coordinator": {
+    "enabled": false,
+    "tenant": "feishu",
+    "appId": "cli_replace_with_coordinator_app_id",
+    "appSecretEnv": "LARK_COLLAB_COORDINATOR_SECRET",
+    "tenantKey": "replace-with-one-shared-tenant-key"
+  },
   "agents": [
     { "id": "world", "displayName": "World", "aliases": ["codex"] },
     { "id": "justice", "displayName": "Justice", "aliases": ["antigravity"] },

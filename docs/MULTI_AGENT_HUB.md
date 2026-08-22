@@ -109,11 +109,23 @@ Implemented in this branch:
 - authenticated loopback HTTP server and client;
 - optional bridge intake adapter and collaboration prompt injection;
 - CLI actions and unit coverage.
+- optional silent Feishu coordinator ingestion (one authoritative event stream).
 
-Before production rollout, add a fifth silent Feishu coordinator app that can
-read all messages in the collaboration group and normalize them into this Hub.
-That avoids relying on whichever execution bot happened to receive an event and
-provides one authoritative event stream. The coordinator must not run a model.
+For production rollout, create a fifth silent Feishu app, enable its group
+message receive event, grant it permission to receive every message in the
+collaboration group, and add it to that group. Put its App ID in the Hub config,
+keep its App Secret in `LARK_COLLAB_COORDINATOR_SECRET`, set `enabled` to `true`,
+and set every execution bridge to:
+
+```powershell
+$env:LARK_COLLAB_EVENT_SOURCE = 'coordinator'
+```
+
+This app never runs a model or replies. It normalizes all topic messages into
+the Hub before execution bots consume their authorized dispatches. Display
+names and configured aliases map structured Feishu mentions to agent IDs; add a
+bot's coordinator-visible open ID to its aliases if its display name is not
+stable.
 
 Hard confidentiality is outside this process boundary. All four current agents
 can access the local machine, so Hub visibility is logical routing, not an OS

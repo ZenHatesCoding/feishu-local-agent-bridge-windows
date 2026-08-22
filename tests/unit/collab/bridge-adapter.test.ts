@@ -99,4 +99,27 @@ describe('BridgeCollaborationAdapter', () => {
     delete (msg as { threadId?: string }).threadId;
     expect(await adapter.intake(msg)).toEqual({ managed: false, respond: true });
   });
+
+  it('lets the silent coordinator be the only event writer', async () => {
+    const { hub, client } = await fixture();
+    const address = { tenantKey: 'tenant', chatId: 'chat', threadId: 'topic' };
+    const routed = await hub.submit({
+      type: 'message',
+      idempotencyKey: 'feishu-message:coordinated',
+      address,
+      messageId: 'coordinated',
+      actor: { type: 'human', id: 'user' },
+      content: 'Coordinator saw this first',
+      targetAgentIds: ['chariot'],
+    });
+    const adapter = new BridgeCollaborationAdapter(client, 'chariot', 'tenant', 'coordinator');
+    const decision = await adapter.intake(message({
+      id: 'coordinated', senderType: 'user', senderId: 'user', content: 'Coordinator saw this first',
+    }));
+    expect(decision).toMatchObject({
+      managed: true,
+      respond: true,
+      taskId: routed.task.id,
+    });
+  });
 });

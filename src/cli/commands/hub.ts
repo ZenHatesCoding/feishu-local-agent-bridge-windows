@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { CollaborationClient } from '../../collab/client';
 import type { ActionInput } from '../../collab/types';
+import { startFeishuCoordinator } from '../../collab/coordinator';
 import { loadHubConfig } from '../../collab/config';
 import { CollaborationHub } from '../../collab/hub';
 import { JsonlLedger } from '../../collab/ledger';
@@ -22,9 +23,32 @@ export async function runCollaborationHub(options: { config: string }): Promise<
   const address = await server.listen();
   console.log(`Feishu collaboration hub listening on http://${address.host}:${address.port}`);
   console.log(`Ledger: ${config.ledgerPath}`);
+  const coordinatorConfig = config.coordinator?.enabled ? config.coordinator : undefined;
+  const coordinatorSecret = coordinatorConfig
+    ? process.env[coordinatorConfig.appSecretEnv]
+    : undefined;
+  if (coordinatorConfig && !coordinatorSecret) {
+    await server.close();
+    throw new Error(`coordinator secret environment variable is not set: ${coordinatorConfig.appSecretEnv}`);
+  }
+  let coordinator: Awaited<ReturnType<typeof startFeishuCoordinator>> | undefined;
+  try {
+    coordinator = coordinatorConfig
+      ? await startFeishuCoordinator(hub, {
+          tenant: coordinatorConfig.tenant,
+          appId: coordinatorConfig.appId,
+          appSecret: coordinatorSecret!,
+          tenantKey: coordinatorConfig.tenantKey,
+          agents: config.agents,
+        })
+      : undefined;
+  } catch (err) {
+    await server.close();
+    throw err;
+  }
 
   const stop = async (): Promise<void> => {
-    await server.close();
+    await Promise.all([server.close(), coordinator?.disconnect()]);
     process.exitCode = 0;
   };
   process.once('SIGINT', () => void stop());

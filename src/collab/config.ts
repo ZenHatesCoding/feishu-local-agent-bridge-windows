@@ -10,6 +10,13 @@ export interface HubConfig {
   leaseMinutes: number;
   maxHops: number;
   agents: AgentRegistration[];
+  coordinator?: {
+    enabled: boolean;
+    tenant: 'feishu' | 'lark';
+    appId: string;
+    appSecretEnv: string;
+    tenantKey: string;
+  };
 }
 
 export async function loadHubConfig(path: string): Promise<HubConfig> {
@@ -24,6 +31,15 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
     if (ids.has(agent.id)) throw new Error(`duplicate agent id: ${agent.id}`);
     ids.add(agent.id);
   }
+  if (parsed.coordinator?.enabled) {
+    const coordinator = parsed.coordinator;
+    if (!coordinator.appId || !coordinator.appSecretEnv || !coordinator.tenantKey) {
+      throw new Error('enabled coordinator requires appId, appSecretEnv, and tenantKey');
+    }
+    if (coordinator.tenant !== 'feishu' && coordinator.tenant !== 'lark') {
+      throw new Error('coordinator tenant must be feishu or lark');
+    }
+  }
   const base = dirname(resolve(path));
   return {
     schemaVersion: 1,
@@ -36,5 +52,6 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
     leaseMinutes: parsed.leaseMinutes ?? 30,
     maxHops: parsed.maxHops ?? 8,
     agents: parsed.agents,
+    ...(parsed.coordinator ? { coordinator: parsed.coordinator } : {}),
   };
 }

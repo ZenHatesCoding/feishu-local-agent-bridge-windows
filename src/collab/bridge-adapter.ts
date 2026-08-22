@@ -2,6 +2,7 @@ import type { NormalizedMessage } from '@larksuite/channel';
 import { buildCollaborationContext } from './context';
 import { CollaborationClient } from './client';
 import type { Dispatch } from './types';
+import { taskIdFor } from './task-id';
 
 export interface BridgeCollaborationDecision {
   managed: boolean;
@@ -17,11 +18,20 @@ export class BridgeCollaborationAdapter {
     private readonly client: CollaborationClient,
     private readonly agentId: string,
     private readonly tenantKey: string,
+    private readonly eventSource: 'distributed' | 'coordinator' = 'distributed',
   ) {}
 
   async intake(msg: NormalizedMessage): Promise<BridgeCollaborationDecision> {
     if (msg.chatType === 'p2p' || !msg.threadId) return { managed: false, respond: true };
     const actorType = senderTypeOf(msg);
+    if (this.eventSource === 'coordinator') {
+      const taskId = taskIdFor({ tenantKey: this.tenantKey, chatId: msg.chatId, threadId: msg.threadId });
+      const dispatch = await this.waitForDispatch(taskId);
+      if (!dispatch) {
+        return { managed: true, respond: false, taskId, reason: 'coordinator has no authorized dispatch' };
+      }
+      return this.acceptDispatch(msg, taskId, dispatch);
+    }
     const result = await this.client.submit({
       type: 'message',
       idempotencyKey: `feishu-message:${msg.messageId}`,
@@ -50,7 +60,25 @@ export class BridgeCollaborationAdapter {
       };
     }
 
-    const context = await this.client.context(result.task.id, this.agentId);
+    return this.acceptDispatch(msg, result.task.id, dispatch);
+  }
+
+  private async waitForDispatch(taskId: string): Promise<Dispatch | undefined> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const pending = await this.client.dispatches(this.agentId);
+      const dispatch = latestPendingForTask(pending.dispatches, taskId);
+      if (dispatch) return dispatch;
+      if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return undefined;
+  }
+
+  private async acceptDispatch(
+    msg: NormalizedMessage,
+    taskId: string,
+    dispatch: Dispatch,
+  ): Promise<BridgeCollaborationDecision> {
+    const context = await this.client.context(taskId, this.agentId);
     await this.client.acknowledge(dispatch.id, {
       agentId: this.agentId,
       status: 'accepted',
@@ -60,11 +88,11 @@ export class BridgeCollaborationAdapter {
       managed: true,
       respond: true,
       promptContext: buildCollaborationContext({
-        task: context.task,
+      task: context.task,
         dispatch,
         entries: context.entries,
       }),
-      taskId: result.task.id,
+      taskId,
       dispatchId: dispatch.id,
     };
   }
@@ -75,6 +103,7 @@ export function bridgeCollaborationFromEnv(): BridgeCollaborationAdapter | undef
   const token = process.env.LARK_COLLAB_HUB_TOKEN;
   const agentId = process.env.LARK_COLLAB_AGENT_ID;
   const tenantKey = process.env.LARK_COLLAB_TENANT_KEY;
+  const eventSource = process.env.LARK_COLLAB_EVENT_SOURCE ?? 'distributed';
   const values = [url, token, agentId, tenantKey];
   if (values.every((value) => !value)) return undefined;
   if (values.some((value) => !value)) {
@@ -83,10 +112,14 @@ export function bridgeCollaborationFromEnv(): BridgeCollaborationAdapter | undef
       'LARK_COLLAB_AGENT_ID, and LARK_COLLAB_TENANT_KEY',
     );
   }
+  if (eventSource !== 'distributed' && eventSource !== 'coordinator') {
+    throw new Error('LARK_COLLAB_EVENT_SOURCE must be distributed or coordinator');
+  }
   return new BridgeCollaborationAdapter(
     new CollaborationClient({ baseUrl: url!, token: token! }),
     agentId!,
     tenantKey!,
+    eventSource,
   );
 }
 
