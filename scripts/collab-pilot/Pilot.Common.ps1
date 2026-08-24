@@ -57,7 +57,7 @@ function Invoke-CollabCommand([object]$Command, [string]$Description) {
   if ($workingDirectory) { Push-Location -LiteralPath $workingDirectory }
   try {
     & $filePath @arguments
-    if ($LASTEXITCODE -ne 0) { throw "$Description failed with exit code $LASTEXITCODE." }
+    if ($LASTEXITCODE -ne 0 -and !$Command.ignoreExitCode) { throw "$Description failed with exit code $LASTEXITCODE." }
   } finally {
     if ($workingDirectory) { Pop-Location }
   }

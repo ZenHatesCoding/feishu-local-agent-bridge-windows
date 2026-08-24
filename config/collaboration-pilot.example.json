@@ -14,7 +14,7 @@
         "environment": { "LARK_CHANNEL_HOME": "C:\\path\\to\\planner-profile", "LARK_CHANNEL_CODEX_BIN": "C:\\path\\to\\codex.cmd" }
       },
       "original": {
-        "stop": { "filePath": "powershell.exe", "arguments": ["-NoProfile", "-File", "C:\\path\\to\\stop-original.ps1"] },
+        "stop": { "filePath": "powershell.exe", "arguments": ["-NoProfile", "-File", "C:\\path\\to\\stop-original.ps1"], "ignoreExitCode": true },
         "start": { "filePath": "powershell.exe", "arguments": ["-NoProfile", "-File", "C:\\path\\to\\start-original.ps1"] }
       }
     },

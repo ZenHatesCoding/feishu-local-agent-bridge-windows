@@ -67,6 +67,7 @@ notepad .\.runtime\pilot.local.json
 - `displayName` 和 `aliases` 用于解析 Agent 之间的委派目标。
 - `launch` 必须启动已经接入本项目 Hub 协议的 bridge。
 - `original.stop/start` 可选。配置后，切换到协作 bridge 前会停止旧监听器；回退时可恢复旧监听器，避免同一个飞书 App 同时被两份进程消费。
+- 停止命令在“原 bridge 本来就没运行”时可能返回非零，可对 `original.stop` 设置 `"ignoreExitCode": true`；恢复命令不建议忽略失败。
 - `hermesHook` 仅用于 Hermes。启用后只复制本项目 Hook 到指定 Hermes Home，停止时只删除该 Hook，不修改源码、venv、配置、记忆或技能。
 - `enabled: false` 可保留尚未准备好的 Agent，不会加入 Hub 或被启动。
 
