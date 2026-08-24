@@ -156,6 +156,61 @@ describe('CollaborationHub', () => {
     expect(replayed.listDispatches('world')).toHaveLength(1);
   });
 
+  it('shares durable artifacts with later participants and replays them', async () => {
+    const { hub, path, options } = await fixture();
+    const assigned = await hub.submit(humanMessage());
+    await hub.submit({
+      type: 'artifact',
+      idempotencyKey: 'artifact-1',
+      taskId: assigned.task.id,
+      actorAgentId: 'world',
+      artifact: {
+        id: 'artifact_abc',
+        name: 'architecture.pptx',
+        kind: 'presentation',
+        localPath: 'C:\\shared\\architecture.pptx',
+        sha256: 'a'.repeat(64),
+        size: 4096,
+      },
+    });
+    await hub.submit(humanMessage({
+      idempotencyKey: 'msg-chariot',
+      messageId: 'om_chariot',
+      content: 'Continue from the presentation',
+      targetAgentIds: ['chariot'],
+    }));
+
+    expect(hub.getArtifacts(assigned.task.id, 'chariot')).toMatchObject([{
+      name: 'architecture.pptx',
+      localPath: 'C:\\shared\\architecture.pptx',
+    }]);
+    const replayed = new CollaborationHub(new JsonlLedger(path), options);
+    await replayed.initialize();
+    expect(replayed.getArtifacts(assigned.task.id, 'chariot')).toHaveLength(1);
+  });
+
+  it('filters targeted artifacts from unrelated participants', async () => {
+    const { hub } = await fixture();
+    const assigned = await hub.submit(humanMessage({ targetAgentIds: ['world', 'chariot'] }));
+    await hub.submit({
+      type: 'artifact',
+      idempotencyKey: 'artifact-targeted',
+      taskId: assigned.task.id,
+      actorAgentId: 'world',
+      visibility: { kind: 'targeted', agents: ['world'] },
+      artifact: {
+        id: 'artifact_private',
+        name: 'world-only.txt',
+        kind: 'document',
+        localPath: 'C:\\shared\\world-only.txt',
+        sha256: 'b'.repeat(64),
+        size: 10,
+      },
+    });
+    expect(hub.getArtifacts(assigned.task.id, 'world')).toHaveLength(1);
+    expect(hub.getArtifacts(assigned.task.id, 'chariot')).toEqual([]);
+  });
+
   it('rejects actions after the owner lease expires', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'collab-hub-expiry-'));
     let now = new Date('2026-08-22T08:00:00.000Z');

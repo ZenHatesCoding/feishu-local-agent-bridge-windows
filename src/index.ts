@@ -32,8 +32,10 @@ export {
 } from './collab/coordinator';
 export { buildCollaborationContext } from './collab/context';
 export { taskIdFor, validateTaskAddress } from './collab/task-id';
+export { snapshotArtifact } from './collab/artifact-store';
 export type {
   ActionInput,
+  ArtifactInput,
   AgentRegistration,
   ContextEntry,
   ContextVisibility,
@@ -41,6 +43,7 @@ export type {
   HubInput,
   HubResult,
   MessageInput,
+  SharedArtifact,
   TaskAddress,
   TaskProjection,
 } from './collab/types';

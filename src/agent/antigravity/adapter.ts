@@ -104,6 +104,7 @@ export class AntigravityAdapter implements AgentAdapter {
       cwd: opts.cwd,
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.larkChannel),
+        ...opts.env,
         LARK_CHANNEL_ANTIGRAVITY_BRIDGE: '1',
         PATH: antigravityPath(this.larkChannel, process.env.PATH),
         HERMES_HOME: undefined,
@@ -162,8 +163,9 @@ function antigravityPath(
   context: LarkChannelEnvContext | undefined,
   basePath: string | undefined,
 ): string | undefined {
-  if (!context?.rootDir) return basePath;
-  return [join(dirname(context.rootDir), 'bin'), basePath].filter(Boolean).join(delimiter);
+  const proxy = process.env.LARK_COLLAB_COMMAND_DIR;
+  if (!context?.rootDir) return [proxy, basePath].filter(Boolean).join(delimiter);
+  return [proxy, join(dirname(context.rootDir), 'bin'), basePath].filter(Boolean).join(delimiter);
 }
 
 async function* createEventStream(

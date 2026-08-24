@@ -149,7 +149,7 @@ export function prefixBridgeSystemPrompt(
 
 const FILE_SENDING_PROMPT = `## Sending files and images
 
-When the user asks you to create and send a file, first create the local file in the current working directory, then send it with the current profile's lark-cli:
+When the user asks you to create and send a file, first create the local file in the current working directory. If a \`collaboration_context\` is present, use its \`collab-artifact.cmd publish\` command so later agents receive a durable shared copy. Otherwise send it with the current profile's lark-cli:
 
 - Send to the current chat: \`lark-cli im +messages-send --chat-id <bridge_context.chatId> --file <local_path>\`
 - Reply to the current message: \`lark-cli im +messages-reply --message-id <bridge_context.messageId> --file <local_path>\`

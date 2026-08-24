@@ -1,4 +1,13 @@
-import type { ActionInput, ContextEntry, Dispatch, HubResult, MessageInput, TaskProjection } from './types';
+import type {
+  ActionInput,
+  ArtifactInput,
+  ContextEntry,
+  Dispatch,
+  HubResult,
+  MessageInput,
+  SharedArtifact,
+  TaskProjection,
+} from './types';
 
 export interface CollaborationClientOptions {
   baseUrl: string;
@@ -15,13 +24,14 @@ export class CollaborationClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  submit(input: MessageInput | ActionInput): Promise<HubResult> {
+  submit(input: MessageInput | ActionInput | ArtifactInput): Promise<HubResult> {
     return this.request('/v1/events', { method: 'POST', body: input });
   }
 
   context(taskId: string, agentId: string, after = 0): Promise<{
     task: TaskProjection;
     entries: ContextEntry[];
+    artifacts: SharedArtifact[];
   }> {
     return this.request(
       `/v1/tasks/${encodeURIComponent(taskId)}/context?agentId=${encodeURIComponent(agentId)}&after=${after}`,

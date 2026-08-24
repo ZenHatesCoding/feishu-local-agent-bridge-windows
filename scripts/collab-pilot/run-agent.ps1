@@ -10,12 +10,17 @@ $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $StateDir = Join-Path $RepoRoot '.runtime'
 $TokenFile = Join-Path $StateDir 'hub-token.txt'
 $TenantFile = Join-Path $StateDir 'tenant-key.txt'
+$CommandDir = Join-Path $RepoRoot 'scripts\collab-pilot\bin'
 
 $env:LARK_COLLAB_HUB_URL = 'http://127.0.0.1:17321'
 $env:LARK_COLLAB_HUB_TOKEN = (Get-Content -LiteralPath $TokenFile -Raw).Trim()
 $env:LARK_COLLAB_TENANT_KEY = (Get-Content -LiteralPath $TenantFile -Raw).Trim()
 $env:LARK_COLLAB_AGENT_ID = $Agent
 $env:LARK_COLLAB_EVENT_SOURCE = 'distributed'
+$env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $StateDir 'artifacts'
+$env:LARK_COLLAB_COMMAND_DIR = $CommandDir
+$env:LARK_COLLAB_REAL_LARK_CLI_JS = 'C:\Users\ZhenpingXing\.trae-cn\binaries\node\versions\24.14.0\node_modules\@larksuite\cli\scripts\run.js'
+$env:PATH = "$CommandDir;$env:PATH"
 $env:LARK_CHANNEL_DISABLE_PROXY = '1'
 Remove-Item Env:HTTP_PROXY -ErrorAction SilentlyContinue
 Remove-Item Env:HTTPS_PROXY -ErrorAction SilentlyContinue

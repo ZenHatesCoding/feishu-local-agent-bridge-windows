@@ -1,7 +1,9 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { spawnProcessSync } from '../../platform/spawn';
 import { CollaborationClient } from '../../collab/client';
 import type { ActionInput } from '../../collab/types';
+import { snapshotArtifact } from '../../collab/artifact-store';
 import { startFeishuCoordinator } from '../../collab/coordinator';
 import { loadHubConfig } from '../../collab/config';
 import { CollaborationHub } from '../../collab/hub';
@@ -83,4 +85,116 @@ export async function runCollaborationAction(
     content: options.content,
   });
   console.log(JSON.stringify({ task: result.task, dispatches: result.dispatches }, null, 2));
+}
+
+export async function runArtifactPublish(options: {
+  task: string;
+  actor: string;
+  path: string;
+  chatId?: string;
+  replyTo?: string;
+  replyInThread?: boolean;
+  name?: string;
+}): Promise<void> {
+  const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');
+  const token = requiredEnv('LARK_COLLAB_HUB_TOKEN');
+  const artifactRoot = requiredEnv('LARK_COLLAB_ARTIFACT_ROOT');
+  const larkCliJs = requiredEnv('LARK_COLLAB_REAL_LARK_CLI_JS');
+  if (!options.chatId && !options.replyTo) throw new Error('--chat-id or --reply-to is required');
+
+  const sourcePath = resolve(options.path);
+  const artifact = await snapshotArtifact({
+    sourcePath,
+    root: artifactRoot,
+    taskId: options.task,
+    originalName: options.name,
+  });
+  const sendIdempotencyKey = `collab-${options.task.slice(-12)}-${options.actor}-${artifact.sha256.slice(0, 24)}`;
+  const args = options.replyTo
+    ? [
+        larkCliJs,
+        'im',
+        '+messages-reply',
+        '--message-id',
+        options.replyTo,
+        '--file',
+        artifact.name,
+        '--idempotency-key',
+        sendIdempotencyKey,
+        ...(options.replyInThread ? ['--reply-in-thread'] : []),
+        '--json',
+      ]
+    : [
+        larkCliJs,
+        'im',
+        '+messages-send',
+        '--chat-id',
+        options.chatId!,
+        '--file',
+        artifact.name,
+        '--idempotency-key',
+        sendIdempotencyKey,
+        '--json',
+      ];
+  const send = spawnProcessSync(process.execPath, args, {
+    cwd: dirname(artifact.localPath),
+    env: process.env,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (send.stdout) process.stdout.write(String(send.stdout));
+  if (send.stderr) process.stderr.write(String(send.stderr));
+  if (send.error) throw send.error;
+  if (send.status !== 0) throw new Error(`lark-cli file send failed with exit code ${send.status}`);
+
+  const output = parseJsonOutput(String(send.stdout ?? ''));
+  const published = {
+    ...artifact,
+    ...optionalStringField(output, ['message_id', 'messageId'], 'sourceMessageId'),
+    ...optionalStringField(output, ['file_key', 'fileKey'], 'sourceFileKey'),
+  };
+  const client = new CollaborationClient({ baseUrl, token });
+  await client.submit({
+    type: 'artifact',
+    idempotencyKey: `artifact-publish:${options.task}:${options.actor}:${artifact.id}`,
+    taskId: options.task,
+    actorAgentId: options.actor,
+    artifact: published,
+  });
+  process.stdout.write(`${JSON.stringify({ sharedArtifact: published }, null, 2)}\n`);
+}
+
+function requiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function parseJsonOutput(output: string): unknown {
+  try {
+    return JSON.parse(output);
+  } catch {
+    return undefined;
+  }
+}
+
+function optionalStringField(
+  value: unknown,
+  keys: string[],
+  outputKey: 'sourceMessageId' | 'sourceFileKey',
+): Partial<Record<'sourceMessageId' | 'sourceFileKey', string>> {
+  const found = findString(value, new Set(keys));
+  return found ? { [outputKey]: found } : {};
+}
+
+function findString(value: unknown, keys: ReadonlySet<string>): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  for (const [key, child] of Object.entries(value)) {
+    if (keys.has(key) && typeof child === 'string' && child.trim()) return child;
+  }
+  for (const child of Object.values(value)) {
+    const found = findString(child, keys);
+    if (found) return found;
+  }
+  return undefined;
 }

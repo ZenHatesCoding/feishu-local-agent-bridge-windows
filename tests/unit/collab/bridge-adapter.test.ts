@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { NormalizedMessage } from '@larksuite/channel';
@@ -64,6 +64,36 @@ describe('BridgeCollaborationAdapter', () => {
     await adapter.recordResult(decision.taskId!, 'World accepted architecture A', 'run-1');
     expect(JSON.stringify(hub.getContext(decision.taskId!, 'world')))
       .toContain('World accepted architecture A');
+  });
+
+  it('snapshots accepted inbound attachments into shared task context', async () => {
+    const { hub, client } = await fixture();
+    const root = await mkdtemp(join(tmpdir(), 'collab-inbound-artifact-'));
+    const source = join(root, 'input.pdf');
+    await writeFile(source, 'pdf bytes');
+    const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant', 'distributed', join(root, 'shared'));
+    const decision = await adapter.intake(message({
+      id: 'human-file', senderType: 'user', senderId: 'user', content: 'Review this file',
+    }));
+    await adapter.recordAttachments(decision.taskId!, [{
+      absPath: source,
+      path: source,
+      kind: 'file',
+      size: 9,
+      mime: 'application/pdf',
+      hash: 'input-hash',
+      source: 'lark',
+      sourceMessageId: 'human-file',
+      sourceFileKey: 'file_key',
+      originalName: 'input.pdf',
+      requiredness: 'optional',
+      decision: 'accepted',
+    }]);
+    expect(hub.getArtifacts(decision.taskId!, 'world')).toMatchObject([{
+      name: 'input.pdf',
+      sourceMessageId: 'human-file',
+      sourceFileKey: 'file_key',
+    }]);
   });
 
   it('requires a structured dispatch before accepting an agent mention', async () => {

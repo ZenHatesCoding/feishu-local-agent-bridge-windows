@@ -23,6 +23,7 @@ export interface SubmitRunInput {
   model?: string;
   images?: readonly string[];
   stopGraceMs?: number;
+  env?: NodeJS.ProcessEnv;
   nowait?: boolean;
   observability?: {
     profile: string;
@@ -104,6 +105,7 @@ export class RunExecutor {
       sandbox: input.policy.sandbox,
       permissionMode: input.policy.permissionMode,
       stopGraceMs: input.stopGraceMs,
+      env: input.env,
     };
     let run: AgentRun;
     try {

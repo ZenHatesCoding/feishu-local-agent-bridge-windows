@@ -118,6 +118,8 @@ Implemented in this branch:
 - optional bridge intake adapter and collaboration prompt injection;
 - CLI actions and unit coverage.
 - optional silent Feishu coordinator ingestion (one authoritative event stream).
+- content-addressed shared artifact snapshots with visibility filtering, inbound
+  attachment capture, and atomic Feishu publish-and-register commands.
 
 For production rollout, create a fifth silent Feishu app, enable its group
 message receive event, grant it permission to receive every message in the

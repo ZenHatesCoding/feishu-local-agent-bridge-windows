@@ -18,6 +18,9 @@ describe('collaboration design and Windows operations contract', () => {
       'secret',
       'collaboration_context',
       '不是操作系统强隔离',
+      '文件不是文字附注，而是一等共享产物',
+      'collab-artifact.cmd publish',
+      'SHA-256',
     ]) {
       expect(design).toContain(phrase);
     }

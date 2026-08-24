@@ -11,6 +11,7 @@
 - Hermes 原源码、venv、配置、会话、记忆和技能不改动。
 - 唯一写入 Hermes Home 的内容是 `hooks\\feishu-collaboration-hub`，停止脚本只删除这一项。
 - Hub token、PID、日志和事务账本位于仓库忽略的 `.runtime`。
+- Agent 交付文件的持久共享副本位于 `.runtime\\artifacts\\<taskId>`。
 
 完整设计说明：[`docs/DESIGN.zh-CN.md`](../../docs/DESIGN.zh-CN.md)
 

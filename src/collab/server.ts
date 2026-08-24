@@ -55,7 +55,11 @@ export class CollaborationHubServer {
         const taskId = decodeURIComponent(contextMatch[1]!);
         const task = this.hub.getTask(taskId);
         if (!task) return json(res, 404, { error: 'task not found' });
-        return json(res, 200, { task, entries: this.hub.getContext(taskId, agentId, after) });
+        return json(res, 200, {
+          task,
+          entries: this.hub.getContext(taskId, agentId, after),
+          artifacts: this.hub.getArtifacts(taskId, agentId),
+        });
       }
       const dispatchListMatch = url.pathname.match(/^\/v1\/dispatches\/agents\/([^/]+)$/);
       if (req.method === 'GET' && dispatchListMatch) {

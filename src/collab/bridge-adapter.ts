@@ -2,6 +2,8 @@ import type { NormalizedMessage } from '@larksuite/channel';
 import { buildCollaborationContext } from './context';
 import { CollaborationClient } from './client';
 import type { Dispatch } from './types';
+import type { NormalizedAttachment } from '../media/attachment';
+import { snapshotArtifact } from './artifact-store';
 import { taskIdFor } from './task-id';
 
 export interface BridgeCollaborationDecision {
@@ -19,6 +21,7 @@ export class BridgeCollaborationAdapter {
     private readonly agentId: string,
     private readonly tenantKey: string,
     private readonly eventSource: 'distributed' | 'coordinator' = 'distributed',
+    private readonly artifactRoot?: string,
   ) {}
 
   async intake(msg: NormalizedMessage): Promise<BridgeCollaborationDecision> {
@@ -74,6 +77,30 @@ export class BridgeCollaborationAdapter {
     });
   }
 
+  async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {
+    if (!this.artifactRoot) return;
+    for (const attachment of attachments) {
+      if (attachment.decision !== 'accepted') continue;
+      const artifact = await snapshotArtifact({
+        sourcePath: attachment.absPath,
+        root: this.artifactRoot,
+        taskId,
+        originalName: attachment.originalName,
+        kind: attachment.kind,
+        mime: attachment.mime,
+        sourceMessageId: attachment.sourceMessageId,
+        sourceFileKey: attachment.sourceFileKey,
+      });
+      await this.client.submit({
+        type: 'artifact',
+        idempotencyKey: `artifact-inbound:${taskId}:${artifact.id}`,
+        taskId,
+        actorAgentId: this.agentId,
+        artifact,
+      });
+    }
+  }
+
   private async waitForDispatch(taskId: string): Promise<Dispatch | undefined> {
     for (let attempt = 0; attempt < 5; attempt++) {
       const pending = await this.client.dispatches(this.agentId);
@@ -101,7 +128,8 @@ export class BridgeCollaborationAdapter {
       promptContext: buildCollaborationContext({
       task: context.task,
         dispatch,
-        entries: context.entries,
+      entries: context.entries,
+      artifacts: context.artifacts,
       }),
       taskId,
       dispatchId: dispatch.id,
@@ -131,6 +159,7 @@ export function bridgeCollaborationFromEnv(): BridgeCollaborationAdapter | undef
     agentId!,
     tenantKey!,
     eventSource,
+    process.env.LARK_COLLAB_ARTIFACT_ROOT,
   );
 }
 

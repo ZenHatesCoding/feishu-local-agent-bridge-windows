@@ -1,10 +1,11 @@
 import { promptSection } from '../agent/prompt';
-import type { ContextEntry, Dispatch, TaskProjection } from './types';
+import type { ContextEntry, Dispatch, SharedArtifact, TaskProjection } from './types';
 
 export function buildCollaborationContext(input: {
   task: TaskProjection;
   dispatch: Dispatch;
   entries: ContextEntry[];
+  artifacts?: SharedArtifact[];
 }): string {
   return promptSection('collaboration_context', {
     contract: {
@@ -18,8 +19,11 @@ export function buildCollaborationContext(input: {
         'After the command succeeds, use a real Feishu @ in this topic to wake the target. Plain text @ alone is not authorization.',
         'For an ask, the target records its answer with hub return, then really @ mentions the current owner.',
         'Complete only the assigned objective and return structured results and artifact paths.',
+        `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>" --reply-in-thread. Do not use raw lark-cli --file in a collaboration task.`,
+        'Files listed in artifacts are durable shared copies. Read localPath directly and verify sha256 when integrity matters.',
       ],
     },
+    artifacts: input.artifacts ?? [],
     entries: input.entries,
   });
 }

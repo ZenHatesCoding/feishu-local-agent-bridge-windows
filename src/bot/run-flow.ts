@@ -34,6 +34,7 @@ export interface StartRunFlowInput {
   executor: RunExecutor;
   now: number;
   stopGraceMs?: number;
+  env?: NodeJS.ProcessEnv;
   observability?: {
     profile: string;
     agent: string;
@@ -151,6 +152,7 @@ export async function startRunFlow(input: StartRunFlowInput): Promise<StartRunFl
               .filter((path): path is string => Boolean(path))
           : undefined,
       stopGraceMs: input.stopGraceMs,
+      env: input.env,
       observability: input.observability,
     });
   } catch (err) {

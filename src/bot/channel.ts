@@ -791,6 +791,9 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     .map((message) => collaborationRuns?.get(message.messageId))
     .find((value): value is NonNullable<typeof value> => Boolean(value));
   for (const message of batch) collaborationRuns?.delete(message.messageId);
+  if (collaboration && collaborationRun && attachments.length > 0) {
+    await collaboration.recordAttachments(collaborationRun.taskId, attachments);
+  }
   const prompt = buildPrompt(
     batch,
     attachments,
@@ -846,6 +849,12 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     executor,
     now: Date.now(),
     stopGraceMs: getAgentStopGraceMs(controls.cfg),
+    env: collaborationRun ? {
+      LARK_COLLAB_TASK_ID: collaborationRun.taskId,
+      LARK_COLLAB_CHAT_ID: chatId,
+      ...(threadId ? { LARK_COLLAB_THREAD_ID: threadId } : {}),
+      LARK_COLLAB_REPLY_TO: lastMsg.messageId,
+    } : undefined,
     observability: {
       profile: controls.profile,
       agent: capability.agentId,

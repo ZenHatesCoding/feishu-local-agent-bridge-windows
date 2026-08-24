@@ -24,6 +24,14 @@ C:\feishu-multi-agent-hub
 Hub 只监听 `127.0.0.1:17321`。token、PID、日志和任务账本位于
 `C:\feishu-multi-agent-hub\.runtime`，该目录不会提交 Git。
 
+共享文件快照位于：
+
+```text
+C:\feishu-multi-agent-hub\.runtime\artifacts\<taskId>
+```
+
+该目录是协作任务的持久产物库。普通启停和回退不会删除它。
+
 ## 第一次使用前检查
 
 打开 PowerShell：
@@ -231,6 +239,27 @@ Start-Process -WindowStyle Hidden -FilePath powershell.exe `
 
 第二个 Agent 能准确复用第一个 Agent 的结论和产物，且不同话题不串线，才算核心
 链路通过。
+
+文件交接验收可以这样做：
+
+1. 在新话题 `@World`：创建一个两页 PPT，发到本话题，并说明文件名。
+2. World 发出文件后，在同一话题 `@Chariot`：读取 World 刚才的 PPT，增加一页，
+   另存为新文件并发回来。
+3. 检查 `.runtime\artifacts` 下出现两个以 SHA-256 为目录名的 PPT 共享副本。
+
+手工发布一个已存在文件时，可以使用 Agent 在上下文中收到的 task ID：
+
+```powershell
+.\scripts\collab-pilot\bin\collab-artifact.cmd publish `
+  --task task_xxx `
+  --actor world `
+  --path C:\project\report.pptx `
+  --reply-to om_xxx `
+  --reply-in-thread
+```
+
+这条命令使用当前进程的飞书 profile 身份。不要在普通未绑定的 PowerShell 窗口中
+伪造 Hub token；正常情况下由 Agent 在 bridge 子进程内调用。
 
 ## 常见故障
 

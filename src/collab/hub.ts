@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { taskIdFor } from './task-id';
 import type {
   ActionInput,
+  ArtifactInput,
   AgentId,
   AgentRegistration,
   ContextEntry,
@@ -12,6 +13,7 @@ import type {
   LedgerEvent,
   LedgerRecord,
   MessageInput,
+  SharedArtifact,
   TaskProjection,
 } from './types';
 import { JsonlLedger } from './ledger';
@@ -102,6 +104,16 @@ export class CollaborationHub {
       }));
   }
 
+  getArtifacts(taskId: string, agentId: string): SharedArtifact[] {
+    const artifacts = new Map<string, SharedArtifact>();
+    for (const entry of this.getContext(taskId, agentId)) {
+      if (entry.event.kind === 'artifact') {
+        artifacts.set(entry.event.artifact.id, structuredClone(entry.event.artifact));
+      }
+    }
+    return [...artifacts.values()];
+  }
+
   private async submitInternal(input: HubInput): Promise<HubResult> {
     this.validateInput(input);
     const previousTaskId = this.idempotency.get(input.idempotencyKey);
@@ -126,7 +138,9 @@ export class CollaborationHub {
 
     const records = input.type === 'message'
       ? this.recordsForMessage(taskId, input)
-      : this.recordsForAction(task!, input);
+      : input.type === 'artifact'
+        ? this.recordsForArtifact(task!, input)
+        : this.recordsForAction(task!, input);
     await this.commit(records);
     const resultTask = this.tasks.get(taskId);
     if (!resultTask) throw new Error('task projection was not created');
@@ -234,6 +248,20 @@ export class CollaborationHub {
     return records;
   }
 
+  private recordsForArtifact(task: TaskProjection, input: ArtifactInput): LedgerRecord[] {
+    this.requireAgent(input.actorAgentId);
+    if (!task.participants.includes(input.actorAgentId)) {
+      throw new Error('only a task participant may publish an artifact');
+    }
+    return [this.record(input.idempotencyKey, task.id, {
+      kind: 'artifact',
+      actorAgentId: input.actorAgentId,
+      artifact: structuredClone(input.artifact),
+      occurredAt: input.occurredAt ?? this.now().toISOString(),
+      visibility: input.visibility ?? { kind: 'task-public' },
+    })];
+  }
+
   private dispatchRecord(
     baseKey: string,
     taskId: string,
@@ -310,6 +338,8 @@ export class CollaborationHub {
     } else if (event.kind === 'action') {
       addParticipant(task, event.actorAgentId);
       if (event.targetAgentId) addParticipant(task, event.targetAgentId);
+    } else if (event.kind === 'artifact') {
+      addParticipant(task, event.actorAgentId);
     } else if (event.kind === 'dispatch') {
       task.lastDispatchHop = Math.max(task.lastDispatchHop, event.hop);
       addParticipant(task, event.targetAgentId);
@@ -334,12 +364,21 @@ export class CollaborationHub {
 
   private validateInput(input: HubInput): void {
     if (!input.idempotencyKey.trim()) throw new Error('idempotencyKey is required');
-    if (!input.content.trim() && input.type !== 'return') throw new Error('content is required');
+    if (input.type !== 'artifact' && !input.content.trim() && input.type !== 'return') {
+      throw new Error('content is required');
+    }
     if (input.type === 'message') {
       for (const agentId of input.targetAgentIds) this.requireAgent(agentId);
       if (input.visibility?.kind === 'secret') {
         throw new Error('secret content must not be submitted to the collaboration hub');
       }
+    } else if (input.type === 'artifact') {
+      const artifact = input.artifact;
+      if (!artifact.id.trim() || !artifact.name.trim() || !artifact.localPath.trim()) {
+        throw new Error('artifact id, name, and localPath are required');
+      }
+      if (!/^[a-f0-9]{64}$/i.test(artifact.sha256)) throw new Error('artifact sha256 is invalid');
+      if (!Number.isSafeInteger(artifact.size) || artifact.size < 0) throw new Error('artifact size is invalid');
     }
   }
 

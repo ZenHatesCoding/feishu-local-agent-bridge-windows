@@ -43,7 +43,29 @@ export interface ActionInput {
   occurredAt?: string;
 }
 
-export type HubInput = MessageInput | ActionInput;
+export interface SharedArtifact {
+  id: string;
+  name: string;
+  kind: string;
+  localPath: string;
+  sha256: string;
+  size: number;
+  mime?: string;
+  sourceMessageId?: string;
+  sourceFileKey?: string;
+}
+
+export interface ArtifactInput {
+  type: 'artifact';
+  idempotencyKey: string;
+  taskId: string;
+  actorAgentId: AgentId;
+  artifact: SharedArtifact;
+  visibility?: Exclude<ContextVisibility, { kind: 'secret' }>;
+  occurredAt?: string;
+}
+
+export type HubInput = MessageInput | ActionInput | ArtifactInput;
 
 export type LedgerEvent =
   | {
@@ -71,6 +93,13 @@ export type LedgerEvent =
       references: string[];
       occurredAt: string;
       visibility: ContextVisibility;
+    }
+  | {
+      kind: 'artifact';
+      actorAgentId: AgentId;
+      artifact: SharedArtifact;
+      occurredAt: string;
+      visibility: Exclude<ContextVisibility, { kind: 'secret' }>;
     }
   | {
       kind: 'dispatch';

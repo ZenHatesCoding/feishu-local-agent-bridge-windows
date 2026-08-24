@@ -198,6 +198,40 @@ bridge_context
 Agent 被要求输出结论、证据、产物路径和下一步，而不是输出私有推理过程。最终
 可见答复会自动记录回任务上下文，成为后来接手者可以复用的状态。
 
+## 文件不是文字附注，而是一等共享产物
+
+PPT、Word、Excel、PDF、图片和压缩包不能只靠最终回复里的一段路径文字来交接。
+项目为此定义了 `artifact` 事件和内容寻址的共享文件库：
+
+```text
+.runtime/artifacts/<taskId>/<sha256>/<safe-file-name>
+```
+
+每个共享产物包含：
+
+- 稳定 artifact ID、原文件名和种类；
+- 共享副本的本机绝对路径；
+- SHA-256、字节大小和可选 MIME；
+- 创建者与可见范围；
+- 能取得时保存飞书 `message_id` 和 `file_key`。
+
+文件发布是一个原子工作流，而不是“先发飞书、以后希望有人记得登记”：
+
+1. Agent 创建文件。
+2. `collab-artifact.cmd publish` 计算哈希并复制到任务共享库。
+3. 命令使用当前 Agent 已绑定的飞书身份把文件回复到原话题。
+4. 只有发送成功后才向 Hub 追加 artifact 事件。
+5. 后续 Agent 的 `collaboration_context.artifacts` 直接给出共享路径和完整性信息。
+
+World、Justice 和 Chariot 在协作任务中被明确要求使用该命令代替裸
+`lark-cli --file`。Fool 保留 Hermes 原生附件发送：Hermes 最终回复中的真实本机
+文件路径会由隔离 Hook 在发送前自动快照和登记。用户发给任一 Agent 的入站附件
+也会在下载和安全策略校验通过后自动进入同一共享库。
+
+共享的是快照，不是脆弱的源路径。即使 Agent 后来清理自己的工作目录，其他
+Agent 仍可读取共享副本。同一任务中的相同文件按 SHA-256 去重；artifact 事件仍
+遵守 `task-public`、`handoff`、`targeted` 和 `private-runtime` 可见性过滤。
+
 Fool 使用同样的协议，但通过一个隔离 Hermes 源码副本和可移除 Hook 实现输入
 注入、未经授权唤醒取消与结果记录。Hermes 原源码、venv、配置、会话、记忆和
 技能不被重装或覆盖。

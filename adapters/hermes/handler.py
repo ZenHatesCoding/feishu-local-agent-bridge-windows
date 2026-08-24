@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
+import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -17,6 +19,17 @@ from typing import Any
 
 
 _TASK_BY_SESSION: dict[str, str] = {}
+
+_FILE_PATTERNS = (
+    re.compile(r"MEDIA:\s*([^\r\n]+)", re.IGNORECASE),
+    re.compile(r"\[[^\]]*\]\((?:file://)?([^\)]+)\)"),
+    re.compile(r"`((?:[A-Za-z]:\\|/)[^`]+)`"),
+    re.compile(
+        r"((?:[A-Za-z]:\\|/)[^\r\n\"<>|]+?\."
+        r"(?:pptx?|docx?|xlsx?|pdf|zip|csv|tsv|md|txt|png|jpe?g|gif|webp))\b",
+        re.IGNORECASE,
+    ),
+)
 
 
 def _settings() -> tuple[str, str, str, str]:
@@ -52,6 +65,89 @@ def _request(path: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]
 def _task_id(tenant: str, chat_id: str, thread_id: str) -> str:
     canonical = f"{tenant}\0{chat_id}\0{thread_id}".encode("utf-8")
     return f"task_{hashlib.sha256(canonical).hexdigest()[:24]}"
+
+
+def _artifact_root() -> str:
+    root = os.environ.get("LARK_COLLAB_ARTIFACT_ROOT", "").strip()
+    if not root:
+        raise RuntimeError("LARK_COLLAB_ARTIFACT_ROOT is required")
+    return root
+
+
+def _paths_in_text(text: str) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    for pattern in _FILE_PATTERNS:
+        for match in pattern.finditer(text):
+            candidate = match.group(1).strip().strip("'\" ").rstrip(".,;:)]}")
+            if candidate.startswith("file:///"):
+                candidate = candidate[8:]
+            candidate = os.path.abspath(os.path.expanduser(candidate))
+            key = os.path.normcase(candidate)
+            if key not in seen and os.path.isfile(candidate):
+                seen.add(key)
+                paths.append(candidate)
+    return paths
+
+
+def _snapshot_artifact(task_id: str, path: str) -> dict[str, Any]:
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    sha256 = digest.hexdigest()
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", os.path.basename(path)).strip()
+    name = (name or "artifact.bin")[:180]
+    artifact_dir = os.path.join(
+        _artifact_root(),
+        re.sub(r"[^A-Za-z0-9._-]", "_", task_id)[:120],
+        sha256,
+    )
+    os.makedirs(artifact_dir, exist_ok=True)
+    local_path = os.path.join(artifact_dir, name)
+    if not os.path.isfile(local_path):
+        temp_path = f"{local_path}.tmp-{os.getpid()}"
+        try:
+            shutil.copy2(path, temp_path)
+            os.replace(temp_path, local_path)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    return {
+        "id": f"artifact_{sha256[:24]}",
+        "name": name,
+        "kind": _kind_for_name(name),
+        "localPath": local_path,
+        "sha256": sha256,
+        "size": os.path.getsize(local_path),
+    }
+
+
+def _kind_for_name(name: str) -> str:
+    extension = os.path.splitext(name)[1].lower()
+    if extension in {".ppt", ".pptx", ".key"}:
+        return "presentation"
+    if extension in {".doc", ".docx", ".md", ".txt"}:
+        return "document"
+    if extension in {".xls", ".xlsx", ".csv", ".tsv"}:
+        return "spreadsheet"
+    if extension in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        return "image"
+    if extension == ".pdf":
+        return "pdf"
+    return "file"
+
+
+def _register_artifacts(task_id: str, agent_id: str, text: str, source: str) -> None:
+    for path in _paths_in_text(text):
+        artifact = _snapshot_artifact(task_id, path)
+        _request("/v1/events", body={
+            "type": "artifact",
+            "idempotencyKey": f"artifact-{source}:{task_id}:{agent_id}:{artifact['id']}",
+            "taskId": task_id,
+            "actorAgentId": agent_id,
+            "artifact": artifact,
+        })
 
 
 def _pending_dispatch(task_id: str, agent_id: str) -> dict[str, Any] | None:
@@ -107,18 +203,23 @@ def _on_start(context: dict[str, Any]) -> None:
             context["cancel"] = True
         return
 
+    message = str(context.get("message_full") or context.get("message") or "")
+    _register_artifacts(task_id, agent_id, message, "inbound")
+
     encoded_task = urllib.parse.quote(task_id)
     encoded_agent = urllib.parse.quote(agent_id)
     shared = _request(f"/v1/tasks/{encoded_task}/context?agentId={encoded_agent}&after=0")
-    message = str(context.get("message_full") or context.get("message") or "")
     collaboration = {
         "task": shared.get("task"),
         "dispatch": dispatch,
         "entries": shared.get("entries", []),
+        "artifacts": shared.get("artifacts", []),
         "rules": [
             "Continue from accepted shared conclusions and artifacts.",
             "Do not reveal private chain-of-thought or secrets.",
             "Your final visible answer will be recorded into shared task context.",
+            "Files listed in artifacts are durable shared copies; read localPath directly.",
+            "When you create a file, include its absolute path in the final response so Hermes sends it and the Hub registers it.",
         ],
     }
     context["message_full"] = (
@@ -144,6 +245,7 @@ def _on_end(context: dict[str, Any]) -> None:
     if not task_id or not response:
         return
     _, _, _, agent_id = _settings()
+    _register_artifacts(task_id, agent_id, response, "outbound")
     digest = hashlib.sha256(response.encode("utf-8")).hexdigest()[:24]
     _request("/v1/events", body={
         "type": "return",

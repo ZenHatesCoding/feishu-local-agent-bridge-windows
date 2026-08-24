@@ -24,7 +24,7 @@ import {
   runServiceUnregister,
 } from './commands/service';
 import { runStart } from './commands/start';
-import { runCollaborationAction, runCollaborationHub } from './commands/hub';
+import { runArtifactPublish, runCollaborationAction, runCollaborationHub } from './commands/hub';
 
 const program = new Command();
 
@@ -64,6 +64,22 @@ for (const action of ['handoff', 'ask', 'return', 'complete'] as const) {
       await runCollaborationAction(action, opts);
     });
 }
+
+const artifact = hub
+  .command('artifact')
+  .description('Publish and register shared task artifacts');
+
+artifact
+  .command('publish')
+  .description('Snapshot a local file, send it to Feishu, and register it with the task')
+  .requiredOption('--task <id>', 'collaboration task id')
+  .requiredOption('--actor <agent>', 'publishing agent id')
+  .requiredOption('--path <path>', 'local file path')
+  .option('--name <name>', 'shared file name')
+  .option('--chat-id <id>', 'target Feishu chat id')
+  .option('--reply-to <id>', 'message id to reply to')
+  .option('--reply-in-thread', 'send the reply inside the Feishu topic')
+  .action(runArtifactPublish);
 
 // === process-level commands (work directly on bridge processes) ===
 
