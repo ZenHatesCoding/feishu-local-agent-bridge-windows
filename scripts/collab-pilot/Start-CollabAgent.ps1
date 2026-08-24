@@ -1,12 +1,14 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('world', 'justice', 'chariot', 'fool')]
   [string]$Agent,
+  [string]$Config,
   [switch]$SkipStatus
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
+$agentConfig = Get-CollabAgent $Agent
 
 & (Join-Path $PSScriptRoot 'Start-CollabHub.ps1') -Quiet
 $table = Read-CollabPidTable
@@ -16,8 +18,8 @@ if (Test-CollabPid $table[$Agent]) {
   return
 }
 
-Stop-OriginalAgent $Agent
-if ($Agent -eq 'fool') { Install-CollabHermesHook }
+Stop-OriginalAgent $agentConfig
+Install-CollabAgentHook $agentConfig
 
 try {
   $pidValue = Start-CollabBackground `
@@ -31,8 +33,8 @@ try {
   Write-Output "$Agent started in background (PID $pidValue)."
 } catch {
   Stop-CollabComponent $Agent
-  if ($Agent -eq 'fool') { Remove-CollabHermesHook }
-  Start-OriginalAgent $Agent
+  Remove-CollabAgentHook $agentConfig
+  Start-OriginalAgent $agentConfig
   throw
 }
 

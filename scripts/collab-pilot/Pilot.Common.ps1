@@ -5,45 +5,102 @@ $script:CollabTokenFile = Join-Path $script:CollabStateDir 'hub-token.txt'
 $script:CollabTenantFile = Join-Path $script:CollabStateDir 'tenant-key.txt'
 $script:CollabConfigFile = Join-Path $script:CollabStateDir 'hub-config.json'
 $script:CollabPidFile = Join-Path $script:CollabStateDir 'pids.json'
-$script:CollabHermesHome = Join-Path $env:LOCALAPPDATA 'hermes'
-$script:CollabHermesPython = Join-Path $script:CollabHermesHome 'hermes-agent\venv\Scripts\python.exe'
-$script:CollabHermesHook = Join-Path $script:CollabHermesHome 'hooks\feishu-collaboration-hub'
+$script:CollabManifestFile = if ($env:LARK_COLLAB_PILOT_CONFIG) { [IO.Path]::GetFullPath($env:LARK_COLLAB_PILOT_CONFIG) } else { Join-Path $script:CollabStateDir 'pilot.local.json' }
+
+function Expand-CollabValue([object]$Value) {
+  if ($null -eq $Value) { return '' }
+  $expanded = [string]$Value
+  $tokens = @{
+    '${REPO_ROOT}' = $script:CollabRepoRoot
+    '${STATE_DIR}' = $script:CollabStateDir
+    '${USERPROFILE}' = $env:USERPROFILE
+    '${LOCALAPPDATA}' = $env:LOCALAPPDATA
+  }
+  foreach ($token in $tokens.Keys) { $expanded = $expanded.Replace($token, [string]$tokens[$token]) }
+  return [Environment]::ExpandEnvironmentVariables($expanded)
+}
+
+function Get-CollabPilotConfig {
+  if (!(Test-Path -LiteralPath $script:CollabManifestFile)) {
+    throw "Pilot config not found: $script:CollabManifestFile`nRun .\scripts\collab-pilot\Setup-CollabPilot.ps1, then edit the generated file."
+  }
+  $config = Get-Content -LiteralPath $script:CollabManifestFile -Raw | ConvertFrom-Json
+  if ([int]$config.schemaVersion -ne 1) { throw 'Unsupported pilot config schemaVersion.' }
+  return $config
+}
+
+function Get-CollabAgents([switch]$IncludeDisabled) {
+  $agents = @((Get-CollabPilotConfig).agents)
+  if ($IncludeDisabled) { return $agents }
+  return @($agents | Where-Object { $null -eq $_.enabled -or $_.enabled })
+}
+
+function Get-CollabAgent([string]$Agent) {
+  $match = @(Get-CollabAgents | Where-Object { $_.id -eq $Agent })
+  if ($match.Count -ne 1) { throw "Unknown or disabled agent '$Agent'. Check $script:CollabManifestFile." }
+  return $match[0]
+}
+
+function Set-CollabEnvironment([object]$Values) {
+  if (!$Values) { return }
+  foreach ($property in $Values.PSObject.Properties) {
+    [Environment]::SetEnvironmentVariable($property.Name, (Expand-CollabValue $property.Value), 'Process')
+  }
+}
+
+function Invoke-CollabCommand([object]$Command, [string]$Description) {
+  if (!$Command -or !$Command.filePath) { return }
+  $filePath = Expand-CollabValue $Command.filePath
+  $arguments = @($Command.arguments | ForEach-Object { Expand-CollabValue $_ })
+  $workingDirectory = if ($Command.workingDirectory) { Expand-CollabValue $Command.workingDirectory } else { $null }
+  Set-CollabEnvironment $Command.environment
+  if ($workingDirectory) { Push-Location -LiteralPath $workingDirectory }
+  try {
+    & $filePath @arguments
+    if ($LASTEXITCODE -ne 0) { throw "$Description failed with exit code $LASTEXITCODE." }
+  } finally {
+    if ($workingDirectory) { Pop-Location }
+  }
+}
 
 function Initialize-CollabRuntimeState {
+  $pilot = Get-CollabPilotConfig
   New-Item -ItemType Directory -Force -Path $script:CollabStateDir, $script:CollabLogDir | Out-Null
-
   if (!(Test-Path -LiteralPath $script:CollabTokenFile)) {
-    $token = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-    [IO.File]::WriteAllText($script:CollabTokenFile, $token)
+    [IO.File]::WriteAllText($script:CollabTokenFile, [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)))
   }
   if (!(Test-Path -LiteralPath $script:CollabTenantFile)) {
-    [IO.File]::WriteAllText($script:CollabTenantFile, 'zhenping-feishu-collab-v1')
+    $tenantKey = if ($pilot.hub.tenantKey) { [string]$pilot.hub.tenantKey } else { [guid]::NewGuid().ToString('N') }
+    [IO.File]::WriteAllText($script:CollabTenantFile, $tenantKey)
   }
-
+  $listenHost = if ($pilot.hub.host) { [string]$pilot.hub.host } else { '127.0.0.1' }
+  $listenPort = if ($pilot.hub.port) { [int]$pilot.hub.port } else { 17321 }
+  $hubAgents = @(Get-CollabAgents | ForEach-Object { [ordered]@{ id = $_.id; displayName = $_.displayName; aliases = @($_.aliases) } })
+  if ($hubAgents.Count -eq 0) { throw 'Pilot config has no enabled agents.' }
   $config = [ordered]@{
     schemaVersion = 1
-    listen = [ordered]@{ host = '127.0.0.1'; port = 17321 }
+    listen = [ordered]@{ host = $listenHost; port = $listenPort }
     ledgerPath = 'collaboration.jsonl'
     tokenEnv = 'LARK_COLLAB_HUB_TOKEN'
-    leaseMinutes = 30
-    maxHops = 8
-    agents = @(
-      [ordered]@{ id = 'world'; displayName = 'World'; aliases = @('codex') }
-      [ordered]@{ id = 'justice'; displayName = 'Justice'; aliases = @('antigravity') }
-      [ordered]@{ id = 'chariot'; displayName = 'Chariot'; aliases = @('deepseek') }
-      [ordered]@{ id = 'fool'; displayName = 'Fool'; aliases = @('hermes') }
-    )
+    leaseMinutes = if ($pilot.hub.leaseMinutes) { [int]$pilot.hub.leaseMinutes } else { 30 }
+    maxHops = if ($pilot.hub.maxHops) { [int]$pilot.hub.maxHops } else { 8 }
+    agents = $hubAgents
   }
   [IO.File]::WriteAllText($script:CollabConfigFile, ($config | ConvertTo-Json -Depth 8))
+}
+
+function Get-CollabHubUrl {
+  $hub = (Get-CollabPilotConfig).hub
+  $hostName = if ($hub.host -and $hub.host -ne '0.0.0.0') { $hub.host } else { '127.0.0.1' }
+  $port = if ($hub.port) { [int]$hub.port } else { 17321 }
+  return "http://${hostName}:$port"
 }
 
 function Read-CollabPidTable {
   $table = [ordered]@{}
   if (!(Test-Path -LiteralPath $script:CollabPidFile)) { return $table }
   $saved = Get-Content -LiteralPath $script:CollabPidFile -Raw | ConvertFrom-Json
-  foreach ($property in $saved.PSObject.Properties) {
-    $table[$property.Name] = $property.Value
-  }
+  foreach ($property in $saved.PSObject.Properties) { $table[$property.Name] = $property.Value }
   return $table
 }
 
@@ -57,21 +114,11 @@ function Test-CollabPid([object]$ProcessId) {
   return [bool](Get-Process -Id ([int]$ProcessId) -ErrorAction SilentlyContinue)
 }
 
-function Start-CollabBackground(
-  [string]$Name,
-  [string]$ScriptPath,
-  [string[]]$ScriptArguments = @()
-) {
+function Start-CollabBackground([string]$Name, [string]$ScriptPath, [string[]]$ScriptArguments = @()) {
   $table = Read-CollabPidTable
-  if (Test-CollabPid $table[$Name]) {
-    Write-Output "$Name is already running (PID $($table[$Name]))."
-    return [int]$table[$Name]
-  }
-
+  if (Test-CollabPid $table[$Name]) { Write-Output "$Name is already running (PID $($table[$Name]))."; return [int]$table[$Name] }
   $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArguments
-  $process = Start-Process -WindowStyle Hidden -PassThru `
-    -FilePath powershell.exe `
-    -ArgumentList $arguments `
+  $process = Start-Process -WindowStyle Hidden -PassThru -FilePath powershell.exe -ArgumentList $arguments `
     -RedirectStandardOutput (Join-Path $script:CollabLogDir "$Name.out.log") `
     -RedirectStandardError (Join-Path $script:CollabLogDir "$Name.err.log")
   $table[$Name] = $process.Id
@@ -87,52 +134,28 @@ function Stop-CollabProcessTree([int]$ProcessId) {
 
 function Stop-CollabComponent([string]$Name) {
   $table = Read-CollabPidTable
-  if (Test-CollabPid $table[$Name]) {
-    Stop-CollabProcessTree -ProcessId ([int]$table[$Name])
-  }
+  if (Test-CollabPid $table[$Name]) { Stop-CollabProcessTree -ProcessId ([int]$table[$Name]) }
   if ($table.Contains($Name)) { $table.Remove($Name) }
   Write-CollabPidTable $table
 }
 
-function Install-CollabHermesHook {
-  New-Item -ItemType Directory -Force -Path $script:CollabHermesHook | Out-Null
-  Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\HOOK.yaml') -Destination $script:CollabHermesHook -Force
-  Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\handler.py') -Destination $script:CollabHermesHook -Force
+function Install-CollabAgentHook([object]$Agent) {
+  if (!$Agent.hermesHook -or !$Agent.hermesHook.enabled) { return }
+  $hermesHome = Expand-CollabValue $Agent.hermesHook.home
+  $target = Join-Path $hermesHome 'hooks\feishu-collaboration-hub'
+  New-Item -ItemType Directory -Force -Path $target | Out-Null
+  Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\HOOK.yaml') -Destination $target -Force
+  Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\handler.py') -Destination $target -Force
 }
 
-function Remove-CollabHermesHook {
-  if (!(Test-Path -LiteralPath $script:CollabHermesHook)) { return }
-  $target = [IO.Path]::GetFullPath($script:CollabHermesHook)
-  $hooksRoot = [IO.Path]::GetFullPath((Join-Path $script:CollabHermesHome 'hooks'))
-  if (!$target.StartsWith($hooksRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to remove Hook outside Hermes hooks directory: $target"
-  }
-  Remove-Item -LiteralPath $target -Recurse -Force
+function Remove-CollabAgentHook([object]$Agent) {
+  if (!$Agent.hermesHook -or !$Agent.hermesHook.enabled) { return }
+  $hermesHome = [IO.Path]::GetFullPath((Expand-CollabValue $Agent.hermesHook.home))
+  $hooksRoot = [IO.Path]::GetFullPath((Join-Path $hermesHome 'hooks'))
+  $target = [IO.Path]::GetFullPath((Join-Path $hooksRoot 'feishu-collaboration-hub'))
+  if (!$target.StartsWith($hooksRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw "Unsafe Hook path: $target" }
+  if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
 }
 
-function Invoke-CollabPowerShellScript([string]$Path) {
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Path
-  if ($LASTEXITCODE -ne 0) {
-    throw "PowerShell script failed with exit code $LASTEXITCODE`: $Path"
-  }
-}
-
-function Stop-OriginalAgent([string]$Agent) {
-  switch ($Agent) {
-    'world' { Invoke-CollabPowerShellScript 'C:\codex-bridge\stop-codex-bridge.ps1' }
-    'justice' { Invoke-CollabPowerShellScript 'C:\antigravity-bridge\scripts\stop-antigravity-bridge-service.ps1' }
-    'chariot' { Invoke-CollabPowerShellScript 'C:\deepseek-bridge\scripts\stop-deepseek-bridge-service.ps1' }
-    'fool' { & $script:CollabHermesPython -c "import sys; from hermes_cli.main import main; sys.argv=['hermes','gateway','stop']; main()" }
-    default { throw "Unknown agent: $Agent" }
-  }
-}
-
-function Start-OriginalAgent([string]$Agent) {
-  switch ($Agent) {
-    'world' { Invoke-CollabPowerShellScript 'C:\codex-bridge\start-codex-bridge.ps1' }
-    'justice' { Invoke-CollabPowerShellScript 'C:\antigravity-bridge\scripts\start-antigravity-bridge-service.ps1' }
-    'chariot' { Invoke-CollabPowerShellScript 'C:\deepseek-bridge\scripts\start-deepseek-bridge-service.ps1' }
-    'fool' { & $script:CollabHermesPython -c "import sys; from hermes_cli.main import main; sys.argv=['hermes','gateway','start']; main()" }
-    default { throw "Unknown agent: $Agent" }
-  }
-}
+function Stop-OriginalAgent([object]$Agent) { Invoke-CollabCommand $Agent.original.stop "Stopping original bridge for $($Agent.id)" }
+function Start-OriginalAgent([object]$Agent) { Invoke-CollabCommand $Agent.original.start "Restoring original bridge for $($Agent.id)" }

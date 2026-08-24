@@ -3,7 +3,8 @@
 > 飞书多 Agent 协作试验：
 > [设计原理与上下文隔离](./docs/DESIGN.zh-CN.md)、
 > [产品目标](./docs/PRODUCT_VISION.zh-CN.md)、
-> [Windows PowerShell 启停手册](./docs/WINDOWS_OPERATIONS.zh-CN.md)。
+> [Windows 部署与启停手册](./docs/WINDOWS_OPERATIONS.zh-CN.md)。部署脚本支持按本机
+> 清单接入任意数量、任意名字的 Agent，不要求沿用作者的机器人命名。
 
 > 个人 vibecoding fork 说明：这是我和 Codex 一起改出来的 Windows 个人适配版，
 > 不是假装自己是原项目作者，也不是面向所有人的正式发行版。本仓库基于

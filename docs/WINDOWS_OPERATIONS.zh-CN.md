@@ -1,294 +1,156 @@
-# Windows PowerShell 启停手册
+# Windows 部署与运维
 
-本文说明如何在 Windows 上后台运行 Collaboration Hub，以及 World、Justice、
-Chariot、Fool 四个飞书桥接。架构原理见
-[DESIGN.zh-CN.md](./DESIGN.zh-CN.md)。
+本文面向从 GitHub 克隆项目的新电脑。协作原理见 [DESIGN.zh-CN.md](./DESIGN.zh-CN.md)，用户体验目标见 [PRODUCT_VISION.zh-CN.md](./PRODUCT_VISION.zh-CN.md)。
 
-以下命令针对当前本机试验工作树：
+## 责任边界
 
-```text
-C:\feishu-multi-agent-hub
-```
+本项目可以部署和管理：
 
-所有封装脚本都使用隐藏 PowerShell 子进程后台运行，不需要保持终端窗口打开。
+- 本机 Collaboration Hub、任务账本、上下文权限和文件产物库；
+- 已集成的 Node bridge，以及供 Hermes 使用的可撤销 Hook；
+- 任意数量、任意名字 Agent 的后台启动、PID、日志、健康检查和原桥回退；
+- Agent 运行时需要的协作环境变量和 `collab-artifact.cmd` 文件交付命令。
 
-## 组件对应关系
+使用者需要自行准备：
 
-| 启动名 | 飞书机器人 | 本地 Agent | 现有凭据目录 |
-| --- | --- | --- | --- |
-| `world` | World | Codex | `%USERPROFILE%\.lark-channel` |
-| `justice` | Justice | Antigravity | `C:\antigravity-bridge\.lark-channel` |
-| `chariot` | Chariot | DeepSeek Harness | `C:\deepseek-bridge\.lark-channel` |
-| `fool` | Fool | Hermes | `%LOCALAPPDATA%\hermes` |
+- Windows、Node.js 20.12+、pnpm 和 Git；
+- 已安装并完成登录的本地 Agent；
+- 每个机器人各自的飞书 PersonalAgent 应用、权限、事件订阅和 bridge profile；
+- 每个 Agent 的实际启动命令、工作区、profile 目录和必要环境变量；
+- 不在本项目适配范围内的 Agent bridge。它必须接入 Hub 协议，不能仅仅启动原生 CLI。
 
-Hub 只监听 `127.0.0.1:17321`。token、PID、日志和任务账本位于
-`C:\feishu-multi-agent-hub\.runtime`，该目录不会提交 Git。
+项目不会安装、重装或升级用户的 Agent，也不会把飞书 App Secret 写入部署清单。飞书凭据继续留在各 bridge 的 profile 目录中。
 
-共享文件快照位于：
-
-```text
-C:\feishu-multi-agent-hub\.runtime\artifacts\<taskId>
-```
-
-该目录是协作任务的持久产物库。普通启停和回退不会删除它。
-
-## 第一次使用前检查
-
-打开 PowerShell：
+## 从 GitHub 部署
 
 ```powershell
+git clone -b feature/feishu-multi-agent-hub https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git C:\feishu-multi-agent-hub
 Set-Location C:\feishu-multi-agent-hub
-node --version
-pnpm --version
-pnpm install
-pnpm build
-```
-
-本机 pilot 还依赖已经准备好的隔离运行时：
-
-```text
-C:\collab-runtime\codex
-C:\collab-runtime\deepseek
-C:\collab-runtime\hermes
-```
-
-其中 Hermes 隔离副本使用原 Hermes venv 和数据目录，只从副本导入 gateway。
-不要对原 Hermes 执行重装、更新或应用 `adapters\hermes\gateway-run.patch`。
-
-PowerShell 执行策略若阻止脚本，只对当前窗口临时放行：
-
-```powershell
 Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\collab-pilot\Setup-CollabPilot.ps1
 ```
 
-不要修改机器级执行策略。
+Setup 会执行 `pnpm install` 和 `pnpm build`，并从 `config\collaboration-pilot.example.json` 生成不受 Git 跟踪的 `.runtime\pilot.local.json`。已有本地配置默认不会被覆盖；只有明确传 `-Force` 才会重建。
 
-## 一行启动全部
+编辑本地清单后进行只读预检：
 
 ```powershell
-Set-Location C:\feishu-multi-agent-hub
+notepad .\.runtime\pilot.local.json
+.\scripts\collab-pilot\Test-CollabPilotConfig.ps1
+```
+
+预检不连接飞书，不停止现有 bridge，也不安装 Hermes。
+
+## 清单结构
+
+每个 `agents[]` 元素定义一个机器人身份和一个实际进程：
+
+```json
+{
+  "id": "planner",
+  "displayName": "Planner",
+  "aliases": ["codex"],
+  "enabled": true,
+  "launch": {
+    "filePath": "node.exe",
+    "arguments": ["C:\\bridge\\dist\\cli.js", "run", "--profile", "planner"],
+    "workingDirectory": "C:\\workspaces\\planner",
+    "environment": {
+      "LARK_CHANNEL_HOME": "C:\\profiles\\planner",
+      "LARK_CHANNEL_CODEX_BIN": "C:\\tools\\codex.cmd"
+    }
+  }
+}
+```
+
+- `id` 是 Hub 内稳定身份，也是命令行 `-Agent` 的值；不要随意改动。
+- `displayName` 和 `aliases` 用于解析 Agent 之间的委派目标。
+- `launch` 必须启动已经接入本项目 Hub 协议的 bridge。
+- `original.stop/start` 可选。配置后，切换到协作 bridge 前会停止旧监听器；回退时可恢复旧监听器，避免同一个飞书 App 同时被两份进程消费。
+- `hermesHook` 仅用于 Hermes。启用后只复制本项目 Hook 到指定 Hermes Home，停止时只删除该 Hook，不修改源码、venv、配置、记忆或技能。
+- `enabled: false` 可保留尚未准备好的 Agent，不会加入 Hub 或被启动。
+
+路径支持 `%USERPROFILE%`、`%PATH%`、`${REPO_ROOT}`、`${STATE_DIR}`、`${LOCALAPPDATA}`。JSON 中 Windows 反斜杠需要写成 `\\`。
+
+`larkCliJs` 是真实飞书 CLI 的 JavaScript 入口，用于让 Agent 发送共享文件。若所用 bridge 自己实现了文件发送，可以留空；否则应填写本机实际路径。
+
+## 适配不同 Agent
+
+Codex、Claude、Antigravity 或 DeepSeek Harness 应使用本仓库相应适配器构建出的 bridge，再把构建产物和 Agent 可执行文件写入 `launch`。Agent 本身的模型、推理强度、速度和登录状态仍由各 Agent 自己管理。
+
+新的第三方 Agent 需要一个适配器完成四件事：
+
+1. 接收飞书消息时向 Hub 请求 `collaboration_context`；
+2. 只在 Hub 授权且消息真实 `@` 到自己时运行；
+3. 把最终摘要、委派和完成状态回写 Hub；
+4. 通过产物协议登记和发送文件。
+
+只有启动命令、但没有这四项协议实现的 Agent，不能获得正确的共享与隔离语义。参照 `src/collab`、`src/agent` 和 `adapters/hermes` 编写适配器后，部署脚本无需再改，只需在本地清单增加一个 Agent。
+
+## 后台启停
+
+一行启动全部启用的 Agent：
+
+```powershell
 .\scripts\collab-pilot\Start-CollabPilot.ps1
 ```
 
-这条命令会：
-
-1. 初始化本地 Hub token、配置、日志目录和账本。
-2. 后台启动 Hub。
-3. 分别停止四个机器人原来的独立监听器，避免同一 App 重复连接。
-4. 后台启动 World、Justice、Chariot 和 Fool 的协作 bridge。
-5. 输出整组状态。
-
-重复执行是安全的。已经由 pilot 运行的组件会显示 `already running`，不会再开一份。
-
-## 一个一个启动
-
-单独启动时会自动确保 Hub 已启动，并只切换指定机器人的监听器。
+一个一个启动，Hub 会自动启动：
 
 ```powershell
-Set-Location C:\feishu-multi-agent-hub
-
-.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent world
-.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent justice
-.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent chariot
-.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent fool
+.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent planner
+.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent reviewer
 ```
 
-也可以用一行 PowerShell 循环依次启动四个：
-
-```powershell
-'world','justice','chariot','fool' | ForEach-Object { .\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent $_ -SkipStatus }
-```
-
-只启动 Hub，不启动任何 Agent：
-
-```powershell
-.\scripts\collab-pilot\Start-CollabHub.ps1
-```
-
-## 查看状态
-
-查看 Hub 和四个 Agent：
+查看全部或单个状态和日志：
 
 ```powershell
 .\scripts\collab-pilot\Status-CollabPilot.ps1
+.\scripts\collab-pilot\Status-CollabPilot.ps1 -Agent planner
+.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name planner -Tail 200
+.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name planner -Follow
 ```
 
-只看一个组件：
+停止协作 bridge，或停止后恢复该 Agent 的原 bridge：
 
 ```powershell
-.\scripts\collab-pilot\Status-CollabPilot.ps1 -Agent world
-.\scripts\collab-pilot\Status-CollabPilot.ps1 -Agent fool
-```
-
-状态中的含义：
-
-- `Hub health: True`：Hub HTTP 健康检查通过；
-- `Running: True`：后台 PowerShell 启动器仍在；
-- `Worker: node.exe` 或 `python.exe`：真正的 bridge 子进程存在；
-- `LastError`：错误日志最后三行，可能包含已经恢复的历史告警，应结合最新日志判断。
-
-## 查看日志
-
-每个组件同时有 stdout 和 stderr 日志：
-
-```powershell
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name hub
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name world -Tail 200
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name justice -Tail 200
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name chariot -Tail 200
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name fool -Tail 200
-```
-
-持续跟踪标准输出，按 `Ctrl+C` 退出跟踪，不会停止后台 bridge：
-
-```powershell
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name world -Tail 50 -Follow
-```
-
-日志文件也可直接读取：
-
-```powershell
-Get-Content .\.runtime\logs\world.out.log -Tail 100
-Get-Content .\.runtime\logs\world.err.log -Tail 100
-```
-
-## 单独停止或切回原桥接
-
-只停止一个协作 bridge：
-
-```powershell
-.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent world
-```
-
-停止该协作 bridge，并立刻恢复它原来的独立 bridge：
-
-```powershell
-.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent world -RestoreOriginal
-.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent justice -RestoreOriginal
-.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent chariot -RestoreOriginal
-.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent fool -RestoreOriginal
-```
-
-`fool` 停止时只删除本项目安装的
-`%LOCALAPPDATA%\hermes\hooks\feishu-collaboration-hub`，不会删除其他 Hook，也不会
-修改 Hermes 源码、venv、配置、会话或记忆。
-
-## 一行停止全部
-
-停止整个协作 pilot，但不启动旧监听器：
-
-```powershell
+.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent planner
+.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent planner -RestoreOriginal
 .\scripts\collab-pilot\Stop-CollabPilot.ps1
+.\scripts\collab-pilot\Stop-CollabPilot.ps1 -RestoreOriginals
 ```
 
-停止 pilot 并恢复原来的四套独立桥接：
+也可让多个克隆或多套环境使用独立清单：
+
+```powershell
+.\scripts\collab-pilot\Start-CollabPilot.ps1 -Config C:\private\team-a.json
+```
+
+## 数据和安全
+
+默认运行数据都在 `.runtime`，不会提交 Git：
+
+```text
+.runtime\pilot.local.json       本机路径与启动配置
+.runtime\hub-token.txt          Hub bearer token
+.runtime\tenant-key.txt         本机协作域
+.runtime\hub-config.json        从本地清单生成的 Hub 配置
+.runtime\collaboration.jsonl    任务账本
+.runtime\artifacts\             SHA-256 文件快照
+.runtime\logs\                 stdout/stderr
+.runtime\pids.json              后台启动器 PID
+```
+
+Hub 默认只监听 `127.0.0.1`。不要把 token、飞书 App Secret、profile 目录或 `pilot.local.json` 提交到仓库。任务产物可能含敏感内容，备份与清理策略由电脑所有者决定，普通停止和回退不会删除产物。
+
+## 验收与回退
+
+启动后先看 `Hub health: True` 和各 Agent 的 `Running: True`、`Worker`。然后在同一飞书话题先 `@planner` 产出文件，再 `@reviewer` 接手修改。后者应看到共享摘要，并能读取 `.runtime\artifacts` 中前者的稳定快照；不同话题不能串线。
+
+需要立即退出试验时：
 
 ```powershell
 .\scripts\collab-pilot\Stop-CollabPilot.ps1 -RestoreOriginals
 ```
 
-这是完整回退命令。Hub 账本不被原桥接依赖，保留 `.runtime` 不会影响原来的使用。
-
-## 底层手动启动方式
-
-通常应使用上面的封装，因为它会处理 PID、日志、Hub、原监听器冲突和 Hermes Hook。
-理解底层行为时，可以看两个前台入口：
-
-```powershell
-# 前台运行 Hub，当前窗口不能关闭
-.\scripts\collab-pilot\run-hub.ps1
-
-# 前台运行一个 Agent bridge，当前窗口不能关闭
-.\scripts\collab-pilot\run-agent.ps1 -Agent world
-```
-
-封装的后台启动本质上等价于：
-
-```powershell
-Start-Process -WindowStyle Hidden -FilePath powershell.exe `
-  -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',`
-    'C:\feishu-multi-agent-hub\scripts\collab-pilot\run-agent.ps1','-Agent','world' `
-  -RedirectStandardOutput 'C:\feishu-multi-agent-hub\.runtime\logs\world.out.log' `
-  -RedirectStandardError 'C:\feishu-multi-agent-hub\.runtime\logs\world.err.log'
-```
-
-不要直接执行这段底层命令去启动第二份相同机器人。相同飞书 App 的两个监听器会争抢
-事件，而且裸 `Start-Process` 不会登记到 pilot PID 文件。
-
-## 重启一个组件
-
-```powershell
-.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent chariot
-.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent chariot
-```
-
-重启整组：
-
-```powershell
-.\scripts\collab-pilot\Stop-CollabPilot.ps1
-.\scripts\collab-pilot\Start-CollabPilot.ps1
-```
-
-## 飞书端验收
-
-必须在话题群中新建一个话题：
-
-1. `@World` 要求先分析并给出结论、产物和下一步。
-2. 等 World 回复后，在同一话题 `@Chariot` 要求接手并先复述前序结论。
-3. 可继续 `@Justice` 做审查，或 `@Fool` 接手需要 Hermes 能力的部分。
-
-第二个 Agent 能准确复用第一个 Agent 的结论和产物，且不同话题不串线，才算核心
-链路通过。
-
-文件交接验收可以这样做：
-
-1. 在新话题 `@World`：创建一个两页 PPT，发到本话题，并说明文件名。
-2. World 发出文件后，在同一话题 `@Chariot`：读取 World 刚才的 PPT，增加一页，
-   另存为新文件并发回来。
-3. 检查 `.runtime\artifacts` 下出现两个以 SHA-256 为目录名的 PPT 共享副本。
-
-手工发布一个已存在文件时，可以使用 Agent 在上下文中收到的 task ID：
-
-```powershell
-.\scripts\collab-pilot\bin\collab-artifact.cmd publish `
-  --task task_xxx `
-  --actor world `
-  --path C:\project\report.pptx `
-  --reply-to om_xxx `
-  --reply-in-thread
-```
-
-这条命令使用当前进程的飞书 profile 身份。不要在普通未绑定的 PowerShell 窗口中
-伪造 Hub token；正常情况下由 Agent 在 bridge 子进程内调用。
-
-## 常见故障
-
-### Hub health 为 False
-
-```powershell
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name hub -Tail 200
-Get-NetTCPConnection -LocalPort 17321 -ErrorAction SilentlyContinue
-```
-
-若端口被一个不在 `.runtime\pids.json` 中的 Hub 占用，启动脚本会拒绝覆盖它。
-
-### Running 为 True，但飞书没有回复
-
-先确认 `Worker` 存在，再看对应日志是否出现“已连接”或 Hermes WebSocket connected：
-
-```powershell
-.\scripts\collab-pilot\Status-CollabPilot.ps1 -Agent world
-.\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name world -Tail 200
-```
-
-### 机器人在普通群里能用，但没有共享上下文
-
-当前协作边界是飞书话题。确认两次 `@` 位于同一个话题，消息具有同一个
-`threadId`。私聊和普通群消息故意保留原桥接行为。
-
-### 需要立即回退
-
-```powershell
-Set-Location C:\feishu-multi-agent-hub
-.\scripts\collab-pilot\Stop-CollabPilot.ps1 -RestoreOriginals
-```
+该命令只使用清单中明确配置的恢复命令。没有配置 `original.start` 的 Agent 会保持停止，需由使用者按自己的原方式启动。

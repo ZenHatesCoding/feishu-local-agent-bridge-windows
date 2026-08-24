@@ -1,6 +1,7 @@
-param([switch]$Quiet)
+param([string]$Config, [switch]$Quiet)
 
 $ErrorActionPreference = 'Stop'
+if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
 
 Initialize-CollabRuntimeState
@@ -10,8 +11,9 @@ if (Test-CollabPid $table['hub']) {
   return
 }
 
+$healthUrl = "$(Get-CollabHubUrl)/health"
 $existingHealth = try {
-  (Invoke-RestMethod -Uri 'http://127.0.0.1:17321/health' -TimeoutSec 1).ok
+  (Invoke-RestMethod -Uri $healthUrl -TimeoutSec 1).ok
 } catch { $false }
 if ($existingHealth) {
   throw 'Port 17321 already has a healthy Hub that is not owned by this PID file.'
@@ -21,7 +23,7 @@ $pidValue = Start-CollabBackground -Name 'hub' -ScriptPath (Join-Path $PSScriptR
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
   Start-Sleep -Milliseconds 250
   $healthy = try {
-    (Invoke-RestMethod -Uri 'http://127.0.0.1:17321/health' -TimeoutSec 1).ok
+    (Invoke-RestMethod -Uri $healthUrl -TimeoutSec 1).ok
   } catch { $false }
   if ($healthy) {
     if (!$Quiet) { Write-Output "Hub started in background (PID $pidValue)." }

@@ -26,21 +26,23 @@ describe('collaboration design and Windows operations contract', () => {
     }
   });
 
-  it('keeps documented per-agent, all-agent, logging, and rollback controls', async () => {
+  it('keeps portable setup, per-agent, all-agent, logging, and rollback controls', async () => {
     const operations = await readFile(
       new URL('../../../docs/WINDOWS_OPERATIONS.zh-CN.md', import.meta.url),
       'utf8',
     );
     for (const phrase of [
+      'Setup-CollabPilot.ps1',
+      'Test-CollabPilotConfig.ps1',
+      'collaboration-pilot.example.json',
+      '.runtime\\pilot.local.json',
       'Start-CollabPilot.ps1',
-      'Start-CollabAgent.ps1 -Agent world',
-      'Start-CollabAgent.ps1 -Agent justice',
-      'Start-CollabAgent.ps1 -Agent chariot',
-      'Start-CollabAgent.ps1 -Agent fool',
+      'Start-CollabAgent.ps1 -Agent planner',
       'Status-CollabPilot.ps1',
       'Get-CollabPilotLog.ps1',
       'Stop-CollabAgent.ps1',
       'Stop-CollabPilot.ps1 -RestoreOriginals',
+      '项目不会安装、重装或升级用户的 Agent',
     ]) {
       expect(operations).toContain(phrase);
     }

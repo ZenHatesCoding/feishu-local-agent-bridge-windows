@@ -6,8 +6,8 @@
 > The user-facing product goal and acceptance criteria are defined in
 > [docs/PRODUCT_VISION.zh-CN.md](./docs/PRODUCT_VISION.zh-CN.md).
 > The architecture rationale and context-isolation model are documented in
-> [docs/DESIGN.zh-CN.md](./docs/DESIGN.zh-CN.md). Windows background startup,
-> per-agent controls, logs, and rollback commands are in
+> [docs/DESIGN.zh-CN.md](./docs/DESIGN.zh-CN.md). Portable Windows setup,
+> config-driven Agent registration, logs, and rollback commands are in
 > [docs/WINDOWS_OPERATIONS.zh-CN.md](./docs/WINDOWS_OPERATIONS.zh-CN.md).
 
 > Personal vibecoding fork note: this is a Windows personal-use adaptation built
