@@ -17,3 +17,9 @@ notepad .\.runtime\pilot.local.json
 
 The repository supplies the Hub and orchestration. Users supply installed and
 logged-in agents, Feishu apps/profiles and real launch commands.
+
+When Antigravity uses `agy.exe`, the launcher reads the current Windows user
+proxy and passes it only to Antigravity. The Feishu connection remains direct
+through `LARK_CHANNEL_DISABLE_PROXY=1`. If Feishu reports `Authentication
+required` while the desktop client is already logged in, verify that the
+Windows proxy is running and restart only that agent.

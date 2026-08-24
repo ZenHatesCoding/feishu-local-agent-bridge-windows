@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "antigravity-proxy-env.ps1")
+Initialize-AntigravityProxyEnvironment
 $env:LARK_CHANNEL_HOME = Join-Path $Root ".lark-channel"
 $env:LARK_CHANNEL_ANTIGRAVITY_BIN = Join-Path $env:LOCALAPPDATA "agy\bin\agy.exe"
 $env:LARK_CHANNEL_DISABLE_PROXY = "1"

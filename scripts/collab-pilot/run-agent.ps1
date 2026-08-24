@@ -17,9 +17,16 @@ $env:LARK_COLLAB_COMMAND_DIR = $commandDir
 $env:PATH = "$commandDir;$env:PATH"
 if ($pilot.larkCliJs) { $env:LARK_COLLAB_REAL_LARK_CLI_JS = Expand-CollabValue $pilot.larkCliJs }
 
+foreach ($name in @($pilot.unsetEnvironment)) {
+  if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
+}
 Set-CollabEnvironment $pilot.commonEnvironment
 Set-CollabEnvironment $agentConfig.launch.environment
-foreach ($name in @($pilot.unsetEnvironment) + @($agentConfig.launch.unsetEnvironment)) {
+if ([System.IO.Path]::GetFileName([string]$env:LARK_CHANNEL_ANTIGRAVITY_BIN) -ieq 'agy.exe') {
+  . (Join-Path $script:CollabRepoRoot 'scripts\antigravity-proxy-env.ps1')
+  Initialize-AntigravityProxyEnvironment
+}
+foreach ($name in @($agentConfig.launch.unsetEnvironment)) {
   if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
 
