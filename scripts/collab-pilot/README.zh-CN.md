@@ -12,12 +12,26 @@
 - 唯一写入 Hermes Home 的内容是 `hooks\\feishu-collaboration-hub`，停止脚本只删除这一项。
 - Hub token、PID、日志和事务账本位于仓库忽略的 `.runtime`。
 
-## 启停
+完整设计说明：[`docs/DESIGN.zh-CN.md`](../../docs/DESIGN.zh-CN.md)
+
+完整 Windows 操作手册：
+[`docs/WINDOWS_OPERATIONS.zh-CN.md`](../../docs/WINDOWS_OPERATIONS.zh-CN.md)
+
+## 快速启停
 
 ```powershell
 .\\scripts\\collab-pilot\\Start-CollabPilot.ps1
 .\\scripts\\collab-pilot\\Status-CollabPilot.ps1
 .\\scripts\\collab-pilot\\Stop-CollabPilot.ps1
+```
+
+单独后台启动一个 Agent，Hub 会自动启动：
+
+```powershell
+.\\scripts\\collab-pilot\\Start-CollabAgent.ps1 -Agent world
+.\\scripts\\collab-pilot\\Start-CollabAgent.ps1 -Agent justice
+.\\scripts\\collab-pilot\\Start-CollabAgent.ps1 -Agent chariot
+.\\scripts\\collab-pilot\\Start-CollabAgent.ps1 -Agent fool
 ```
 
 完全回到原来的四套后台连接：

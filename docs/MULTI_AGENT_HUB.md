@@ -2,6 +2,9 @@
 
 > Product north star: [飞书多 Agent 协作：产品目标](./PRODUCT_VISION.zh-CN.md).
 > Architecture and implementation decisions must preserve that user experience.
+> The detailed Chinese design rationale is in [DESIGN.zh-CN.md](./DESIGN.zh-CN.md),
+> and Windows operations are in
+> [WINDOWS_OPERATIONS.zh-CN.md](./WINDOWS_OPERATIONS.zh-CN.md).
 
 This branch develops a control plane for sequential collaboration between the
 World, Justice, Chariot, and Fool bridge bots. It is deliberately opt-in and
