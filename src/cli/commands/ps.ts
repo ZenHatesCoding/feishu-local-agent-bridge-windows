@@ -1,4 +1,4 @@
-import { readAndPrune, resolveTarget, isAlive } from '../../runtime/registry';
+import { readAndPrune, resolveTarget, isAlive, unregister } from '../../runtime/registry';
 import type { ProcessEntry } from '../../runtime/registry';
 
 /**
@@ -43,6 +43,11 @@ export async function runKillCli(target: string | undefined): Promise<void> {
     process.exit(1);
   }
   console.log(`正在关闭 bot ${entry.id}…`);
+  if (!isAlive(entry.pid)) {
+    await unregister(entry.id);
+    console.log(`✓ 已清理 bot ${entry.id} 的陈旧登记。`);
+    return;
+  }
   let result: StopProcessEntryResult;
   try {
     result = await stopProcessEntry(entry);
@@ -50,6 +55,7 @@ export async function runKillCli(target: string | undefined): Promise<void> {
     console.error(`✗ 关闭失败:${(err as Error).message}`);
     process.exit(1);
   }
+  await unregister(entry.id);
 
   if (result === 'killed') {
     console.log(`✓ 已强制关闭 bot ${entry.id}。`);
@@ -64,6 +70,7 @@ export async function stopProcessEntry(
   entry: Pick<ProcessEntry, 'pid'> & { id?: string },
   timeoutMs = 2000,
 ): Promise<StopProcessEntryResult> {
+  if (!isAlive(entry.pid)) return 'terminated';
   process.kill(entry.pid, 'SIGTERM');
 
   const deadline = Date.now() + timeoutMs;
