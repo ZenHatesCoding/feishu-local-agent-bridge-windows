@@ -1,5 +1,8 @@
 # 飞书多 Agent 协作：产品目标
 
+[返回中文 README](../README.zh.md) | [English](./PRODUCT_VISION.md) |
+[协作设计](./DESIGN.zh-CN.md) | [Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md)
+
 本文档定义这个项目最终要交付给用户的体验。架构、协议和代码可以演进，
 但不能以牺牲这里的使用体验为代价。出现实现分歧时，以本文档作为产品判断依据。
 

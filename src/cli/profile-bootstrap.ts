@@ -107,6 +107,9 @@ export async function createBootstrapAntigravityConfig(binaryPath: string | unde
   }
   return {
     binaryPath: resolvedBinary,
+    ...(process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY
+      ? { project: process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY }
+      : {}),
     printTimeout: '10m',
     dangerouslySkipPermissions: true,
   };

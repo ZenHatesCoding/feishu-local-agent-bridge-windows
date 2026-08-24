@@ -29,7 +29,7 @@ type AntigravityChild = SpawnedProcessByStdio<null, Readable, Readable>;
 
 export class AntigravityAdapter implements AgentAdapter {
   readonly id = 'antigravity';
-  readonly displayName = 'Antigravity CLI';
+  readonly displayName: string;
 
   private readonly binary: string;
   private readonly project: string | undefined;
@@ -39,6 +39,7 @@ export class AntigravityAdapter implements AgentAdapter {
   private readonly sandbox: boolean;
   private readonly defaultStopGraceMs: number;
   private readonly larkChannel: LarkChannelEnvContext | undefined;
+  private readonly deepSeekHarness: boolean;
   private botIdentity: AgentBotIdentity | undefined;
 
   constructor(opts: AntigravityAdapterOptions) {
@@ -50,6 +51,11 @@ export class AntigravityAdapter implements AgentAdapter {
     this.sandbox = opts.sandbox === true;
     this.defaultStopGraceMs = opts.stopGraceMs ?? 5000;
     this.larkChannel = opts.larkChannel;
+    this.deepSeekHarness = Boolean(
+      process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY &&
+      opts.project === process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY,
+    );
+    this.displayName = this.deepSeekHarness ? 'DeepSeek Harness' : 'Antigravity CLI';
   }
 
   setBotIdentity(identity: AgentBotIdentity): void {
@@ -61,11 +67,13 @@ export class AntigravityAdapter implements AgentAdapter {
   }
 
   async checkAvailability(): Promise<AgentAvailability> {
+    const entryScript = this.deepSeekHarness ? this.project : undefined;
     return checkAgentAvailability({
       agentId: 'antigravity',
-      agentName: 'Antigravity CLI',
+      agentName: this.displayName,
       command: this.binary,
       binaryPath: this.binary,
+      ...(entryScript ? { args: [entryScript, '--version'] } : {}),
     });
   }
 
@@ -73,7 +81,7 @@ export class AntigravityAdapter implements AgentAdapter {
     const availability = await this.checkAvailability();
     if (!availability.ok) {
       throw new SpawnFailed(
-        'antigravity binary check failed',
+        `${this.displayName} binary check failed`,
         availability.error,
         availability.diagnostic.code,
         availability.diagnostic,
@@ -86,26 +94,34 @@ export class AntigravityAdapter implements AgentAdapter {
       throw new Error('cwd is required for AntigravityAdapter.run');
     }
 
+    if (this.deepSeekHarness && !this.project) {
+      throw new Error('DeepSeek Harness CLI entry script is required');
+    }
+
     const prompt = prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
-    const args = [
-      '--print',
-      prompt,
-      '--print-timeout',
-      this.printTimeout,
-      ...(this.project ? ['--project', this.project] : []),
-      ...(opts.model ?? this.model ? ['--model', opts.model ?? this.model!] : []),
-      ...(this.dangerouslySkipPermissions ? ['--dangerously-skip-permissions'] : []),
-      ...(this.sandbox ? ['--sandbox'] : []),
-      '--add-dir',
-      opts.cwd,
-    ];
+    const args = this.deepSeekHarness
+      ? [this.project!, '--profile', 'headless', prompt]
+      : [
+          '--print',
+          prompt,
+          '--print-timeout',
+          this.printTimeout,
+          ...(this.project ? ['--project', this.project] : []),
+          ...(opts.model ?? this.model ? ['--model', opts.model ?? this.model!] : []),
+          ...(this.dangerouslySkipPermissions ? ['--dangerously-skip-permissions'] : []),
+          ...(this.sandbox ? ['--sandbox'] : []),
+          '--add-dir',
+          opts.cwd,
+        ];
 
     const child = spawnProcess(this.binary, args, {
       cwd: opts.cwd,
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.larkChannel),
         ...opts.env,
-        LARK_CHANNEL_ANTIGRAVITY_BRIDGE: '1',
+        LARK_CHANNEL_ANTIGRAVITY_BRIDGE: this.deepSeekHarness ? undefined : '1',
+        LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: this.deepSeekHarness ? '1' : undefined,
+        DSH_CWD: this.deepSeekHarness ? opts.cwd : undefined,
         PATH: antigravityPath(this.larkChannel, process.env.PATH),
         HERMES_HOME: undefined,
         HERMES_GIT_BASH_PATH: undefined,
@@ -126,7 +142,7 @@ export class AntigravityAdapter implements AgentAdapter {
 
     return {
       runId: opts.runId,
-      events: createEventStream(child, stderrChunks, () => runtimeError),
+      events: createEventStream(child, stderrChunks, () => runtimeError, this.displayName),
       async stop() {
         if (child.exitCode !== null || child.signalCode !== null) return;
         child.kill('SIGTERM');
@@ -172,12 +188,13 @@ async function* createEventStream(
   child: AntigravityChild,
   stderrChunks: Buffer[],
   getError: () => Error | null,
+  displayName = 'Antigravity CLI',
 ): AsyncGenerator<AgentEvent> {
   if (!child.pid) {
     const err = getError();
     yield {
       type: 'error',
-      message: err ? `failed to spawn antigravity: ${err.message}` : 'spawn returned no pid',
+      message: err ? `failed to spawn ${displayName}: ${err.message}` : 'spawn returned no pid',
       terminationReason: 'failed',
     };
     return;
@@ -202,7 +219,7 @@ async function* createEventStream(
     const detail = stderr ? `: ${truncateForReply(stderr)}` : '';
     yield {
       type: 'error',
-      message: `antigravity exited with code ${exitCode}${detail}`,
+      message: `${displayName} exited with code ${exitCode}${detail}`,
       terminationReason: 'failed',
     };
     return;
@@ -210,7 +227,7 @@ async function* createEventStream(
   if (runtimeError) {
     yield {
       type: 'error',
-      message: `antigravity runtime error: ${runtimeError.message}`,
+      message: `${displayName} runtime error: ${runtimeError.message}`,
       terminationReason: 'failed',
     };
     return;
@@ -218,7 +235,7 @@ async function* createEventStream(
   if (text.trim().length === 0 && stderr.length > 0) {
     yield {
       type: 'error',
-      message: `antigravity produced no reply. stderr: ${truncateForReply(stderr)}`,
+      message: `${displayName} produced no reply. stderr: ${truncateForReply(stderr)}`,
       terminationReason: 'failed',
     };
     return;

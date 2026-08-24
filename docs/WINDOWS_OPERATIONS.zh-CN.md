@@ -1,6 +1,10 @@
 # Windows 部署与运维
 
-本文面向从 GitHub 克隆项目的新电脑。协作原理见 [DESIGN.zh-CN.md](./DESIGN.zh-CN.md)，用户体验目标见 [PRODUCT_VISION.zh-CN.md](./PRODUCT_VISION.zh-CN.md)。
+[返回中文 README](../README.zh.md) | [English](./WINDOWS_OPERATIONS.md) |
+[Agent 桥接](./AGENT_BRIDGES.zh-CN.md) | [协作设计](./DESIGN.zh-CN.md)
+
+本文面向从 GitHub 克隆项目的新电脑。新部署统一使用
+`feature/feishu-multi-agent-hub`，不再需要为不同 Agent 拉多份分支。
 
 ## 责任边界
 

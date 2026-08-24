@@ -27,3 +27,4 @@ tests-smoke/
 .gemini/
 AppData/
 workspace/
+vendor/

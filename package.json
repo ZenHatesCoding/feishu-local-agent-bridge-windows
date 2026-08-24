@@ -10,12 +10,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows.git"
+    "url": "git+https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git"
   },
   "bugs": {
-    "url": "https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows/issues"
+    "url": "https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows/issues"
   },
-  "homepage": "https://github.com/ZenHatesCoding/lark-antigravity-bridge-windows#readme",
+  "homepage": "https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows#readme",
   "bin": {
     "lark-channel-bridge": "./bin/lark-channel-bridge.mjs"
   },

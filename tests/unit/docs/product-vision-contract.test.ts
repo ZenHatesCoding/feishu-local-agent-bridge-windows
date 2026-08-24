@@ -5,9 +5,11 @@ describe('multi-agent product vision contract', () => {
   it('keeps the product north star linked from entry and architecture docs', async () => {
     const [readme, architecture] = await Promise.all([
       readFile(new URL('../../../README.md', import.meta.url), 'utf8'),
-      readFile(new URL('../../../docs/MULTI_AGENT_HUB.md', import.meta.url), 'utf8'),
+      readFile(new URL('../../../docs/DESIGN.md', import.meta.url), 'utf8'),
     ]);
+    expect(readme).toContain('PRODUCT_VISION.md');
     expect(readme).toContain('PRODUCT_VISION.zh-CN.md');
+    expect(architecture).toContain('PRODUCT_VISION.md');
     expect(architecture).toContain('PRODUCT_VISION.zh-CN.md');
   });
 

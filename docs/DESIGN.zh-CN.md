@@ -1,9 +1,10 @@
 # 飞书多 Agent 协作设计
 
+[返回中文 README](../README.zh.md) | [English](./DESIGN.md) |
+[产品目标](./PRODUCT_VISION.zh-CN.md) | [Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md)
+
 本文解释这个项目真正解决的问题、用户能得到什么体验，以及为什么不能把四个
-机器人简单拉进一个群就算“多 Agent 协作”。产品目标见
-[PRODUCT_VISION.zh-CN.md](./PRODUCT_VISION.zh-CN.md)，Windows 启停操作见
-[WINDOWS_OPERATIONS.zh-CN.md](./WINDOWS_OPERATIONS.zh-CN.md)。
+机器人简单拉进一个群就算“多 Agent 协作”。
 
 ## 一句话思路
 
