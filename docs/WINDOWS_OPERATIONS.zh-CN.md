@@ -74,6 +74,7 @@ notepad .\.runtime\pilot.local.json
 - 停止命令在“原 bridge 本来就没运行”时可能返回非零，可对 `original.stop` 设置 `"ignoreExitCode": true`；恢复命令不建议忽略失败。
 - `hermesHook` 仅用于 Hermes。启用后只复制本项目 Hook 到指定 Hermes Home，停止时只删除该 Hook，不修改源码、venv、配置、记忆或技能。
 - `enabled: false` 可保留尚未准备好的 Agent，不会加入 Hub 或被启动。
+- `hub.maxCausalDepth` 限制单条 Agent 委派因果链的深度，不限制一个话题的累计工作轮数。旧 `maxHops` 仅用于读取旧清单；新配置应使用 `maxCausalDepth`。
 
 路径支持 `%USERPROFILE%`、`%PATH%`、`${REPO_ROOT}`、`${STATE_DIR}`、`${LOCALAPPDATA}`。JSON 中 Windows 反斜杠需要写成 `\\`。
 
@@ -91,6 +92,63 @@ Codex、Claude、Antigravity 或 DeepSeek Harness 应使用本仓库相应适配
 4. 通过产物协议登记和发送文件。
 
 只有启动命令、但没有这四项协议实现的 Agent，不能获得正确的共享与隔离语义。参照 `src/collab`、`src/agent` 和 `adapters/hermes` 编写适配器后，部署脚本无需再改，只需在本地清单增加一个 Agent。
+
+## 协作群白名单
+
+每个 Node bridge profile 都独立维护飞书群白名单；Hub 的任务授权不会绕过这层
+消息入口访问控制。因此，所有会在同一协作群中被人或其他 Agent `@` 的 Node
+bridge（例如 Codex、Antigravity、DeepSeek Harness）都必须分别允许该群。
+
+最稳妥的首次配置方式是由**每个 bot 的 owner 或管理员**在目标群中，逐一真实
+`@` 对应 bot 并发送 `/invite group`。例如分别对 World、Justice、Chariot 操作一次。
+群内通常启用了“必须 @bot”策略，单独发送裸的 `/invite group` 会被静默忽略。
+
+如果 bot 回复“当前群尚未加入响应列表”，说明当前 bot 自己的 profile 尚未加入该群，
+不是 Hub、dispatch 或 Agent 登录失效。也可在该 profile 的 `config.json` 中把当前
+`chat_id` 添加到 `profiles.<profile>.access.allowedChats`，然后仅重启对应 Agent：
+
+```powershell
+.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent justice
+.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent justice
+```
+
+不要把一个 bot 的 `allowedChats` 复制后就假定其他 bot 也已生效：每个 profile 都需要
+单独写入和验证。Hermes 使用自己的原生飞书访问策略，不适用 `allowedChats` 字段；保持
+其现有配置，并按 Hermes 的接入方式单独验证群内 @ 响应。
+
+## Agent 自主委派
+
+协作任务中，Agent 不能只在回复里写一个文本 `@`。要让当前负责人请求专家协助或正式
+交接，使用 pilot 注入的命令：
+
+```powershell
+collab-delegate.cmd ask --target justice --content "审查这份视觉方案的风险"
+collab-delegate.cmd handoff --target chariot --content "接手并完成证据整理"
+```
+
+该命令从当前运行环境取得任务和话题回复目标，先向 Hub 写入幂等 `ask` 或 `handoff`，再
+以当前 bot 身份发送带真实飞书 mention 的话题回复。目标 bridge 只会消费对应 dispatch。
+各 bridge 连接后会自动把自己的飞书 `open_id` 注册到 Hub，因此 Agent 应只使用稳定的
+Hub Agent ID（如 `world`、`justice`、`chariot`），不应自行查询群成员、猜测 open_id，或用
+裸 `lark-cli` 发送委派。
+
+Pilot 还会把 `scripts\collab-pilot\bin` 放在每个 Agent 的 `PATH` 最前面。目录内的
+`lark-cli.cmd` / `lark-cli.ps1` 是不绑定身份的统一入口：它们只调用清单中配置的真实
+`larkCliJs`，并保留当前 Agent 的 `LARK_CHANNEL_*` 和 `LARKSUITE_CLI_CONFIG_DIR`。因此即使
+某个外部 bridge 目录残留了写死其他 bot profile 的同名脚本，也不能劫持当前 bot 的发送
+身份。不要在这些统一入口中写死 profile 路径、App ID、`HOME` 或 `USERPROFILE`。
+
+## 网络环境边界
+
+`commonEnvironment` 和 `unsetEnvironment` 用于建立默认直连环境；某个 Agent 的
+`launch.environment` 只覆盖自己的子进程。不要为了一个模型 CLI 修改 Hub 或所有
+机器人的全局代理。Antigravity 使用 `agy.exe` 时，pilot 会在未显式配置代理的前提下
+读取 Windows 当前用户代理，并只传给该 Agent；`LARK_CHANNEL_DISABLE_PROXY=1` 仍让
+飞书连接直连，`NO_PROXY` 则保证本机 Hub 地址不经过代理。
+
+认证文件属于 Agent 自己，网络配置不应安装、重置或迁移认证数据。排查时分别检查
+Hub health、bridge 是否连接、Agent CLI 是否可执行、代理端口和模型端点，不能把模型
+端点的 EOF 或超时直接归类成登录失效。
 
 ## 后台启停
 

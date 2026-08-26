@@ -29,6 +29,23 @@ It does not share raw chain-of-thought, scratch work, irrelevant tool logs,
 model session metadata, App Secrets, tokens or unrelated topics. Agents retain
 their own models, reasoning depth, speed, tools and memory.
 
+## Correctness Comes From Boundaries
+
+Collaboration spans three planes that must align without being conflated:
+
+| Plane | Source of truth | Responsibility |
+| --- | --- | --- |
+| Control | Hub ledger | Tasks, ownership, dispatch, causality, lifecycle and idempotency |
+| Messaging | Feishu | Visible conversation, real mentions, topics and file delivery |
+| Execution | Agent bridge | Model process, workspace, login, network and current bot identity |
+
+A text mention is not authorization, a dispatch is not a physical wake-up, and
+a model name is not a Feishu sending identity. Consequently, one run consumes
+one dispatch addressed to it; child actions cite that active parent dispatch;
+messages and files use the current bridge profile; every bot independently
+passes group admission; and proxy settings are scoped to the process that needs
+them rather than inherited by the whole system.
+
 ```mermaid
 flowchart LR
   U["User and Feishu topic"]
@@ -61,8 +78,30 @@ A real Feishu `@` and a Hub `dispatch` are two separate keys:
 A human mention can assign work directly. An agent must first record a
 structured `handoff`, `ask` or `return`, then visibly mention the target in the
 same topic. A text-only mention without pending authorization is ignored. Each
-dispatch is consumed once and has hop/idempotency limits, preventing prompt
-forgery, duplicate retries and bot wake-up loops.
+dispatch is consumed once, is tied to the active dispatch that caused it, and
+has an idempotency key. The loop guard applies to the depth of that causal
+chain—not to the lifetime number of delegations in a topic. Every new human
+assignment starts a new root at depth 1, so a long-lived topic never becomes
+unusable merely because it has accumulated legitimate work. The causal-depth
+ceiling only stops unbounded Agent-to-Agent recursion.
+
+Dispatches have an explicit lifecycle: `pending -> accepted -> completed` or
+`pending -> accepted -> failed`. A child action must name an accepted parent
+dispatch for the same task and actor. This prevents stale work from spawning
+new work and makes failed runs auditable instead of leaving them accepted.
+
+Agent-originated delegation uses one entry point for both keys. It accepts a
+stable Hub agent ID, records the causal `ask` or `handoff`, resolves the target
+bot's current Feishu `open_id` from the runtime identity registry, and sends a
+real mention. Agents never guess identity from group membership. Hub actions
+and Feishu delivery use stable idempotency keys, so a retry does not create a
+second unit of work.
+
+The identity registry contains routing metadata, never credentials. Each bot's
+credentials remain in its profile. The pilot prepends an identity-neutral
+`lark-cli` entry point that preserves the current bridge environment; stale
+same-name scripts in an external workspace therefore cannot make one agent send
+as another.
 
 ## Ownership State Machine
 
@@ -99,6 +138,27 @@ bury it. The model is asked for conclusions, evidence, artifact paths and next
 steps, not private reasoning. Its final visible response becomes a reusable
 task event for later authorized participants.
 
+Capacity must not be handled by silently chopping arbitrary ledger events. The
+ledger remains the complete append-only fact source and the Hub produces a
+semantic projection by task, participation and visibility. As tasks grow, the
+correct extension is a source-sequenced summary checkpoint with cursor access
+to original events, while adapters carry large prompts over stdin or files
+instead of treating Windows argv length as a business limit. Every projection
+must disclose its covered sequence range and provenance.
+
+## Causal Depth, Not Topic Age
+
+`hop` is the depth of the current delegation chain. Every new human assignment
+creates a root at depth 1; only an Agent-to-Agent child increments it. A topic
+may therefore host any number of legitimate human turns without becoming
+permanently unusable. `maxCausalDepth` limits only recursive wake-up chains.
+Legacy `maxHops` is accepted for manifest migration, but new configuration uses
+the causal name.
+
+A child action must reference an accepted dispatch for the same task whose
+target is the acting agent. Bridges close every accepted dispatch as
+`completed` or `failed`, so stale and failed runs cannot silently remain active.
+
 ## Visibility
 
 | Visibility | Readers | Typical content |
@@ -132,9 +192,22 @@ keys. `collab-artifact.cmd publish` snapshots the file, sends it through the
 current bot identity, then records the event only after delivery succeeds.
 Inbound attachments are also snapshotted after bridge validation.
 
+Transport idempotency keys are bounded protocol fields. They are derived from
+bounded task/agent/content-hash components to satisfy the platform limit; the
+full SHA-256 remains in the artifact record for integrity and deduplication.
+
 Hermes keeps native attachment sending. The isolated Hook detects real output
 paths, snapshots them and records the same protocol event. Hermes source, venv,
 configuration, sessions, memories and skills are not replaced.
+
+## Network Is Per-Agent Capability
+
+The Hub and Feishu channel remain direct. A model CLI that needs a proxy gets
+it only in that agent's child environment, with localhost excluded so Hub calls
+stay local. For Antigravity, the launcher may derive the current Windows user
+proxy for `agy.exe`; it does not reinstall the agent, modify authentication
+state, or leak proxy variables to other agents. Connectivity, bridge health and
+authentication are separate diagnostic dimensions.
 
 ## Deployment Shape
 

@@ -7,7 +7,7 @@
   "ledgerPath": "../data/collaboration.jsonl",
   "tokenEnv": "LARK_COLLAB_HUB_TOKEN",
   "leaseMinutes": 30,
-  "maxHops": 8,
+  "maxCausalDepth": 8,
   "coordinator": {
     "enabled": false,
     "tenant": "feishu",

@@ -19,6 +19,13 @@ export interface AgentRegistration {
   aliases?: string[];
 }
 
+/** Runtime-only Feishu identity, registered by a connected bridge. */
+export interface AgentIdentity {
+  id: AgentId;
+  displayName: string;
+  openId: string;
+}
+
 export interface MessageInput {
   type: 'message';
   idempotencyKey: string;
@@ -37,6 +44,8 @@ export interface ActionInput {
   idempotencyKey: string;
   taskId: string;
   actorAgentId: AgentId;
+  /** Dispatch whose active agent run caused this action. */
+  causedByDispatchId: string;
   targetAgentId?: AgentId;
   content: string;
   references?: string[];
@@ -93,6 +102,7 @@ export type LedgerEvent =
       references: string[];
       occurredAt: string;
       visibility: ContextVisibility;
+      causedByDispatchId: string;
     }
   | {
       kind: 'artifact';
@@ -108,6 +118,8 @@ export type LedgerEvent =
       reason: 'assign' | 'fanout' | 'handoff' | 'ask' | 'return';
       objective: string;
       sourceSequence: number;
+      parentDispatchId?: string;
+      /** Depth in the current causal dispatch chain. Human assignments start at 1. */
       hop: number;
     }
   | {
@@ -135,6 +147,8 @@ export interface Dispatch {
   reason: 'assign' | 'fanout' | 'handoff' | 'ask' | 'return';
   objective: string;
   sourceSequence: number;
+  parentDispatchId?: string;
+  /** Depth in the current causal dispatch chain. Human assignments start at 1. */
   hop: number;
   status: 'pending' | 'accepted' | 'completed' | 'failed';
 }
@@ -147,7 +161,6 @@ export interface TaskProjection {
   leaseExpiresAt?: string;
   participants: AgentId[];
   lastSequence: number;
-  lastDispatchHop: number;
 }
 
 export interface ContextEntry {

@@ -1,5 +1,5 @@
 import { dirname, resolve } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnProcessSync } from '../../platform/spawn';
 import { CollaborationClient } from '../../collab/client';
 import type { ActionInput } from '../../collab/types';
@@ -18,7 +18,7 @@ export async function runCollaborationHub(options: { config: string }): Promise<
   const hub = new CollaborationHub(new JsonlLedger(config.ledgerPath), {
     agents: config.agents,
     leaseMs: config.leaseMinutes * 60_000,
-    maxHops: config.maxHops,
+    maxCausalDepth: config.maxCausalDepth,
   });
   await hub.initialize();
   const server = new CollaborationHubServer(hub, { ...config.listen, token });
@@ -65,6 +65,7 @@ export async function runCollaborationAction(
     target?: string;
     content: string;
     idempotencyKey?: string;
+    causedByDispatchId?: string;
   },
 ): Promise<void> {
   const baseUrl = process.env.LARK_COLLAB_HUB_URL;
@@ -76,15 +77,64 @@ export async function runCollaborationAction(
     throw new Error(`${type} requires --target`);
   }
   const client = new CollaborationClient({ baseUrl, token });
+  const causedByDispatchId = options.causedByDispatchId ?? process.env.LARK_COLLAB_DISPATCH_ID;
+  if (!causedByDispatchId) throw new Error('collaboration actions require --caused-by-dispatch or LARK_COLLAB_DISPATCH_ID');
   const result = await client.submit({
     type,
     idempotencyKey: options.idempotencyKey ?? `${type}:${randomUUID()}`,
     taskId: options.task,
     actorAgentId: options.actor,
+    causedByDispatchId,
     ...(options.target ? { targetAgentId: options.target } : {}),
     content: options.content,
   });
   console.log(JSON.stringify({ task: result.task, dispatches: result.dispatches }, null, 2));
+}
+
+/** Authorize a delegation and visibly wake the target bot in the current topic. */
+export async function runCollaborationDelegate(
+  type: 'handoff' | 'ask',
+  options: { target: string; content: string },
+): Promise<void> {
+  const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');
+  const token = requiredEnv('LARK_COLLAB_HUB_TOKEN');
+  const taskId = requiredEnv('LARK_COLLAB_TASK_ID');
+  const actor = requiredEnv('LARK_COLLAB_AGENT_ID');
+  const replyTo = requiredEnv('LARK_COLLAB_REPLY_TO');
+  const causedByDispatchId = requiredEnv('LARK_COLLAB_DISPATCH_ID');
+  const client = new CollaborationClient({ baseUrl, token });
+  const target = options.target.trim();
+  const content = options.content.trim();
+  if (!target || !content) throw new Error('target and content are required');
+  const identity = (await client.identities()).agents.find((agent) => agent.id === target);
+  if (!identity) {
+    throw new Error(`target agent is connected but has not registered its Feishu identity: ${target}`);
+  }
+  const digest = createHash('sha256').update(`${type}\0${taskId}\0${causedByDispatchId}\0${actor}\0${target}\0${content}`).digest('hex').slice(0, 24);
+  const result = await client.submit({
+    type,
+    idempotencyKey: `delegate:${digest}`,
+    taskId,
+    actorAgentId: actor,
+    causedByDispatchId,
+    targetAgentId: target,
+    content,
+  });
+  const post = JSON.stringify({
+    zh_cn: { content: [[
+      { tag: 'at', user_id: identity.openId, user_name: identity.displayName },
+      { tag: 'text', text: ` ${content}` },
+    ]] },
+  });
+  const send = spawnProcessSync('lark-cli', [
+    'im', '+messages-reply', '--message-id', replyTo, '--content', post,
+    '--msg-type', 'post', '--reply-in-thread', '--idempotency-key', `delegate-${digest}`, '--json',
+  ], { env: process.env, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+  if (send.stdout) process.stdout.write(String(send.stdout));
+  if (send.stderr) process.stderr.write(String(send.stderr));
+  if (send.error) throw send.error;
+  if (send.status !== 0) throw new Error(`Feishu delegation mention failed with exit code ${send.status}`);
+  process.stdout.write(`${JSON.stringify({ task: result.task, dispatches: result.dispatches, mentioned: target }, null, 2)}\n`);
 }
 
 export async function runArtifactPublish(options: {
@@ -109,7 +159,7 @@ export async function runArtifactPublish(options: {
     taskId: options.task,
     originalName: options.name,
   });
-  const sendIdempotencyKey = `collab-${options.task.slice(-12)}-${options.actor}-${artifact.sha256.slice(0, 24)}`;
+  const sendIdempotencyKey = `collab-${options.task.slice(-8)}-${options.actor}-${artifact.sha256.slice(0, 16)}`.slice(0, 50);
   const args = options.replyTo
     ? [
         larkCliJs,

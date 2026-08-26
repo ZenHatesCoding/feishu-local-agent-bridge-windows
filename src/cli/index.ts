@@ -24,7 +24,7 @@ import {
   runServiceUnregister,
 } from './commands/service';
 import { runStart } from './commands/start';
-import { runArtifactPublish, runCollaborationAction, runCollaborationHub } from './commands/hub';
+import { runArtifactPublish, runCollaborationAction, runCollaborationDelegate, runCollaborationHub } from './commands/hub';
 
 const program = new Command();
 
@@ -53,6 +53,7 @@ for (const action of ['handoff', 'ask', 'return', 'complete'] as const) {
     .requiredOption('--actor <agent>', 'calling agent id')
     .option('--target <agent>', 'target agent id (required for handoff and ask)')
     .requiredOption('--content <text>', 'objective, question, result, or summary')
+    .option('--caused-by-dispatch <id>', 'active dispatch that caused this action; defaults to bridge environment')
     .option('--idempotency-key <key>', 'stable retry key; generated when omitted')
     .action(async (opts: {
       task: string;
@@ -60,8 +61,20 @@ for (const action of ['handoff', 'ask', 'return', 'complete'] as const) {
       target?: string;
       content: string;
       idempotencyKey?: string;
+      causedByDispatchId?: string;
     }) => {
       await runCollaborationAction(action, opts);
+    });
+}
+
+for (const action of ['handoff', 'ask'] as const) {
+  hub
+    .command(`delegate-${action}`)
+    .description(`Authorize and visibly @ an agent for a collaboration ${action}`)
+    .requiredOption('--target <agent>', 'target agent id')
+    .requiredOption('--content <text>', 'objective or question')
+    .action(async (opts: { target: string; content: string }) => {
+      await runCollaborationDelegate(action, opts);
     });
 }
 

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { taskIdFor } from './task-id';
 import type {
   ActionInput,
+  AgentIdentity,
   ArtifactInput,
   AgentId,
   AgentRegistration,
@@ -21,7 +22,7 @@ import { JsonlLedger } from './ledger';
 export interface CollaborationHubOptions {
   agents: AgentRegistration[];
   leaseMs?: number;
-  maxHops?: number;
+  maxCausalDepth?: number;
   now?: () => Date;
   idFactory?: () => string;
 }
@@ -32,8 +33,9 @@ export class CollaborationHub {
   private readonly dispatches = new Map<string, Dispatch>();
   private readonly idempotency = new Map<string, string>();
   private readonly agents: Map<string, AgentRegistration>;
+  private readonly agentIdentities = new Map<string, AgentIdentity>();
   private readonly leaseMs: number;
-  private readonly maxHops: number;
+  private readonly maxCausalDepth: number;
   private readonly now: () => Date;
   private readonly idFactory: () => string;
   private sequence = 0;
@@ -42,7 +44,7 @@ export class CollaborationHub {
   constructor(private readonly ledger: JsonlLedger, options: CollaborationHubOptions) {
     this.agents = new Map(options.agents.map((agent) => [agent.id, agent]));
     this.leaseMs = options.leaseMs ?? 30 * 60_000;
-    this.maxHops = options.maxHops ?? 8;
+    this.maxCausalDepth = options.maxCausalDepth ?? 8;
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? randomUUID;
     if (this.agents.size !== options.agents.length) throw new Error('agent ids must be unique');
@@ -68,6 +70,12 @@ export class CollaborationHub {
       if (!dispatch) throw new Error(`dispatch not found: ${dispatchId}`);
       if (dispatch.targetAgentId !== agentId) throw new Error('dispatch belongs to another agent');
       if (this.idempotency.has(idempotencyKey)) return { ...dispatch };
+      if (status === 'accepted' && dispatch.status !== 'pending') {
+        throw new Error(`dispatch cannot be accepted from ${dispatch.status}`);
+      }
+      if ((status === 'completed' || status === 'failed') && dispatch.status !== 'accepted') {
+        throw new Error(`dispatch cannot be ${status} from ${dispatch.status}`);
+      }
       const record = this.record(idempotencyKey, dispatch.taskId, {
         kind: 'ack', dispatchId, agentId, status,
       });
@@ -87,6 +95,19 @@ export class CollaborationHub {
       .filter((item) => item.targetAgentId === agentId && item.sequence > afterSequence)
       .sort((a, b) => a.sequence - b.sequence)
       .map((item) => ({ ...item }));
+  }
+
+  registerAgentIdentity(agentId: string, openId: string): AgentIdentity {
+    const agent = this.agents.get(agentId);
+    if (!agent) throw new Error(`unknown agent: ${agentId}`);
+    if (!openId.trim()) throw new Error('agent openId is required');
+    const identity = { id: agent.id, displayName: agent.displayName, openId: openId.trim() };
+    this.agentIdentities.set(agentId, identity);
+    return { ...identity };
+  }
+
+  listAgentIdentities(): AgentIdentity[] {
+    return [...this.agentIdentities.values()].sort((a, b) => a.id.localeCompare(b.id)).map((item) => ({ ...item }));
   }
 
   getContext(taskId: string, agentId: string, afterSequence = 0): ContextEntry[] {
@@ -199,9 +220,10 @@ export class CollaborationHub {
       if (input.targetAgentId === input.actorAgentId) throw new Error('an agent cannot target itself');
     }
 
-    const nextHop = task.lastDispatchHop + 1;
-    if ((input.type === 'handoff' || input.type === 'ask' || input.type === 'return') && nextHop > this.maxHops) {
-      throw new Error(`maximum collaboration hops exceeded (${this.maxHops})`);
+    const parent = this.requireActiveParentDispatch(task.id, input.actorAgentId, input.causedByDispatchId);
+    const nextHop = parent.hop + 1;
+    if ((input.type === 'handoff' || input.type === 'ask' || input.type === 'return') && nextHop > this.maxCausalDepth) {
+      throw new Error(`maximum causal delegation depth exceeded (${this.maxCausalDepth})`);
     }
     if (input.type === 'complete' && activeOwner !== input.actorAgentId) {
       throw new Error(`only the current owner (${activeOwner ?? 'none'}) may complete the task`);
@@ -221,15 +243,16 @@ export class CollaborationHub {
       references: input.references ?? [],
       occurredAt,
       visibility,
+      causedByDispatchId: input.causedByDispatchId,
     });
     const records = [action];
     if (input.type === 'handoff') {
       records.push(this.record(`${input.idempotencyKey}:lease`, task.id, {
         kind: 'lease', ownerAgentId: input.targetAgentId!, reason: 'handoff', expiresAt: this.leaseExpiry(),
       }));
-      records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'handoff', input.content, action.sequence, nextHop));
+      records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'handoff', input.content, action.sequence, nextHop, parent.id));
     } else if (input.type === 'ask') {
-      records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'ask', input.content, action.sequence, nextHop));
+      records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'ask', input.content, action.sequence, nextHop, parent.id));
     } else if (input.type === 'return' && activeOwner && activeOwner !== input.actorAgentId) {
       records.push(this.dispatchRecord(
         input.idempotencyKey,
@@ -239,6 +262,7 @@ export class CollaborationHub {
         input.content,
         action.sequence,
         nextHop,
+        parent.id,
       ));
     } else if (input.type === 'complete') {
       records.push(this.record(`${input.idempotencyKey}:complete`, task.id, {
@@ -270,6 +294,7 @@ export class CollaborationHub {
     objective: string,
     sourceSequence: number,
     hop: number,
+    parentDispatchId?: string,
   ): LedgerRecord {
     this.requireAgent(targetAgentId);
     return this.record(`${baseKey}:dispatch:${targetAgentId}`, taskId, {
@@ -279,6 +304,7 @@ export class CollaborationHub {
       reason,
       objective,
       sourceSequence,
+      ...(parentDispatchId ? { parentDispatchId } : {}),
       hop,
     });
   }
@@ -322,7 +348,6 @@ export class CollaborationHub {
         status: 'open',
         participants: [],
         lastSequence: record.sequence,
-        lastDispatchHop: 0,
       };
       this.tasks.set(record.taskId, task);
     }
@@ -341,7 +366,6 @@ export class CollaborationHub {
     } else if (event.kind === 'artifact') {
       addParticipant(task, event.actorAgentId);
     } else if (event.kind === 'dispatch') {
-      task.lastDispatchHop = Math.max(task.lastDispatchHop, event.hop);
       addParticipant(task, event.targetAgentId);
       this.dispatches.set(event.dispatchId, {
         id: event.dispatchId,
@@ -351,6 +375,7 @@ export class CollaborationHub {
         reason: event.reason,
         objective: event.objective,
         sourceSequence: event.sourceSequence,
+        ...(event.parentDispatchId ? { parentDispatchId: event.parentDispatchId } : {}),
         hop: event.hop,
         status: 'pending',
       });
@@ -384,6 +409,18 @@ export class CollaborationHub {
 
   private requireAgent(agentId: AgentId): void {
     if (!this.agents.has(agentId)) throw new Error(`unknown agent: ${agentId}`);
+  }
+
+  private requireActiveParentDispatch(taskId: string, actorAgentId: AgentId, dispatchId: string): Dispatch {
+    if (!dispatchId?.trim()) throw new Error('causedByDispatchId is required');
+    const dispatch = this.dispatches.get(dispatchId);
+    if (!dispatch) throw new Error(`causal dispatch not found: ${dispatchId}`);
+    if (dispatch.taskId !== taskId) throw new Error('causal dispatch belongs to another task');
+    if (dispatch.targetAgentId !== actorAgentId) throw new Error('causal dispatch belongs to another agent');
+    if (dispatch.status !== 'accepted') {
+      throw new Error(`causal dispatch is not active: ${dispatch.status}`);
+    }
+    return dispatch;
   }
 
   private leaseExpiry(): string {

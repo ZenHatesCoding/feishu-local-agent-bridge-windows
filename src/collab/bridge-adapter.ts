@@ -24,6 +24,10 @@ export class BridgeCollaborationAdapter {
     private readonly artifactRoot?: string,
   ) {}
 
+  registerIdentity(openId: string): Promise<void> {
+    return this.client.registerIdentity(this.agentId, openId).then(() => undefined);
+  }
+
   async intake(msg: NormalizedMessage): Promise<BridgeCollaborationDecision> {
     if (msg.chatType === 'p2p' || !msg.threadId) return { managed: false, respond: true };
     const actorType = senderTypeOf(msg);
@@ -66,15 +70,39 @@ export class BridgeCollaborationAdapter {
     return this.acceptDispatch(msg, result.task.id, dispatch);
   }
 
-  async recordResult(taskId: string, content: string, runId: string): Promise<void> {
-    if (!content.trim()) return;
-    await this.client.submit({
-      type: 'return',
-      idempotencyKey: `agent-result:${this.agentId}:${runId}`,
-      taskId,
-      actorAgentId: this.agentId,
-      content,
-    });
+  async finishRun(
+    taskId: string,
+    content: string,
+    runId: string,
+    dispatchId: string,
+    success: boolean,
+  ): Promise<void> {
+    try {
+      if (success && content.trim()) {
+        await this.client.submit({
+          type: 'return',
+          idempotencyKey: `agent-result:${this.agentId}:${runId}`,
+          taskId,
+          actorAgentId: this.agentId,
+          causedByDispatchId: dispatchId,
+          content,
+        });
+      }
+      await this.client.acknowledge(dispatchId, {
+        agentId: this.agentId,
+        status: success ? 'completed' : 'failed',
+        idempotencyKey: `${success ? 'complete' : 'fail'}:${dispatchId}:${runId}`,
+      });
+    } catch (err) {
+      if (success) {
+        await this.client.acknowledge(dispatchId, {
+          agentId: this.agentId,
+          status: 'failed',
+          idempotencyKey: `fail:${dispatchId}:${runId}`,
+        }).catch(() => undefined);
+      }
+      throw err;
+    }
   }
 
   async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {
@@ -117,6 +145,7 @@ export class BridgeCollaborationAdapter {
     dispatch: Dispatch,
   ): Promise<BridgeCollaborationDecision> {
     const context = await this.client.context(taskId, this.agentId);
+    const identities = await this.client.identities();
     await this.client.acknowledge(dispatch.id, {
       agentId: this.agentId,
       status: 'accepted',
@@ -130,6 +159,7 @@ export class BridgeCollaborationAdapter {
         dispatch,
       entries: context.entries,
       artifacts: context.artifacts,
+      agents: identities.agents,
       }),
       taskId,
       dispatchId: dispatch.id,

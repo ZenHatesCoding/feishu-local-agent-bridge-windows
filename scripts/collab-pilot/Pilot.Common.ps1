@@ -83,7 +83,7 @@ function Initialize-CollabRuntimeState {
     ledgerPath = 'collaboration.jsonl'
     tokenEnv = 'LARK_COLLAB_HUB_TOKEN'
     leaseMinutes = if ($pilot.hub.leaseMinutes) { [int]$pilot.hub.leaseMinutes } else { 30 }
-    maxHops = if ($pilot.hub.maxHops) { [int]$pilot.hub.maxHops } else { 8 }
+    maxCausalDepth = if ($pilot.hub.maxCausalDepth) { [int]$pilot.hub.maxCausalDepth } elseif ($pilot.hub.maxHops) { [int]$pilot.hub.maxHops } else { 8 }
     agents = $hubAgents
   }
   [IO.File]::WriteAllText($script:CollabConfigFile, ($config | ConvertTo-Json -Depth 8))

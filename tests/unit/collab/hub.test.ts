@@ -41,6 +41,18 @@ function humanMessage(overrides: Partial<MessageInput> = {}): MessageInput {
 }
 
 describe('CollaborationHub', () => {
+  it('keeps connected bot identities available for deterministic delegation', async () => {
+    const { hub } = await fixture();
+    expect(hub.registerAgentIdentity('chariot', 'ou_chariot')).toEqual({
+      id: 'chariot', displayName: 'Chariot', openId: 'ou_chariot',
+    });
+    hub.registerAgentIdentity('world', 'ou_world');
+    expect(hub.listAgentIdentities()).toEqual([
+      { id: 'chariot', displayName: 'Chariot', openId: 'ou_chariot' },
+      { id: 'world', displayName: 'World', openId: 'ou_world' },
+    ]);
+  });
+
   it('assigns one mentioned agent and creates a durable dispatch', async () => {
     const { hub, path } = await fixture();
     const result = await hub.submit(humanMessage());
@@ -73,31 +85,37 @@ describe('CollaborationHub', () => {
   it('moves the lease on handoff and keeps ask ownership unchanged', async () => {
     const { hub } = await fixture();
     const assigned = await hub.submit(humanMessage());
+    await hub.acknowledge(assigned.dispatches[0]!.id, 'world', 'accepted', 'accept-assigned');
     const asked = await hub.submit({
       type: 'ask',
       idempotencyKey: 'ask-1',
       taskId: assigned.task.id,
       actorAgentId: 'world',
+      causedByDispatchId: assigned.dispatches[0]!.id,
       targetAgentId: 'justice',
       content: 'Check this assumption',
     });
     expect(asked.task.ownerAgentId).toBe('world');
     expect(asked.dispatches[0]).toMatchObject({ targetAgentId: 'justice', reason: 'ask' });
+    await hub.acknowledge(asked.dispatches[0]!.id, 'justice', 'accepted', 'accept-asked');
     const returned = await hub.submit({
       type: 'return',
       idempotencyKey: 'return-1',
       taskId: assigned.task.id,
       actorAgentId: 'justice',
+      causedByDispatchId: asked.dispatches[0]!.id,
       content: 'Assumption checked',
     });
     expect(returned.task.ownerAgentId).toBe('world');
     expect(returned.dispatches[0]).toMatchObject({ targetAgentId: 'world', reason: 'return' });
+    await hub.acknowledge(returned.dispatches[0]!.id, 'world', 'accepted', 'accept-returned');
 
     const handedOff = await hub.submit({
       type: 'handoff',
       idempotencyKey: 'handoff-1',
       taskId: assigned.task.id,
       actorAgentId: 'world',
+      causedByDispatchId: returned.dispatches[0]!.id,
       targetAgentId: 'chariot',
       content: 'Implement from these conclusions',
     });
@@ -107,6 +125,7 @@ describe('CollaborationHub', () => {
       idempotencyKey: 'stale-owner',
       taskId: assigned.task.id,
       actorAgentId: 'world',
+      causedByDispatchId: returned.dispatches[0]!.id,
       targetAgentId: 'fool',
       content: 'This stale owner must not route work',
     })).rejects.toThrow('only the current owner');
@@ -122,11 +141,13 @@ describe('CollaborationHub', () => {
       content: 'World owns the next step',
     }));
     expect(assigned.task.id).toBe(fanout.task.id);
+    await hub.acknowledge(assigned.dispatches[0]!.id, 'world', 'accepted', 'accept-visible');
     await hub.submit({
       type: 'ask',
       idempotencyKey: 'ask-private',
       taskId: assigned.task.id,
       actorAgentId: 'world',
+      causedByDispatchId: assigned.dispatches[0]!.id,
       targetAgentId: 'justice',
       content: 'Targeted question',
     });
@@ -227,8 +248,61 @@ describe('CollaborationHub', () => {
       idempotencyKey: 'expired-handoff',
       taskId: assigned.task.id,
       actorAgentId: 'world',
+      causedByDispatchId: assigned.dispatches[0]!.id,
       targetAgentId: 'justice',
       content: 'Too late',
     })).rejects.toThrow('current owner (none)');
+  });
+
+  it('resets causal depth for each human instruction in a long-lived topic', async () => {
+    const { hub } = await fixture();
+    for (let turn = 1; turn <= 12; turn++) {
+      const assigned = await hub.submit(humanMessage({
+        idempotencyKey: `human-${turn}`,
+        messageId: `om_${turn}`,
+        content: `Human instruction ${turn}`,
+      }));
+      await hub.acknowledge(assigned.dispatches[0]!.id, 'world', 'accepted', `accept-human-${turn}`);
+      const asked = await hub.submit({
+        type: 'ask',
+        idempotencyKey: `ask-${turn}`,
+        taskId: assigned.task.id,
+        actorAgentId: 'world',
+        causedByDispatchId: assigned.dispatches[0]!.id,
+        targetAgentId: 'justice',
+        content: `Review turn ${turn}`,
+      });
+      expect(asked.dispatches[0]!.hop).toBe(2);
+      await hub.acknowledge(assigned.dispatches[0]!.id, 'world', 'completed', `complete-human-${turn}`);
+    }
+  });
+
+  it('limits only a true causal delegation chain', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'collab-causal-depth-'));
+    const hub = new CollaborationHub(new JsonlLedger(join(dir, 'ledger.jsonl')), {
+      agents,
+      maxCausalDepth: 3,
+    });
+    await hub.initialize();
+    const assigned = await hub.submit(humanMessage());
+    const root = assigned.dispatches[0]!;
+    await hub.acknowledge(root.id, 'world', 'accepted', 'accept-root');
+    const ask = await hub.submit({
+      type: 'ask', idempotencyKey: 'causal-ask', taskId: assigned.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.id, targetAgentId: 'justice', content: 'Review',
+    });
+    const review = ask.dispatches[0]!;
+    await hub.acknowledge(review.id, 'justice', 'accepted', 'accept-review');
+    const returned = await hub.submit({
+      type: 'return', idempotencyKey: 'causal-return', taskId: assigned.task.id,
+      actorAgentId: 'justice', causedByDispatchId: review.id, content: 'Reviewed',
+    });
+    const ownerReturn = returned.dispatches[0]!;
+    expect(ownerReturn.hop).toBe(3);
+    await hub.acknowledge(ownerReturn.id, 'world', 'accepted', 'accept-owner-return');
+    await expect(hub.submit({
+      type: 'ask', idempotencyKey: 'too-deep', taskId: assigned.task.id,
+      actorAgentId: 'world', causedByDispatchId: ownerReturn.id, targetAgentId: 'chariot', content: 'Continue recursively',
+    })).rejects.toThrow('maximum causal delegation depth exceeded (3)');
   });
 });

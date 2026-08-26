@@ -61,7 +61,7 @@ describe('BridgeCollaborationAdapter', () => {
     expect(decision).toMatchObject({ managed: true, respond: true });
     expect(decision.promptContext).toContain('collaboration_context');
     expect(decision.promptContext).toContain('Analyze deeply');
-    await adapter.recordResult(decision.taskId!, 'World accepted architecture A', 'run-1');
+    await adapter.finishRun(decision.taskId!, 'World accepted architecture A', 'run-1', decision.dispatchId!, true);
     expect(JSON.stringify(hub.getContext(decision.taskId!, 'world')))
       .toContain('World accepted architecture A');
   });
@@ -115,6 +115,7 @@ describe('BridgeCollaborationAdapter', () => {
       idempotencyKey: 'handoff-1',
       taskId: assigned.taskId!,
       actorAgentId: 'world',
+      causedByDispatchId: assigned.dispatchId!,
       targetAgentId: 'chariot',
       content: 'Implement the accepted design',
     });

@@ -48,6 +48,15 @@ export class CollaborationHubServer {
         const body = await readJson(req, this.options.maxBodyBytes ?? 256 * 1024) as HubInput;
         return json(res, 200, await this.hub.submit(body));
       }
+      if (req.method === 'GET' && url.pathname === '/v1/agents') {
+        return json(res, 200, { agents: this.hub.listAgentIdentities() });
+      }
+      const identityMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)\/identity$/);
+      if (req.method === 'POST' && identityMatch) {
+        const body = await readJson(req, this.options.maxBodyBytes ?? 256 * 1024) as { openId?: string };
+        if (!body.openId) throw new Error('openId is required');
+        return json(res, 200, { agent: this.hub.registerAgentIdentity(decodeURIComponent(identityMatch[1]!), body.openId) });
+      }
       const contextMatch = url.pathname.match(/^\/v1\/tasks\/([^/]+)\/context$/);
       if (req.method === 'GET' && contextMatch) {
         const agentId = requiredQuery(url, 'agentId');

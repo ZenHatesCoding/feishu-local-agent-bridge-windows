@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "hub": { "host": "127.0.0.1", "port": 17321, "leaseMinutes": 30, "maxHops": 8, "tenantKey": "replace-with-a-private-shared-key" },
+  "hub": { "host": "127.0.0.1", "port": 17321, "leaseMinutes": 30, "maxCausalDepth": 8, "tenantKey": "replace-with-a-private-shared-key" },
   "larkCliJs": "",
   "commonEnvironment": { "LARK_CHANNEL_DISABLE_PROXY": "1" },
   "unsetEnvironment": ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"],

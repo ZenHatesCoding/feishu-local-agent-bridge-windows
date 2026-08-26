@@ -8,7 +8,7 @@ export interface HubConfig {
   ledgerPath: string;
   tokenEnv: string;
   leaseMinutes: number;
-  maxHops: number;
+  maxCausalDepth: number;
   agents: AgentRegistration[];
   coordinator?: {
     enabled: boolean;
@@ -50,7 +50,7 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
     ledgerPath: resolve(base, parsed.ledgerPath),
     tokenEnv: parsed.tokenEnv,
     leaseMinutes: parsed.leaseMinutes ?? 30,
-    maxHops: parsed.maxHops ?? 8,
+    maxCausalDepth: parsed.maxCausalDepth ?? (parsed as Partial<HubConfig> & { maxHops?: number }).maxHops ?? 8,
     agents: parsed.agents,
     ...(parsed.coordinator ? { coordinator: parsed.coordinator } : {}),
   };

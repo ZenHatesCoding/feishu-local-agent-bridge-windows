@@ -1,6 +1,7 @@
 import type {
   ActionInput,
   ArtifactInput,
+  AgentIdentity,
   ContextEntry,
   Dispatch,
   HubResult,
@@ -51,6 +52,16 @@ export class CollaborationClient {
     return this.request(`/v1/dispatches/${encodeURIComponent(dispatchId)}/ack`, {
       method: 'POST',
       body: input,
+    });
+  }
+
+  identities(): Promise<{ agents: AgentIdentity[] }> {
+    return this.request('/v1/agents');
+  }
+
+  registerIdentity(agentId: string, openId: string): Promise<{ agent: AgentIdentity }> {
+    return this.request(`/v1/agents/${encodeURIComponent(agentId)}/identity`, {
+      method: 'POST', body: { openId },
     });
   }
 

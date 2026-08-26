@@ -19,17 +19,21 @@ afterEach(async () => {
 describe('collaboration artifact publisher', () => {
   it('sends through the current lark-cli identity and registers the durable snapshot', async () => {
     const root = await mkdtemp(join(tmpdir(), 'collab-publish-'));
+    const agentId = `world-${'x'.repeat(80)}`;
     const source = join(root, 'report.pptx');
     const fakeCli = join(root, 'fake-lark-cli.mjs');
     await writeFile(source, 'deck bytes');
     await writeFile(fakeCli, `
       const args = process.argv.slice(2);
       if (!args.includes('--file') || !args.includes('report.pptx')) process.exit(7);
+      const keyIndex = args.indexOf('--idempotency-key');
+      const key = keyIndex >= 0 ? args[keyIndex + 1] : '';
+      if (!key || key.length > 50 || !/^collab-[a-zA-Z0-9-]+$/.test(key)) process.exit(8);
       console.log(JSON.stringify({ data: { message_id: 'om_sent', file_key: 'file_sent' } }));
     `);
 
     const hub = new CollaborationHub(new JsonlLedger(join(root, 'ledger.jsonl')), {
-      agents: [{ id: 'world', displayName: 'World' }, { id: 'chariot', displayName: 'Chariot' }],
+      agents: [{ id: agentId, displayName: 'World' }, { id: 'chariot', displayName: 'Chariot' }],
     });
     await hub.initialize();
     const assigned = await hub.submit({
@@ -39,7 +43,7 @@ describe('collaboration artifact publisher', () => {
       messageId: 'om_user',
       actor: { type: 'human', id: 'user' },
       content: 'Create a deck',
-      targetAgentIds: ['world'],
+      targetAgentIds: [agentId],
     });
     const server = new CollaborationHubServer(hub, { host: '127.0.0.1', port: 0, token: 'test' });
     servers.push(server);
@@ -52,13 +56,13 @@ describe('collaboration artifact publisher', () => {
 
     await runArtifactPublish({
       task: assigned.task.id,
-      actor: 'world',
+      actor: agentId,
       path: source,
       replyTo: 'om_user',
       replyInThread: true,
     });
 
-    expect(hub.getArtifacts(assigned.task.id, 'world')).toMatchObject([{
+    expect(hub.getArtifacts(assigned.task.id, agentId)).toMatchObject([{
       name: 'report.pptx',
       sourceMessageId: 'om_sent',
       sourceFileKey: 'file_sent',

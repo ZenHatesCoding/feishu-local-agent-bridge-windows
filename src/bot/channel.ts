@@ -447,6 +447,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       openId: identity.openId,
       ...(identity.name ? { name: identity.name } : {}),
     });
+    await collaboration?.registerIdentity(identity.openId);
   }
   log.info('ws', 'connected', {
     bot: identity?.name ?? 'unknown',
@@ -851,6 +852,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     stopGraceMs: getAgentStopGraceMs(controls.cfg),
     env: collaborationRun ? {
       LARK_COLLAB_TASK_ID: collaborationRun.taskId,
+      ...(collaborationRun.dispatchId ? { LARK_COLLAB_DISPATCH_ID: collaborationRun.dispatchId } : {}),
       LARK_COLLAB_CHAT_ID: chatId,
       ...(threadId ? { LARK_COLLAB_THREAD_ID: threadId } : {}),
       LARK_COLLAB_REPLY_TO: lastMsg.messageId,
@@ -945,15 +947,23 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   const reactionPromise =
     cotEnabled || replyMode === 'card' ? undefined : addWorkingReaction(channel, lastMsg.messageId);
   let collaborationFinalState: RunState | undefined;
+  let collaborationFinalized = false;
 
   const recordCollaborationResult = async (state: RunState): Promise<void> => {
-    if (!collaboration || !collaborationRun || state.terminal !== 'done') return;
+    if (!collaboration || !collaborationRun?.dispatchId) return;
     const body = renderText(finalAnswerOnlyState(state));
-    if (!body.trim()) return;
-    await collaboration.recordResult(collaborationRun.taskId, body, execution.runId);
-    log.info('collab', 'result-recorded', {
+    await collaboration.finishRun(
+      collaborationRun.taskId,
+      body,
+      execution.runId,
+      collaborationRun.dispatchId,
+      state.terminal === 'done',
+    );
+    collaborationFinalized = true;
+    log.info('collab', 'run-finalized', {
       taskId: collaborationRun.taskId,
       dispatchId: collaborationRun.dispatchId,
+      status: state.terminal === 'done' ? 'completed' : 'failed',
       chars: body.length,
     });
   };
@@ -1126,6 +1136,15 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     if (collaborationFinalState) await recordCollaborationResult(collaborationFinalState);
   } catch (err) {
     log.fail('stream', err);
+    if (collaboration && collaborationRun?.dispatchId && !collaborationFinalized) {
+      await collaboration.finishRun(
+        collaborationRun.taskId,
+        '',
+        execution.runId,
+        collaborationRun.dispatchId,
+        false,
+      ).catch((ackErr) => log.fail('collab-finalize', ackErr));
+    }
   } finally {
     activePolicyFingerprints.delete(scope);
     scheduleWorkingReactionCleanup(channel, lastMsg.messageId, reactionPromise);

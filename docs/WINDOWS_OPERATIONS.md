@@ -44,6 +44,10 @@ commands switch between collaboration and an existing independent bridge.
 `ignoreExitCode` is useful only for an idempotent stop command. Only Hermes
 uses `hermesHook`.
 
+`hub.maxCausalDepth` limits one Agent-to-Agent causal chain, not the lifetime
+number of turns in a topic. Legacy `maxHops` is read only for manifest
+migration; new manifests should use `maxCausalDepth`.
+
 Paths support `%USERPROFILE%`, `%PATH%`, `${REPO_ROOT}`, `${STATE_DIR}` and
 `${LOCALAPPDATA}`. Escape Windows backslashes in JSON.
 
@@ -51,6 +55,56 @@ See [Agent bridges](./AGENT_BRIDGES.md) for exact Claude, Codex, Antigravity,
 DeepSeek Harness and Hermes launch examples. A launch command alone is not
 enough for an unknown agent: its bridge must request `collaboration_context`,
 honor dispatch authorization, submit final actions and publish artifacts.
+
+## Collaboration Group Allowlist
+
+Each Node bridge profile maintains its own Feishu group allowlist. Hub task
+authorization does not bypass this message-entry access control, so every Node
+bridge that people or other agents will mention in the same collaboration group
+(for example Codex, Antigravity, and DeepSeek Harness) must allow that group.
+
+For first-time setup, the owner or an admin of **each bot** should mention that
+bot in the target group and send `/invite group`; repeat this for World,
+Justice, Chariot, and any other Node bridge. Group profiles commonly require a
+real bot mention, so a bare `/invite group` is intentionally ignored.
+
+If a bot says that the group is not in its response list, that bot's own
+profile has not allowed the group; it is not a Hub, dispatch, or agent-login
+failure. Alternatively, add the current `chat_id` to
+`profiles.<profile>.access.allowedChats` in that profile's `config.json`, then
+restart only that agent:
+
+```powershell
+.\scripts\collab-pilot\Stop-CollabAgent.ps1 -Agent justice
+.\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent justice
+```
+
+Do not assume one bot's `allowedChats` applies to another profile: write and
+verify each profile independently. Hermes uses its own native Feishu access
+policy and does not use the `allowedChats` field; preserve its existing
+configuration and validate its group-mention behavior separately.
+
+The pilot prepends `scripts\collab-pilot\bin` to every agent's `PATH`. Its
+`lark-cli.cmd` and `lark-cli.ps1` are identity-neutral entry points: they invoke
+only the real `larkCliJs` configured by the local manifest and preserve the
+current agent's `LARK_CHANNEL_*` and `LARKSUITE_CLI_CONFIG_DIR` environment.
+This prevents a stale same-name shim in an external bridge directory from
+sending as another bot. Never hard-code a profile path, App ID, `HOME`, or
+`USERPROFILE` in these pilot-owned entry points.
+
+## Network Boundary
+
+Use `commonEnvironment` and `unsetEnvironment` for the direct baseline, then
+override only the child agent that needs a proxy. Do not route the Hub or every
+bot through a proxy because one model CLI requires it. When Antigravity uses
+`agy.exe`, the pilot can derive the current Windows user proxy for that agent
+while `LARK_CHANNEL_DISABLE_PROXY=1` keeps Feishu direct and `NO_PROXY` keeps
+localhost Hub calls local.
+
+Network setup must not install, reset or migrate agent authentication data.
+Diagnose Hub health, bridge connectivity, CLI availability, proxy listener and
+model endpoint separately; an upstream EOF or timeout is not itself proof of
+expired authentication.
 
 ## Start, Status And Logs
 
