@@ -156,9 +156,9 @@ The legacy `sandbox` setting is read for migration only.
 
 - Profile state and App Secrets remain local and Git-ignored.
 - The Hub listens on `127.0.0.1` by default.
-- Pilot currently supports one Windows computer. Remote deployment has a
-  protocol foundation but still needs remote artifacts, per-Agent authentication
-  and worker operations; see the [distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
+- Pilot currently supports one Windows computer. Remote artifacts, per-Agent
+  authentication and worker operations are Planned P0 in the
+  [distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 - Collaboration visibility is protocol isolation, not OS isolation.
 - Hermes is not reinstalled or upgraded; only the named Hook is added/removed.
 - `Stop-CollabPilot.ps1 -RestoreOriginals` restores configured independent

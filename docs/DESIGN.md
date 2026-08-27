@@ -152,8 +152,8 @@ startup replays the complete ledger and hot indexes remain in memory. Topics do
 not pollute one another, but one long-lived topic repeatedly carries all visible
 events and therefore consumes progressively more model tokens. Native Agent
 session history may duplicate Hub history. Summary checkpoints, recent-event
-windows, cold-task archival and hot-memory unloading are roadmap work, not
-current behavior. See the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
+windows, cold-task archival and hot-memory unloading are Planned P1 in the
+[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 
 ## Causal Depth, Not Topic Age
 

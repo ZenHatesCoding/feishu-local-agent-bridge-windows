@@ -37,11 +37,12 @@ describe('collaboration design and Windows operations contract', () => {
       expect(concepts).toContain(phrase);
     }
     for (const phrase of [
-      '当前支持矩阵',
-      '不应把当前 Hub 直接暴露到公网',
+      '能力状态与目标',
+      '当前正式基线是单机 Pilot',
       '每 Agent 独立凭据',
-      '本机路径必须变成可下载的 Artifact',
+      '共享协议使用远程 locator 作为跨节点真相',
       '上下文、内存和 Token 的扩展计划',
+      '路线图维护方式',
     ]) {
       expect(roadmap).toContain(phrase);
     }

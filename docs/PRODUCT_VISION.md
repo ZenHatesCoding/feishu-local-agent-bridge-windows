@@ -70,16 +70,21 @@ and traceable visibility-controlled artifacts. See the
 [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for implementation
 status and acceptance phases.
 
-## Rejected Directions
+## Required Implementation Shape
 
-- asking users to copy complete chat histories between agents;
-- merging all model sessions into one opaque conversation;
-- sharing raw reasoning, all tool logs or machine secrets;
-- replacing formal ownership/routing with prompt etiquette;
-- letting every bot independently maintain task truth;
-- making all bots respond to every group message;
-- overwriting or reinstalling Hermes for collaboration;
-- turning Feishu into an internal protocol console.
+- Users select, transfer and consult naturally in one Feishu topic while the
+  system carries authorized context.
+- The Hub stores filtered shared task state while Agents retain independent
+  model sessions.
+- Shared content contains task facts, conclusions and artifacts; private
+  reasoning, tool noise and secrets remain isolated.
+- Auditable ownership, dispatch and routing enforce authority; prompts explain
+  the rules to Agents.
+- The Hub maintains one task truth and every Bot works from its projection.
+- Only a truly mentioned and authorized Bot responds; explicit multi-selection
+  enables parallel work.
+- A removable adapter preserves Hermes installation, state, commands and gateway.
+- Feishu remains the user interface while the system carries protocol details.
 
 Every change should reduce context carrying, clarify ownership/visibility and
 preserve independent rollback. If it fails any of those tests, revisit it.

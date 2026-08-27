@@ -134,4 +134,4 @@ The current implementation grows in three different ways:
 An Agent's own resumed session may duplicate part of Hub history. The planned
 answer is a complete source ledger plus source-sequenced summary checkpoints,
 recent events and archival of cold completed tasks—not silent truncation. These
-are roadmap items, not current behavior.
+are Planned P1 roadmap capabilities.

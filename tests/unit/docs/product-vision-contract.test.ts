@@ -29,7 +29,8 @@ describe('multi-agent product vision contract', () => {
       '不会形成机器人互相唤醒循环',
       'Hermes 不被重装',
       '后续获准接手的 Agent 可以直接读取',
-      '让用户在 Agent 之间复制粘贴完整聊天记录',
+      '系统自动搬运授权上下文',
+      '实现必须坚持的方式',
     ]) {
       expect(vision).toContain(phrase);
     }

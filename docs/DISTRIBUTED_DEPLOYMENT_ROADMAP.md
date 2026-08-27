@@ -4,10 +4,10 @@
 [Concepts](./COLLABORATION_CONCEPTS.md) | [Design](./DESIGN.md) |
 [Windows operations](./WINDOWS_OPERATIONS.md)
 
-This document distinguishes “the underlying code uses a network protocol”
-from “the project supports a secure, complete multi-computer deployment.” Two
-Bots on different computers can collaborate in one Feishu group in principle,
-but that topology is not yet turnkey or production-ready.
+This document defines the correct target topology, capability status and
+delivery order for multi-computer collaboration. Every capability is marked
+Implemented or Planned P0/P1/P2 and moves to Implemented after its acceptance
+criteria pass.
 
 ## Bottom Line
 
@@ -15,23 +15,22 @@ but that topology is not yet turnkey or production-ready.
 one another. The missing work is in the local Hub, Pilot, authentication,
 dispatch waiting and file sharing behind Feishu.**
 
-Bridge-to-Hub communication already uses HTTP, so a manually configured trusted
-LAN can demonstrate text-only context handoff. Current Pilot behavior, absolute
-artifact paths and one shared bearer token still make the supported product a
-single-machine system. Do not expose the current Hub directly to the Internet.
+The supported baseline is the single-machine Pilot. Bridge-to-Hub communication
+already uses HTTP as the protocol foundation; the complete remote shape adds
+remote workers, downloadable artifacts, per-Agent identity and secure transport.
 
-## Current Support Matrix
+## Capability Status And Target
 
-| Capability | Multi-computer status | Reason |
+| Capability | Status | Correct target |
 | --- | --- | --- |
-| Bots send/receive in one Feishu group | Works | Every Bridge connects to Feishu independently |
-| Real Bot-to-Bot mentions | Works with permissions | Each app needs bot-message permission and group admission |
-| Shared text task context | Protocol foundation only | Client accepts a URL, but Pilot creates and starts a local Hub |
-| Dispatch, ownership and visibility | Network-capable but under-authenticated | All callers share one bearer token |
-| PPT/PDF/Word artifact sharing | Unsupported | `localPath` belongs to the producing computer |
-| One shared code workspace | Unsupported | Uncommitted local state is not replicated |
-| Safe Internet deployment | Unsupported | No TLS or per-Agent identity boundary |
-| Turnkey remote operations | Unsupported | `Start-CollabAgent` starts a local Hub |
+| Bots send/receive in one Feishu group | Implemented | Every Bridge connects to Feishu independently |
+| Real Bot-to-Bot mentions | Implemented | Each app configures bot-message permission and group admission |
+| Shared text task context | Planned P0 | Workers use `publicUrl` to reach one central Hub |
+| Dispatch, ownership and visibility | Planned P0 hardening | Each authenticated principal operates only its Agent identity |
+| PPT/PDF/Word artifact sharing | Planned P0 | Remote locator plus receiver-side materialization |
+| Shared code workspace state | Planned P0 | Repository, branch and commit handoff |
+| Secure remote deployment | Planned P0/P2 | Private-network MVP followed by TLS, rotation, limits and audit |
+| Turnkey remote operations | Planned P0 | Explicit `hub`, `worker` and `all` Pilot roles |
 
 ## Foundation To Preserve
 
@@ -68,7 +67,7 @@ flowchart TB
 Workers need no inbound Agent-to-Agent ports. They make outbound connections to
 Feishu, the central Hub, artifact storage and their own model services.
 
-## Required Changes
+## Planned Changes
 
 ### Separate Process Role, Bind Address And Public URL
 
@@ -95,8 +94,8 @@ capabilities so restart and duplicate instances are observable.
 
 ### Replace Shared Local Paths With Downloadable Artifacts
 
-The shared record should contain an artifact ID, digest, size and remote
-locator (`hub`, `s3` or verified `feishu` reference). A receiver downloads into
+The shared record uses an artifact ID, digest, size and remote locator (`hub`,
+`s3` or verified `feishu` reference) as cross-node truth. A receiver downloads into
 its own cache and verifies SHA-256. Start with Hub upload/download endpoints or
 an object-store adapter. Treat Feishu files as visible copies unless cross-app
 resource-download permissions have been proven in a real group.
@@ -189,10 +188,15 @@ availability is optional and should not block the two-node MVP.
   is heavier than this project needs, but is a useful reference for HTTPS
   gateways, token validation, secret storage, persistent state and audit.
 
-## Accurate Claims Until This Ships
+## Maintaining This Roadmap
 
-It is accurate to say the Hub API has a remote-capable protocol foundation and
-that trusted-private-network text experiments are possible with manual setup.
-It is not accurate to claim supported multi-computer deployment, production
-Internet security, remote artifact access, context summaries or automatic
-archival yet.
+The capability table is the single progress entry point. When a phase ships:
+
+1. pass the acceptance criteria defined here;
+2. move the capability from Planned to Implemented;
+3. move operational configuration and commands into Windows operations;
+4. retain the target architecture and remaining plans while removing obsolete
+   transitional notes.
+
+The documentation then always answers: what is the correct shape, how much is
+implemented, and what comes next.

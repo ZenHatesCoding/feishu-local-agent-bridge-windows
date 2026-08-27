@@ -163,5 +163,5 @@ Agent 自己恢复的模型 session/thread 还可能与 Hub 历史重复，这�
 + 最近事件”，并把完成很久的任务从热内存移入归档。不能直接静默截断中间历史，
 否则可能丢失已经确认的决定。
 
-这些是明确的未来改进项，不应被误解为当前已经实现。具体阶段和验收标准见
-[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+路线图将这些能力标记为 P1：摘要检查点、最近事件窗口和冷任务归档。具体阶段和
+验收标准见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。

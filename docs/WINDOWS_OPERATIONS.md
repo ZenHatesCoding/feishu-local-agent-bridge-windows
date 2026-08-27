@@ -12,10 +12,10 @@ management. The user supplies Windows/Git/Node/pnpm, installed and logged-in
 agents, one Feishu app/profile per bot, actual launch commands, workspaces and
 model settings.
 
-The commands in this document operate a Pilot on **one Windows computer**. Do
-not use them to expose the current Hub directly to the Internet. See the
-[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for remote-worker
-status, gaps and the target configuration.
+The commands in this document operate a Pilot on **one Windows computer**. The
+correct multi-computer operations path adds remote workers, per-Agent identity
+and secure transport; see the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
+for status and target configuration.
 
 The project does not install, reinstall or upgrade agents and does not store
 Feishu App Secrets in the pilot manifest.
