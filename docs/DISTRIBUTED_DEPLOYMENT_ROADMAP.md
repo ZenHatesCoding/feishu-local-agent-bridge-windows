@@ -27,8 +27,8 @@ remote workers, downloadable artifacts, per-Agent identity and secure transport.
 | Real Bot-to-Bot mentions | Implemented | Each app configures bot-message permission and group admission |
 | Shared text task context | Planned P0 | Workers use `publicUrl` to reach one central Hub |
 | Dispatch, ownership and visibility | Planned P0 hardening | Each authenticated principal operates only its Agent identity |
-| PPT/PDF/Word artifact sharing | Planned P0 | Remote locator plus receiver-side materialization |
-| Shared code workspace state | Planned P0 | Repository, branch and commit handoff |
+| PPT/PDF/Word artifact sharing | Planned P0 | Feishu locator plus receiver-side materialization |
+| Shared code workspace state | Planned P0 | Git repository, branch and commit locator |
 | Secure remote deployment | Planned P0/P2 | Private-network MVP followed by TLS, rotation, limits and audit |
 | Turnkey remote operations | Planned P0 | Explicit `hub`, `worker` and `all` Pilot roles |
 
@@ -49,7 +49,7 @@ service—not to turn the Hub into another LLM or merge model sessions.
 flowchart TB
   F["One Feishu group and topic"]
   H["Central Collaboration Hub\ntask / dispatch / context / identity"]
-  S["Shared artifact storage\nHub storage / S3 / MinIO"]
+  S["Artifact providers\nGitHub code / Feishu files / optional object storage"]
   A["Computer A\nWorld Bridge + Agent + local workspace"]
   B["Computer B\nChariot Bridge + Agent + local workspace"]
   C["Optional silent coordinator"]
@@ -59,13 +59,30 @@ flowchart TB
   C -->|"ordered topic events"| H
   A <-->|"HTTPS/VPN authorization and context"| H
   B <-->|"HTTPS/VPN authorization and context"| H
-  H <--> S
+  H <-->|"locator and metadata only"| S
   A <-->|"upload/download and SHA-256 verification"| S
   B <-->|"upload/download and SHA-256 verification"| S
 ```
 
 Workers need no inbound Agent-to-Agent ports. They make outbound connections to
-Feishu, the central Hub, artifact storage and their own model services.
+Feishu, the central Hub, GitHub when a code task needs it, and their own model
+services. Object storage is optional for large data or archives, not a required
+central service for the remote MVP.
+
+### Central Means One Logical Truth, Not Dedicated Hardware
+
+Every Bot computer has a local Bridge and all Bridges connect to one logical
+Hub. Its physical placement can evolve:
+
+| Shape | Hub placement | Stage |
+| --- | --- | --- |
+| Colocated | On computer A beside one Bot | P0 experiment and minimal deployment |
+| Always-on node | NAS, small server or internal host | Stable team operation |
+| Cloud service | Hub API plus database | Remote teams and production |
+
+In every shape there is one authoritative task/owner/dispatch/idempotency/
+visibility state. GitHub and Feishu hold code and ordinary files; the Hub records
+their task relationship, producer, integrity and retrieval locator.
 
 ## Planned Changes
 
@@ -92,18 +109,19 @@ completion endpoints plus long polling, SSE or a background dispatcher. Agent
 registration should carry `nodeId`, `instanceId`, `lastSeenAt`, version and
 capabilities so restart and duplicate instances are observable.
 
-### Replace Shared Local Paths With Downloadable Artifacts
+### Use Provider + Locator For Artifacts
 
-The shared record uses an artifact ID, digest, size and remote locator (`hub`,
-`s3` or verified `feishu` reference) as cross-node truth. A receiver downloads into
-its own cache and verifies SHA-256. Start with Hub upload/download endpoints or
-an object-store adapter. Treat Feishu files as visible copies unless cross-app
-resource-download permissions have been proven in a real group.
+Artifact is a deliverable registration protocol, not a new file server. Use Git
+repository + commit + path for code and Markdown; use Feishu `messageId +
+fileKey` or Drive token for office files, PDFs, images and user attachments; add
+an object-storage key only for large generated data or archival needs. A
+receiver materializes its own cache and verifies SHA-256. P0 acceptance includes
+proving cross-Bot file-download permissions in a real group.
 
 ### Hand Off Workspaces Through Git
 
-Use repository/branch/commit references for code, artifact storage for ordinary
-files, and ownership or branch-per-agent for concurrent edits. A local absolute
+Use repository/branch/commit references for code, Feishu Artifact locators for
+ordinary files, and ownership or branch-per-agent for concurrent edits. A local absolute
 path may be a node cache path, never shared truth.
 
 ## Context, Memory And Token Scaling
@@ -146,10 +164,12 @@ unauthorized Agent cannot read them.
 
 ### P0: Remote Artifacts
 
-- add upload/download or an object-storage backend;
-- share locator and integrity metadata only;
+- define `git`, `feishu` and optional `object` Artifact providers;
+- use Git commit locators for code and Feishu locators for ordinary deliverables;
+- share locator, task ownership, visibility and integrity metadata only;
 - materialize a local cache path on the receiving node;
-- test retry, duplicate upload, digest failure, authorization and size limits.
+- test cross-Bot Feishu download permission, retry, duplicate registration,
+  digest failure and size limits.
 
 Acceptance: a PPT created on computer A can be downloaded without a shared
 filesystem, verified, modified on computer B and sent back by B's Bot identity.

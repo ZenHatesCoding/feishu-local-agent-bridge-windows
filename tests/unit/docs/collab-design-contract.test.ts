@@ -37,10 +37,20 @@ describe('collaboration design and Windows operations contract', () => {
       expect(concepts).toContain(phrase);
     }
     for (const phrase of [
+      'Artifact 是交付件登记卡',
+      '不等于必须再部署一套 Artifact 服务器',
+      '逻辑中央 Hub',
+      '本地 Bridge',
+    ]) {
+      expect(concepts).toContain(phrase);
+    }
+    for (const phrase of [
       '能力状态与目标',
       '当前正式基线是单机 Pilot',
       '每 Agent 独立凭据',
       '共享协议使用远程 locator 作为跨节点真相',
+      '中央表示一份逻辑真相，不表示一台专用机器',
+      'GitHub 代码 / 飞书文件 / 可选对象存储',
       '上下文、内存和 Token 的扩展计划',
       '路线图维护方式',
     ]) {

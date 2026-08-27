@@ -22,7 +22,7 @@ work today.
 | Ledger | The project journal | Records messages, ownership, work orders, results and files in order |
 | Dispatch | A formal work order | Authorizes one Agent to perform one objective |
 | Context | A handoff packet | Current objective, accepted conclusions and visible history |
-| Artifact | A deliverable in the shared cabinet | A file plus integrity and visibility metadata |
+| Artifact | A deliverable registration card | What it is, task ownership, location, integrity and retrieval |
 
 ## The Hub Is Not An LLM
 
@@ -74,7 +74,24 @@ risks and artifacts. It excludes private reasoning, secrets and unrelated
 tasks. One Feishu topic maps to one task, so another topic is not automatically
 included in the prompt.
 
-## Artifacts Are Deliverables, Not Path Prose
+## Artifact Is A Registration Card, Not A Required File Server
+
+An Artifact binds a file or code revision to task semantics: task, producer,
+version, visibility, digest and retrieval location. Its content can use
+different providers:
+
+| Content | Preferred provider | Example locator |
+| --- | --- | --- |
+| Source, Markdown and configuration | GitHub / Git | repository + branch + commit + path |
+| PPT, Word, Excel, PDF and images | Feishu message or Drive | messageId + fileKey, or Drive token |
+| Large generated data or archives | Optional object storage | bucket + objectKey |
+| Current single-machine runtime | Local snapshot | localPath + SHA-256 |
+
+The project needs one Artifact abstraction, but it does not require a separate
+Artifact server. GitHub, Feishu, object storage and the current local directory
+are all possible backends.
+
+### Current Single-Machine Implementation
 
 The current single-machine Pilot snapshots files under:
 
@@ -85,7 +102,8 @@ The current single-machine Pilot snapshots files under:
 The Hub records name, type, local path, size, SHA-256 and available Feishu
 message/file identifiers. This is durable on one machine, but a `C:\...` path
 from computer A is meaningless on computer B. Distributed deployment therefore
-needs downloadable artifact IDs/locators and a per-node cache. See the
+uses provider + locator so each node can retrieve from GitHub, Feishu or optional
+object storage and materialize a local cache. See the
 [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 
 ## Pilot Is Operations, Not Reasoning
@@ -102,6 +120,24 @@ Hub: manages tasks and handoffs while the system is running
 
 Today Pilot assumes the Hub and all Agents live on one Windows computer. That
 assumption—not Feishu—is why remote workers are not yet a supported deployment.
+
+## Why A Logically Central Hub Still Exists
+
+Feishu is excellent for visible conversation, real mentions and ordinary file
+transport. GitHub is excellent for code versions. The system still needs one
+deterministic answer for current owner, valid dispatch, idempotency and context
+visibility. That is the Hub's role.
+
+If every Bot derives those facts independently from its event stream, delivery
+order and retries can produce conflicting answers. The Hub makes them an
+auditable state machine. It is logically central, not necessarily a dedicated
+physical computer: an MVP can colocate it with Bot A; stable operation can use
+a NAS or always-on internal server; a cloud deployment can split Hub API and
+database while retaining one task truth.
+
+Distributed deployment therefore has a local Bridge on every Bot computer and
+one network-reachable Hub shared by them. File content can primarily remain in
+Feishu and GitHub while the Hub stores task state and Artifact locators.
 
 ## One Complete Run
 

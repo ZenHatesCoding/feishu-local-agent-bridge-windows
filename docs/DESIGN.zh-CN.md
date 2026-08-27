@@ -36,7 +36,7 @@ flowchart LR
     C["Chariot / DeepSeek Harness"]
     F["Fool / Hermes"]
     H["Collaboration Hub"]
-    L["追加式任务账本"]
+    L["追加式任务账本与 Artifact 登记"]
 
     U <-->|"可见消息与真实 @"| W
     U <-->|"可见消息与真实 @"| J
@@ -300,6 +300,15 @@ World、Justice 和 Chariot 在协作任务中被明确要求使用该命令代�
 共享的是快照，不是脆弱的源路径。即使 Agent 后来清理自己的工作目录，其他
 Agent 仍可读取共享副本。同一任务中的相同文件按 SHA-256 去重；artifact 事件仍
 遵守 `task-public`、`handoff`、`targeted` 和 `private-runtime` 可见性过滤。
+
+Artifact 是交付件的协议抽象，不等于 Hub 必须保存文件内容。当前单机 provider 是
+`.runtime/artifacts` 本地快照；跨电脑目标采用可插拔 locator：代码和 Markdown 引用
+Git repository/commit/path，PPT、Word、Excel、PDF、图片和用户附件优先引用飞书
+message/file 或云盘资源，大型数据按需引用对象存储。Hub 只维护任务归属、创建者、
+可见性、摘要、完整性和 locator；接手 Bridge 负责拉取并生成本机缓存路径。
+
+这种分层允许更换文件后端而不改变任务、dispatch 和上下文协议，也避免为了获得
+Artifact 语义而强制部署另一套中央文件服务器。
 
 ## 网络是 Agent 运行能力，不是全局副作用
 

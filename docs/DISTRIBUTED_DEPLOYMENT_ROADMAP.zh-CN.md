@@ -24,8 +24,8 @@ Hub、Pilot、鉴权、dispatch 等待和文件共享。**
 | Bot 之间真实 `@` | 已实现 | 每个飞书应用配置 bot-to-bot 消息权限和独立群准入 |
 | 共享文字任务上下文 | 计划 P0 | worker 通过 `publicUrl` 连接同一个中央 Hub |
 | dispatch、所有权和可见性 | 计划 P0 加固 | 每个认证主体只能操作自己的 Agent 身份 |
-| 共享 PPT/PDF/Word 等文件 | 计划 P0 | Artifact 使用远程 locator，并在接收节点本地落盘 |
-| 共享代码工作区状态 | 计划 P0 | 使用 repository、branch 和 commit 交接 |
+| 共享 PPT/PDF/Word 等文件 | 计划 P0 | Artifact 优先引用飞书文件，并在接收节点本地落盘 |
+| 共享代码工作区状态 | 计划 P0 | Artifact 引用 Git repository、branch 和 commit |
 | 安全远程部署 | 计划 P0/P2 | 私网 MVP；TLS、轮换、限流和审计完成生产化 |
 | 开箱即用跨机启停 | 计划 P0 | Pilot 明确支持 `hub`、`worker` 和 `all` 角色 |
 
@@ -50,7 +50,7 @@ LLM 或让 Agent 直接共享彼此的模型会话。
 flowchart TB
   F["同一个飞书群和话题"]
   H["中央 Collaboration Hub\n任务 / dispatch / context / identity"]
-  S["共享 Artifact Storage\nHub storage / S3 / MinIO"]
+  S["Artifact Providers\nGitHub 代码 / 飞书文件 / 可选对象存储"]
   A["电脑 A\nWorld Bridge + Agent + 本地工作区"]
   B["电脑 B\nChariot Bridge + Agent + 本地工作区"]
   C["可选静默 Coordinator"]
@@ -60,13 +60,29 @@ flowchart TB
   C -->|"统一记录话题事件"| H
   A <-->|"HTTPS/VPN：授权和上下文"| H
   B <-->|"HTTPS/VPN：授权和上下文"| H
-  H <--> S
+  H <-->|"只保存 locator 和元数据"| S
   A <-->|"上传/下载并校验 SHA-256"| S
   B <-->|"上传/下载并校验 SHA-256"| S
 ```
 
-Agent 不需要互相开放端口。每台执行电脑只需要主动连接飞书、中央 Hub、共享文件库
-和自己的模型服务。
+Agent 不需要互相开放端口。每台执行电脑只需要主动连接飞书、中央 Hub、GitHub（代码
+任务需要时）和自己的模型服务。对象存储是大文件或长期归档的可选 provider，不是
+跨电脑 MVP 的必备中央服务。
+
+### 中央表示一份逻辑真相，不表示一台专用机器
+
+每台 Bot 电脑都有自己的本地 Bridge；所有 Bridge 连接同一个逻辑 Hub。Hub 的物理
+位置可以按规模选择：
+
+| 形态 | Hub 运行位置 | 适用阶段 |
+| --- | --- | --- |
+| 共置 | 与电脑 A 的 Bot 同机 | P0 实验和最小部署 |
+| 常在线节点 | NAS、小服务器或公司内网主机 | 稳定团队运行 |
+| 云服务 | Hub API + 数据库 | 远程团队和生产化 |
+
+无论物理形态如何，任务、负责人、dispatch、幂等和上下文可见性只有一份权威状态。
+GitHub 和飞书分别保存代码与普通文件；Hub 保存它们属于哪个任务、由谁交付、怎样
+验证和怎样取得。
 
 ## 计划中的改造
 
@@ -124,7 +140,7 @@ POST /v1/dispatches/:id/complete
 Bridge 可以使用长轮询、SSE 或后台拉取。Agent 身份注册还应带上 `nodeId`、
 `instanceId`、`lastSeenAt`、版本和能力，Hub 才能区分离线、重连和重复实例。
 
-### 本机路径必须变成可下载的 Artifact
+### Artifact 使用 provider + locator
 
 共享协议使用远程 locator 作为跨节点真相；`C:\...` 或 `/home/...` 只表示某个节点
 完成下载后的本地缓存。建议模型：
@@ -136,7 +152,10 @@ interface SharedArtifact {
   sha256: string;
   size: number;
   locator: {
-    provider: 'hub' | 's3' | 'feishu';
+    provider: 'git' | 'feishu' | 'object';
+    repository?: string;
+    commit?: string;
+    path?: string;
     objectKey?: string;
     messageId?: string;
     fileKey?: string;
@@ -144,17 +163,22 @@ interface SharedArtifact {
 }
 ```
 
-产出者上传或登记远程 locator；接手者按权限下载到自己的缓存并验证 SHA-256。Hub
-可以先内置上传/下载端点，规模扩大后再替换为 S3/MinIO。飞书文件可作为用户可见
-副本，也可试验通过 `messageId + fileKey` 重新下载，但必须真实验证不同 Bot 应用之间
-的资源权限，不能只假设可用。
+Artifact 是交付件登记协议，不是新的文件服务器。推荐默认策略：
+
+- 代码、Markdown 和配置登记 Git repository + commit + path；
+- PPT、Word、Excel、PDF、图片和用户附件登记飞书 `messageId + fileKey` 或云盘 token；
+- 超大生成数据或长期归档按需要登记对象存储 objectKey。
+
+接手者按 provider 拉取到自己的缓存并验证 SHA-256。P0 需要真实验证不同 Bot 应用对
+同一群文件的下载权限；验证通过后飞书就是普通交付件的默认传输与存储层。对象存储
+仅作为权限模型或文件规模不适合飞书时的扩展 provider。
 
 ### 工作区交接需要 Git 语义
 
 跨电脑后，电脑 A 的未提交代码和本地依赖不会自动出现在电脑 B。应明确约定：
 
 - 代码通过 repository、branch 和 commit 交接；
-- 普通文件通过 Artifact Store 交接；
+- 普通文件优先通过飞书 Artifact locator 交接；
 - 同一分支并发编辑需要所有权或 branch-per-agent；
 - 本机绝对路径只允许作为节点缓存路径，不能作为共享真相。
 
@@ -210,10 +234,11 @@ interface SharedArtifact {
 
 ### P0：跨机文件交付
 
-- 引入 artifact upload/download 或对象存储 backend；
-- Hub 只共享远程 locator 和完整性信息；
+- 定义 `git`、`feishu` 和可选 `object` Artifact provider；
+- 代码通过 Git commit locator，普通交付件优先通过飞书 locator；
+- Hub 只共享 locator、任务归属、可见性和完整性信息；
 - Bridge 下载后生成当前节点的 `materializedPath`；
-- 测试断线重试、重复上传、哈希错误、权限拒绝和大文件限制。
+- 测试跨 Bot 飞书下载权限、断线重试、重复登记、哈希错误和大文件限制。
 
 验收：电脑 A 发布的 PPT 在电脑 B 无共享磁盘的情况下可下载、验签、修改并重新
 以电脑 B Bot 的身份发回原话题。

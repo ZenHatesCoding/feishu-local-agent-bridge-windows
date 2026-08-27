@@ -53,8 +53,9 @@ result, next step and shared artifacts.
 6. The user can see owner, stage, next step and shared artifacts.
 7. Collaboration can be disabled and independent bridges restored.
 8. Hermes is never reinstalled and retains its existing state and commands.
-9. Shared files have a durable path, hash and visibility, so later authorized
-   agents can read them without another upload.
+9. Shared files or code revisions have a durable locator, digest and visibility,
+   so later authorized agents retrieve them from GitHub, Feishu or a configured
+   provider without another user upload.
 
 ## Future Deployment Direction
 

@@ -52,7 +52,7 @@ flowchart LR
   U["User and Feishu topic"]
   A["Claude / Codex / Antigravity / DeepSeek / Hermes"]
   H["Collaboration Hub"]
-  L["Append-only ledger and artifact store"]
+  L["Append-only ledger and artifact registry"]
   U <-->|"visible messages and real @"| A
   A <-->|"events, authorization, filtered context"| H
   H <--> L
@@ -208,6 +208,19 @@ full SHA-256 remains in the artifact record for integrity and deduplication.
 Hermes keeps native attachment sending. The isolated Hook detects real output
 paths, snapshots them and records the same protocol event. Hermes source, venv,
 configuration, sessions, memories and skills are not replaced.
+
+Artifact is a protocol abstraction for a deliverable; it does not require the
+Hub to store file bytes. The current single-machine provider is the
+`.runtime/artifacts` snapshot. The distributed target uses pluggable locators:
+Git repository/commit/path for code and Markdown; Feishu message/file or Drive
+references for office files, PDFs, images and user attachments; optional object
+storage for large data. The Hub retains task relationship, producer,
+visibility, digest and locator, while the receiving Bridge materializes a local
+cache path.
+
+This separation allows storage providers to evolve without changing task,
+dispatch or context semantics and without requiring a separate central file
+server merely to obtain Artifact semantics.
 
 ## Network Is Per-Agent Capability
 

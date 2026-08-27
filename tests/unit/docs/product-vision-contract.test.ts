@@ -28,7 +28,7 @@ describe('multi-agent product vision contract', () => {
       '不能获得第一个 Agent 的私有思维链',
       '不会形成机器人互相唤醒循环',
       'Hermes 不被重装',
-      '后续获准接手的 Agent 可以直接读取',
+      '后续获准接手的 Agent 可以从 GitHub、飞书或配置的 provider 直接',
       '系统自动搬运授权上下文',
       '实现必须坚持的方式',
     ]) {
