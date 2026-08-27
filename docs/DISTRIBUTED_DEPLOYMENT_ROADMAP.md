@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) | [中文](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) |
 [Concepts](./COLLABORATION_CONCEPTS.md) | [Design](./DESIGN.md) |
-[Windows operations](./WINDOWS_OPERATIONS.md)
+[Windows operations](./WINDOWS_OPERATIONS.md) | [Networking](./NETWORKING.md)
 
 This document defines the correct target topology, capability status and
 delivery order for multi-computer collaboration. Every capability is marked

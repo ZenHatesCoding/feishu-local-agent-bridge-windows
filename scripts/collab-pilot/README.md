@@ -3,6 +3,7 @@
 [Project README](../../README.md) | [中文](./README.zh-CN.md) |
 [Windows operations](../../docs/WINDOWS_OPERATIONS.md) |
 [Concepts](../../docs/COLLABORATION_CONCEPTS.md) |
+[Networking](../../docs/NETWORKING.md) |
 [Distributed roadmap](../../docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
 
 These scripts connect any configured number of local agent bridges to one
@@ -10,8 +11,9 @@ Feishu collaboration Hub and manage background processes, logs, context and
 artifact delivery. Agent names and paths come from the Git-ignored
 `.runtime\pilot.local.json`, not repository hard-coding.
 
-“Local” means that one Windows computer manages this Hub and these Agents. The
-current scripts are not a remote-worker manager; see the roadmap linked above.
+With the default `role: "all"`, one Windows computer still manages the Hub and
+its local Agents. The scripts also support a `worker` that connects to the
+central Hub and a center-only `hub` role; a worker never starts another Hub.
 
 ```powershell
 .\scripts\collab-pilot\Setup-CollabPilot.ps1

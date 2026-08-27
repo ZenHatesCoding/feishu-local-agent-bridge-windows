@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) | [中文](./COLLABORATION_CONCEPTS.zh-CN.md) |
 [Design](./DESIGN.md) | [Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) |
-[Windows operations](./WINDOWS_OPERATIONS.md)
+[Windows operations](./WINDOWS_OPERATIONS.md) | [Networking](./NETWORKING.md)
 
 This document explains Bot, Agent, Bridge, Hub, Pilot, dispatch, ledger,
 context and artifact in plain language. See [Design](./DESIGN.md) for protocol

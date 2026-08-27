@@ -2,7 +2,7 @@
 
 [返回中文 README](../README.zh.md) | [English](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) |
 [概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [设计原理](./DESIGN.zh-CN.md) |
-[Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md)
+[Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md) | [多电脑联网](./NETWORKING.zh-CN.md)
 
 本文定义跨电脑协作的正确目标形态、能力状态和实施顺序。每项能力使用“已实现”或
 “计划 P0/P1/P2”标记；达到对应验收标准后直接更新状态，使本文始终描述项目正在

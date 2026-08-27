@@ -2,7 +2,7 @@
 
 [返回中文 README](../README.zh.md) | [English](./COLLABORATION_CONCEPTS.md) |
 [设计原理](./DESIGN.zh-CN.md) | [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) |
-[Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md)
+[Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md) | [多电脑联网](./NETWORKING.zh-CN.md)
 
 本文用尽量直白的语言解释项目中的 Bot、Agent、Bridge、Hub、Pilot、dispatch、
 账本、上下文和产物。它回答“这些东西分别是什么”，协议细节见

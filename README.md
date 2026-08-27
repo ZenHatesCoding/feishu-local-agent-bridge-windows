@@ -70,10 +70,13 @@ Read [collaboration design](./docs/DESIGN.md) and the
 | What experience must the project preserve? | [Product vision](./docs/PRODUCT_VISION.md) | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) |
 | How do context, routing and files work? | [Design](./docs/DESIGN.md) | [设计原理](./docs/DESIGN.zh-CN.md) |
 | How do I deploy and operate the group? | [Windows operations](./docs/WINDOWS_OPERATIONS.md) | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) |
+| How do computers connect securely, and what is Tailscale? | [Networking](./docs/NETWORKING.md) | [多电脑联网](./docs/NETWORKING.zh-CN.md) |
 | Can Bots run on different computers? | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) | [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) |
+| What are the common Pilot commands? | [Pilot script summary](./scripts/collab-pilot/README.md) | [Pilot 脚本速查](./scripts/collab-pilot/README.zh-CN.md) |
 
-This README is the canonical entry point. Every detailed document links back
-here and to its language counterpart.
+This README is the human entry point; coding agents start at
+[AGENTS.md](./AGENTS.md). Every maintained detailed document links back here
+and to its language counterpart.
 
 ## Build Once
 

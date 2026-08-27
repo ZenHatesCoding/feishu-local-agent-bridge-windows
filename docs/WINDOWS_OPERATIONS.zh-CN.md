@@ -2,7 +2,8 @@
 
 [返回中文 README](../README.zh.md) | [English](./WINDOWS_OPERATIONS.md) |
 [Agent 桥接](./AGENT_BRIDGES.zh-CN.md) | [协作设计](./DESIGN.zh-CN.md) |
-[概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
+[概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [多电脑联网](./NETWORKING.zh-CN.md) |
+[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
 本文面向从 GitHub 克隆项目的新电脑。新部署统一使用
 `feature/feishu-multi-agent-hub`，不再需要为不同 Agent 拉多份分支。
@@ -117,6 +118,7 @@ notepad .\.runtime\pilot.local.json
 优先把 `100.x.y.z` 设为 Tailscale、WireGuard 或企业 VPN 私网地址。每个 Agent 使用
 独立的 256 位随机凭据；主节点保存在 `.runtime\agent-tokens.json`，Hub 从凭据推导
 调用者身份，Agent 不能靠修改请求体冒充另一个 Agent。
+联网原理、安全边界和排查顺序见[多电脑联网](./NETWORKING.zh-CN.md)。
 
 为已经登记在主节点清单中的 Agent 生成 worker 清单：
 

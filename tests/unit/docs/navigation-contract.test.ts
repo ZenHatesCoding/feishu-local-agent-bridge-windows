@@ -8,6 +8,7 @@ const pairs: Array<readonly [string, string]> = [
   ['docs/COLLABORATION_CONCEPTS.md', 'docs/COLLABORATION_CONCEPTS.zh-CN.md'],
   ['docs/DESIGN.md', 'docs/DESIGN.zh-CN.md'],
   ['docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md', 'docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md'],
+  ['docs/NETWORKING.md', 'docs/NETWORKING.zh-CN.md'],
   ['docs/PRODUCT_VISION.md', 'docs/PRODUCT_VISION.zh-CN.md'],
   ['docs/WINDOWS_OPERATIONS.md', 'docs/WINDOWS_OPERATIONS.zh-CN.md'],
   ['scripts/collab-pilot/README.md', 'scripts/collab-pilot/README.zh-CN.md'],
@@ -27,8 +28,20 @@ describe('documentation navigation', () => {
       expect(content).toContain('COLLABORATION_CONCEPTS');
       expect(content).toContain('DESIGN');
       expect(content).toContain('DISTRIBUTED_DEPLOYMENT_ROADMAP');
+      expect(content).toContain('NETWORKING');
       expect(content).toContain('PRODUCT_VISION');
       expect(content).toContain('WINDOWS_OPERATIONS');
+    }
+  });
+
+  it('routes coding agents from AGENTS.md to every maintained documentation area', async () => {
+    const guide = await readFile(resolve(root, 'AGENTS.md'), 'utf8');
+    for (const name of [
+      'README.md', 'PRODUCT_VISION', 'COLLABORATION_CONCEPTS', 'DESIGN',
+      'AGENT_BRIDGES', 'WINDOWS_OPERATIONS', 'NETWORKING',
+      'DISTRIBUTED_DEPLOYMENT_ROADMAP', 'scripts/collab-pilot/README',
+    ]) {
+      expect(guide).toContain(name);
     }
   });
 
@@ -46,7 +59,7 @@ describe('documentation navigation', () => {
   });
 
   it('has no broken relative Markdown links in entry and maintained docs', async () => {
-    const files = ['README.md', 'README.zh.md', ...pairs.flat()];
+    const files = ['README.md', 'README.zh.md', 'AGENTS.md', ...pairs.flat()];
     for (const file of files) {
       const content = await readFile(resolve(root, file), 'utf8');
       for (const match of content.matchAll(/\[[^\]]+\]\((?!https?:|#)([^)]+)\)/g)) {

@@ -2,7 +2,8 @@
 
 [Back to README](../README.md) | [中文](./WINDOWS_OPERATIONS.zh-CN.md) |
 [Agent bridges](./AGENT_BRIDGES.md) | [Design](./DESIGN.md) |
-[Concepts](./COLLABORATION_CONCEPTS.md) | [Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
+[Concepts](./COLLABORATION_CONCEPTS.md) | [Networking](./NETWORKING.md) |
+[Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
 
 ## Responsibility Boundary
 

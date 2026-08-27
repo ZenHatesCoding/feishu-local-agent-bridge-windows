@@ -65,9 +65,12 @@ profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项�
 | 项目必须守住什么用户体验？ | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) | [Product vision](./docs/PRODUCT_VISION.md) |
 | 上下文、路由、文件怎么工作？ | [设计原理](./docs/DESIGN.zh-CN.md) | [Design](./docs/DESIGN.md) |
 | 协作群如何部署和运维？ | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) | [Windows operations](./docs/WINDOWS_OPERATIONS.md) |
+| 不同电脑怎么安全联网，Tailscale 是什么？ | [多电脑联网](./docs/NETWORKING.zh-CN.md) | [Networking](./docs/NETWORKING.md) |
 | 两个 Bot 能否运行在不同电脑？ | [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) |
+| Pilot 脚本有哪些常用命令？ | [Pilot 脚本速查](./scripts/collab-pilot/README.zh-CN.md) | [Pilot script summary](./scripts/collab-pilot/README.md) |
 
-README 是统一入口。每份详细文档都会链接回这里和另一语言版本。
+README 是给使用者的统一入口；编码 Agent 从 [AGENTS.md](./AGENTS.md) 进入。每份维护中
+的详细文档都会链接回这里和另一语言版本。
 
 ## 一次构建
 
