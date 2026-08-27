@@ -1,7 +1,8 @@
 # 飞书多 Agent 协作设计
 
 [返回中文 README](../README.zh.md) | [English](./DESIGN.md) |
-[产品目标](./PRODUCT_VISION.zh-CN.md) | [Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md)
+[概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [产品目标](./PRODUCT_VISION.zh-CN.md) |
+[Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md) | [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
 本文解释这个项目真正解决的问题、用户能得到什么体验，以及为什么不能把四个
 机器人简单拉进一个群就算“多 Agent 协作”。
@@ -239,6 +240,12 @@ Agent 的内容是按任务、参与关系和可见性生成的语义投影。�
 无论采用哪种传输，都必须让 Agent 知道投影覆盖的序号范围和摘要来源，不能用固定
 字符预算静默丢掉中间决策。
 
+这也意味着当前版本存在明确的容量边界：JSONL 磁盘账本会持续追加，Hub 启动时会
+重放全部记录并把热索引保留在内存；不同话题互不进入对方提示词，但同一个长期话题
+会重复携带全部可见事件，逐渐增加模型 token。Agent 自己恢复的原生 session 还可能
+与 Hub 历史重复。摘要检查点、最近事件窗口、完成任务归档和热内存卸载属于未来
+路线图，当前不能宣称已经实现。详见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+
 ## 转发层级是因果链，不是话题寿命
 
 `hop` 只表示当前这条委派因果链的深度。用户每次在话题中重新指定 Agent，都会
@@ -323,3 +330,8 @@ Fool 使用同样的协议，但通过一个隔离 Hermes 源码副本和可移�
 
 无论实现如何演进，以下原则不变：飞书是操作界面，Hub 是唯一任务真相，Agent
 保留各自能力，上下文按任务和权限投影，真实通知与正式授权必须对应。
+
+当前 Pilot 的正式部署范围仍是同一台 Windows 电脑。Bridge 与 Hub 已经通过 HTTP
+协议通信，所以跨电脑具备基础，但现有脚本会自动启动本机 Hub、所有调用者共享同一
+Bearer token、Artifact 暴露产出机器的绝对 `localPath`，固定短轮询也不适合跨网
+抖动。目标形态和分阶段验收见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。

@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 const root = process.cwd();
 const pairs: Array<readonly [string, string]> = [
   ['docs/AGENT_BRIDGES.md', 'docs/AGENT_BRIDGES.zh-CN.md'],
+  ['docs/COLLABORATION_CONCEPTS.md', 'docs/COLLABORATION_CONCEPTS.zh-CN.md'],
   ['docs/DESIGN.md', 'docs/DESIGN.zh-CN.md'],
+  ['docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md', 'docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md'],
   ['docs/PRODUCT_VISION.md', 'docs/PRODUCT_VISION.zh-CN.md'],
   ['docs/WINDOWS_OPERATIONS.md', 'docs/WINDOWS_OPERATIONS.zh-CN.md'],
   ['scripts/collab-pilot/README.md', 'scripts/collab-pilot/README.zh-CN.md'],
@@ -22,7 +24,9 @@ describe('documentation navigation', () => {
       expect(content).toContain('DeepSeek Harness');
       expect(content).toContain('Hermes');
       expect(content).toContain('AGENT_BRIDGES');
+      expect(content).toContain('COLLABORATION_CONCEPTS');
       expect(content).toContain('DESIGN');
+      expect(content).toContain('DISTRIBUTED_DEPLOYMENT_ROADMAP');
       expect(content).toContain('PRODUCT_VISION');
       expect(content).toContain('WINDOWS_OPERATIONS');
     }

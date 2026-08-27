@@ -1,10 +1,15 @@
 # Windows 部署与运维
 
 [返回中文 README](../README.zh.md) | [English](./WINDOWS_OPERATIONS.md) |
-[Agent 桥接](./AGENT_BRIDGES.zh-CN.md) | [协作设计](./DESIGN.zh-CN.md)
+[Agent 桥接](./AGENT_BRIDGES.zh-CN.md) | [协作设计](./DESIGN.zh-CN.md) |
+[概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
 本文面向从 GitHub 克隆项目的新电脑。新部署统一使用
 `feature/feishu-multi-agent-hub`，不再需要为不同 Agent 拉多份分支。
+
+本文命令管理的是**同一台 Windows 电脑上的 Pilot**。不要照搬这些命令把当前 Hub
+开放到公网；两个 Bot 分别部署到不同电脑的现状、缺口和目标配置见
+[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 
 ## 责任边界
 

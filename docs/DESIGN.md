@@ -1,8 +1,9 @@
 # Feishu Multi-Agent Collaboration Design
 
 [Back to README](../README.md) | [中文](./DESIGN.zh-CN.md) |
-[Product vision](./PRODUCT_VISION.md) | [产品目标](./PRODUCT_VISION.zh-CN.md) |
-[Windows operations](./WINDOWS_OPERATIONS.md)
+[Concepts](./COLLABORATION_CONCEPTS.md) | [Product vision](./PRODUCT_VISION.md) |
+[产品目标](./PRODUCT_VISION.zh-CN.md) |
+[Windows operations](./WINDOWS_OPERATIONS.md) | [Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
 
 ## One-Sentence Architecture
 
@@ -146,6 +147,14 @@ to original events, while adapters carry large prompts over stdin or files
 instead of treating Windows argv length as a business limit. Every projection
 must disclose its covered sequence range and provenance.
 
+This is also an explicit current capacity boundary. JSONL grows continuously,
+startup replays the complete ledger and hot indexes remain in memory. Topics do
+not pollute one another, but one long-lived topic repeatedly carries all visible
+events and therefore consumes progressively more model tokens. Native Agent
+session history may duplicate Hub history. Summary checkpoints, recent-event
+windows, cold-task archival and hot-memory unloading are roadmap work, not
+current behavior. See the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
+
 ## Causal Depth, Not Topic Age
 
 `hop` is the depth of the current delegation chain. Every new human assignment
@@ -225,3 +234,10 @@ Whatever implementation evolves, these invariants remain: Feishu is the user
 interface, the Hub is task truth, agents preserve their individual abilities,
 context is projected by task and visibility, and visible wake-up must match
 formal authorization.
+
+Pilot's supported deployment remains one Windows computer. Bridge and Hub
+already communicate over HTTP, but current scripts start a local Hub, all
+callers share one bearer token, artifacts expose the producing computer's
+absolute `localPath`, and short fixed dispatch polling is not WAN-resilient.
+See the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for the target
+shape and phased acceptance criteria.

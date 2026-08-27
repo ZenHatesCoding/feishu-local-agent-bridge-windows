@@ -65,10 +65,12 @@ Read [collaboration design](./docs/DESIGN.md) and the
 
 | Question | English | 中文 |
 | --- | --- | --- |
+| What are Hub, Pilot and dispatch? | [Concepts](./docs/COLLABORATION_CONCEPTS.md) | [概念入门](./docs/COLLABORATION_CONCEPTS.zh-CN.md) |
 | How do I configure each agent bridge? | [Agent bridges](./docs/AGENT_BRIDGES.md) | [Agent 桥接](./docs/AGENT_BRIDGES.zh-CN.md) |
 | What experience must the project preserve? | [Product vision](./docs/PRODUCT_VISION.md) | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) |
 | How do context, routing and files work? | [Design](./docs/DESIGN.md) | [设计原理](./docs/DESIGN.zh-CN.md) |
 | How do I deploy and operate the group? | [Windows operations](./docs/WINDOWS_OPERATIONS.md) | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) |
+| Can Bots run on different computers? | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) | [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) |
 
 This README is the canonical entry point. Every detailed document links back
 here and to its language counterpart.
@@ -154,6 +156,9 @@ The legacy `sandbox` setting is read for migration only.
 
 - Profile state and App Secrets remain local and Git-ignored.
 - The Hub listens on `127.0.0.1` by default.
+- Pilot currently supports one Windows computer. Remote deployment has a
+  protocol foundation but still needs remote artifacts, per-Agent authentication
+  and worker operations; see the [distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 - Collaboration visibility is protocol isolation, not OS isolation.
 - Hermes is not reinstalled or upgraded; only the named Hook is added/removed.
 - `Stop-CollabPilot.ps1 -RestoreOriginals` restores configured independent

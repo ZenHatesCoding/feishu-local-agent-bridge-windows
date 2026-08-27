@@ -1,7 +1,8 @@
 # Feishu Multi-Agent Collaboration: Product Vision
 
 [Back to README](../README.md) | [中文](./PRODUCT_VISION.zh-CN.md) |
-[Design](./DESIGN.md) | [Windows operations](./WINDOWS_OPERATIONS.md)
+[Concepts](./COLLABORATION_CONCEPTS.md) | [Design](./DESIGN.md) |
+[Windows operations](./WINDOWS_OPERATIONS.md) | [Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
 
 ## North Star
 
@@ -54,6 +55,20 @@ result, next step and shared artifacts.
 8. Hermes is never reinstalled and retains its existing state and commands.
 9. Shared files have a durable path, hash and visibility, so later authorized
    agents can read them without another upload.
+
+## Future Deployment Direction
+
+Agents should eventually run on different computers, operating-system users or
+isolated execution environments without changing the Feishu experience. Users
+still mention Bots, inspect handoffs and receive files in one topic; Hub
+addressing, node identity, artifact download and reconnect recovery belong to
+deployment and protocol layers.
+
+Remote deployment must preserve the existing invariants: one Hub task truth,
+independent Feishu identities, real notifications matched to formal authority,
+and traceable visibility-controlled artifacts. See the
+[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for implementation
+status and acceptance phases.
 
 ## Rejected Directions
 

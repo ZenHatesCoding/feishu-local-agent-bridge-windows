@@ -1,7 +1,8 @@
 # 飞书多 Agent 协作：产品目标
 
 [返回中文 README](../README.zh.md) | [English](./PRODUCT_VISION.md) |
-[协作设计](./DESIGN.zh-CN.md) | [Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md)
+[概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [协作设计](./DESIGN.zh-CN.md) |
+[Windows 运维](./WINDOWS_OPERATIONS.zh-CN.md) | [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
 本文档定义这个项目最终要交付给用户的体验。架构、协议和代码可以演进，
 但不能以牺牲这里的使用体验为代价。出现实现分歧时，以本文档作为产品判断依据。
@@ -134,6 +135,16 @@ Justice 回答后，结果返回 World，当前负责人仍然是 World。
 8. Hermes 不被重装、不丢失原有状态，也不因协作层接入而改变现有命令和网关。
 9. 任一 Agent 在任务中交付的文件会成为有哈希、可见性和持久路径的共享产物，
    后续获准接手的 Agent 可以直接读取，不要求用户重新上传。
+
+## 未来部署方向
+
+Agent 最终应能运行在不同电脑、不同用户或隔离执行环境中，而不改变用户在飞书中的
+协作方式。用户仍然只需要在同一话题正常 `@`、查看交接和接收文件；Hub 地址、节点
+身份、文件下载和断线恢复都应由部署与协议层处理。
+
+跨电脑不能以牺牲当前不变量为代价：Hub 仍是唯一任务真相，每个 Agent 仍使用自己
+的飞书身份，真实通知仍需匹配正式授权，交付件仍需可追溯和按可见性授权。实现状态
+与阶段验收见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 
 ## 明确不接受的方向
 

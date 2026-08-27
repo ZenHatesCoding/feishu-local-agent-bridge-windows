@@ -60,10 +60,12 @@ profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项�
 
 | 问题 | 中文 | English |
 | --- | --- | --- |
+| Hub、Pilot、dispatch 到底是什么？ | [概念入门](./docs/COLLABORATION_CONCEPTS.zh-CN.md) | [Concepts](./docs/COLLABORATION_CONCEPTS.md) |
 | 每个 Agent 的 bridge 怎么配置？ | [Agent 桥接](./docs/AGENT_BRIDGES.zh-CN.md) | [Agent bridges](./docs/AGENT_BRIDGES.md) |
 | 项目必须守住什么用户体验？ | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) | [Product vision](./docs/PRODUCT_VISION.md) |
 | 上下文、路由、文件怎么工作？ | [设计原理](./docs/DESIGN.zh-CN.md) | [Design](./docs/DESIGN.md) |
 | 协作群如何部署和运维？ | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) | [Windows operations](./docs/WINDOWS_OPERATIONS.md) |
+| 两个 Bot 能否运行在不同电脑？ | [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) |
 
 README 是统一入口。每份详细文档都会链接回这里和另一语言版本。
 
@@ -144,6 +146,8 @@ lark-channel-bridge profile remove <name> --purge --yes
 
 - profile 和 App Secret 只保存在本机并被 Git 忽略。
 - Hub 默认只监听 `127.0.0.1`。
+- 当前 Pilot 正式支持的是同一台 Windows 电脑；跨电脑只有协议基础，尚缺远程
+  Artifact、每 Agent 鉴权和 worker 运维，见[跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 - 协作可见性是协议隔离，不是操作系统强隔离。
 - 不重装、不升级 Hermes，只增加/移除有明确名称的项目 Hook。
 - `Stop-CollabPilot.ps1 -RestoreOriginals` 可以恢复清单中的独立 bridge，不删除

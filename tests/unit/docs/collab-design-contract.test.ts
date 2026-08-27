@@ -21,8 +21,29 @@ describe('collaboration design and Windows operations contract', () => {
       '文件不是文字附注，而是一等共享产物',
       'collab-artifact.cmd publish',
       'SHA-256',
+      '同一个长期话题',
+      '当前 Pilot 的正式部署范围仍是同一台 Windows 电脑',
     ]) {
       expect(design).toContain(phrase);
+    }
+  });
+
+  it('keeps current remote limits separate from planned distributed support', async () => {
+    const [concepts, roadmap] = await Promise.all([
+      readFile(new URL('../../../docs/COLLABORATION_CONCEPTS.zh-CN.md', import.meta.url), 'utf8'),
+      readFile(new URL('../../../docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md', import.meta.url), 'utf8'),
+    ]);
+    for (const phrase of ['Hub 不是 LLM', 'Pilot 是运维脚本', '账本、内存和 Token']) {
+      expect(concepts).toContain(phrase);
+    }
+    for (const phrase of [
+      '当前支持矩阵',
+      '不应把当前 Hub 直接暴露到公网',
+      '每 Agent 独立凭据',
+      '本机路径必须变成可下载的 Artifact',
+      '上下文、内存和 Token 的扩展计划',
+    ]) {
+      expect(roadmap).toContain(phrase);
     }
   });
 

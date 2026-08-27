@@ -1,7 +1,8 @@
 # Windows Deployment And Operations
 
 [Back to README](../README.md) | [中文](./WINDOWS_OPERATIONS.zh-CN.md) |
-[Agent bridges](./AGENT_BRIDGES.md) | [Design](./DESIGN.md)
+[Agent bridges](./AGENT_BRIDGES.md) | [Design](./DESIGN.md) |
+[Concepts](./COLLABORATION_CONCEPTS.md) | [Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
 
 ## Responsibility Boundary
 
@@ -10,6 +11,11 @@ artifact store, maintained bridge adapters, Hermes Hook and background process
 management. The user supplies Windows/Git/Node/pnpm, installed and logged-in
 agents, one Feishu app/profile per bot, actual launch commands, workspaces and
 model settings.
+
+The commands in this document operate a Pilot on **one Windows computer**. Do
+not use them to expose the current Hub directly to the Internet. See the
+[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for remote-worker
+status, gaps and the target configuration.
 
 The project does not install, reinstall or upgrade agents and does not store
 Feishu App Secrets in the pilot manifest.

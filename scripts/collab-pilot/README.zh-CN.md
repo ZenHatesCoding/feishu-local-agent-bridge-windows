@@ -1,9 +1,14 @@
 # 协作 Pilot 脚本
 
 [项目 README](../../README.zh.md) | [English](./README.md) |
-[Windows 运维](../../docs/WINDOWS_OPERATIONS.zh-CN.md)
+[Windows 运维](../../docs/WINDOWS_OPERATIONS.zh-CN.md) |
+[概念入门](../../docs/COLLABORATION_CONCEPTS.zh-CN.md) |
+[跨电脑路线图](../../docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
 这组脚本把任意数量的本地 Agent bridge 接到同一个飞书协作 Hub，并统一管理后台进程、日志、上下文和文件交付。Agent 名称与路径不写死在仓库中，而是来自 Git 忽略的 `.runtime\pilot.local.json`。
+
+这里的“本地”表示 Hub 和这些 Agent 都由同一台 Windows 电脑管理。当前脚本不是
+远程 worker 管理器；跨电脑支持计划见上方路线图。
 
 首次部署：
 
