@@ -7,8 +7,10 @@ $pilot = Get-CollabPilotConfig
 $errors = [Collections.Generic.List[string]]::new()
 $agents = @(Get-CollabAgents)
 if ($agents.Count -eq 0) { $errors.Add('No enabled agents are configured.') }
-if (!(Test-Path -LiteralPath (Join-Path $script:CollabRepoRoot 'dist\cli.js'))) { $errors.Add('dist\cli.js is missing; run pnpm build.') }
-foreach ($agent in $agents) {
+if ((Test-CollabRunsHub) -and !(Test-Path -LiteralPath (Join-Path $script:CollabRepoRoot 'dist\cli.js'))) { $errors.Add('dist\cli.js is missing; run pnpm build.') }
+if ((Get-CollabRole) -eq 'worker' -and !$pilot.hub.publicUrl) { $errors.Add('Worker role requires hub.publicUrl.') }
+$launchAgents = @(Get-CollabLocalAgents)
+foreach ($agent in $launchAgents) {
   if (!$agent.id -or !$agent.displayName) { $errors.Add('Every enabled agent needs id and displayName.'); continue }
   if (!$agent.launch.filePath) { $errors.Add("$($agent.id): launch.filePath is required."); continue }
   $file = Expand-CollabValue $agent.launch.filePath
@@ -23,5 +25,6 @@ foreach ($agent in $agents) {
 }
 if ($errors.Count) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
 Write-Output "Config OK: $script:CollabManifestFile"
+Write-Output "Role: $(Get-CollabRole)"
 Write-Output "Enabled agents: $(($agents.id) -join ', ')"
 Write-Output "Hub: $(Get-CollabHubUrl)"

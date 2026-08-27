@@ -12,10 +12,10 @@ management. The user supplies Windows/Git/Node/pnpm, installed and logged-in
 agents, one Feishu app/profile per bot, actual launch commands, workspaces and
 model settings.
 
-The commands in this document operate a Pilot on **one Windows computer**. The
-correct multi-computer operations path adds remote workers, per-Agent identity
-and secure transport; see the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md)
-for status and target configuration.
+Pilot supports both one Windows computer running the Hub and all Bots, and
+multiple computers connected to one Hub. Start with `role: "all"`: the main PC
+is both the center and an execution node. Later workers add Bots without moving
+the Bots already running on the main PC.
 
 The project does not install, reinstall or upgrade agents and does not store
 Feishu App Secrets in the pilot manifest.
@@ -61,6 +61,43 @@ See [Agent bridges](./AGENT_BRIDGES.md) for exact Claude, Codex, Antigravity,
 DeepSeek Harness and Hermes launch examples. A launch command alone is not
 enough for an unknown agent: its bridge must request `collaboration_context`,
 honor dispatch authorization, submit final actions and publish artifacts.
+
+## Single-PC Compatibility And Node Roles
+
+An existing manifest without `role` means `all`, preserving the original
+single-PC startup behavior. `all` runs the Hub and local Bots, `hub` runs only
+the Hub, and `worker` runs local Bots against `hub.publicUrl` without starting
+another Hub. An enabled entry with `runOnThisNode: false` is registered by the
+main Hub but is not launched there.
+
+For a main PC that is also an execution node:
+
+```json
+{
+  "role": "all",
+  "nodeId": "main-pc",
+  "hub": {
+    "bindHost": "100.x.y.z",
+    "publicUrl": "http://100.x.y.z:17321",
+    "port": 17321,
+    "tenantKey": "one-private-shared-domain"
+  }
+}
+```
+
+Use a Tailscale, WireGuard, or enterprise VPN address. The main node creates a
+separate random credential for each registered Agent and derives agent identity
+from that credential. Export a private starter manifest for a registered Agent:
+
+```powershell
+.\scripts\collab-pilot\Export-CollabWorkerConfig.ps1 `
+  -Agent reviewer -HubUrl http://100.x.y.z:17321 `
+  -OutputPath .\.runtime\worker-reviewer.local.json
+```
+
+The export contains one credential. Transfer it privately, never commit it,
+and update node-specific launch/profile/workspace paths before using `-Config`.
+`config\collaboration-worker.example.json` shows environment-based credentials.
 
 ## Collaboration Group Allowlist
 
@@ -145,7 +182,8 @@ does not delete the ledger or shared artifacts. Hermes stop removes only
 
 ```text
 .runtime\pilot.local.json       machine-specific launch configuration
-.runtime\hub-token.txt          Hub bearer token
+.runtime\hub-token.txt          Hub administrative credential
+.runtime\agent-tokens.json      one independent Hub credential per Agent
 .runtime\tenant-key.txt         collaboration domain
 .runtime\hub-config.json        generated Hub configuration
 .runtime\collaboration.jsonl    append-only task ledger
@@ -154,9 +192,9 @@ does not delete the ledger or shared artifacts. Hermes stop removes only
 .runtime\pids.json              tracked launcher PIDs
 ```
 
-The Hub binds to `127.0.0.1` by default. Never commit tokens, App Secrets,
-profiles or `pilot.local.json`. Artifacts can contain sensitive user data and
-are not removed by ordinary stop/rollback.
+A single-PC manifest can bind only to `127.0.0.1`. For workers, bind on the VPN
+interface and use its private URL. Never commit tokens, worker exports, App
+Secrets, profiles, or `pilot.local.json`.
 
 ## Acceptance Test
 

@@ -25,7 +25,11 @@ export class BridgeCollaborationAdapter {
   ) {}
 
   registerIdentity(openId: string): Promise<void> {
-    return this.client.registerIdentity(this.agentId, openId).then(() => undefined);
+    return this.client.registerIdentity(this.agentId, openId, {
+      ...(process.env.LARK_COLLAB_NODE_ID ? { nodeId: process.env.LARK_COLLAB_NODE_ID } : {}),
+      ...(process.env.LARK_COLLAB_INSTANCE_ID ? { instanceId: process.env.LARK_COLLAB_INSTANCE_ID } : {}),
+      ...(process.env.npm_package_version ? { version: process.env.npm_package_version } : {}),
+    }).then(() => undefined);
   }
 
   async intake(msg: NormalizedMessage): Promise<BridgeCollaborationDecision> {
@@ -130,12 +134,19 @@ export class BridgeCollaborationAdapter {
   }
 
   private async waitForDispatch(taskId: string): Promise<Dispatch | undefined> {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    const rawWaitMs = Number(process.env.LARK_COLLAB_DISPATCH_WAIT_MS ?? 10_000);
+    const waitMs = Number.isFinite(rawWaitMs) && rawWaitMs >= 0 ? rawWaitMs : 10_000;
+    const deadline = Date.now() + waitMs;
+    let delayMs = 100;
+    do {
       const pending = await this.client.dispatches(this.agentId);
       const dispatch = latestPendingForTask(pending.dispatches, taskId);
       if (dispatch) return dispatch;
-      if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, remaining)));
+      delayMs = Math.min(Math.round(delayMs * 1.5), 1_000);
+    } while (Date.now() <= deadline);
     return undefined;
   }
 

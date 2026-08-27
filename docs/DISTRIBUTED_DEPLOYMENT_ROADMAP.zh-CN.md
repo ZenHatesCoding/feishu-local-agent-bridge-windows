@@ -13,8 +13,8 @@
 **飞书已经允许异地 Bot 收发消息和真实互相 `@`；需要改造的是飞书背后的本地
 Hub、Pilot、鉴权、dispatch 等待和文件共享。**
 
-当前正式基线是单机 Pilot。Bridge 到 Hub 已经使用 HTTP，为远程化提供协议基础；
-跨电脑正式形态由远程 worker、可下载 Artifact、每 Agent 身份和安全传输共同组成。
+单机 Pilot 仍是默认兼容基线；同一套 Pilot 现已支持主电脑以 `all` 角色兼任中心和
+执行节点，并允许额外 `worker` 连接。跨电脑文件自动取得和生产级可靠调度继续演进。
 
 ## 能力状态与目标
 
@@ -22,12 +22,12 @@ Hub、Pilot、鉴权、dispatch 等待和文件共享。**
 | --- | --- | --- |
 | 两个 Bot 在同一飞书群收发消息 | 已实现 | 每个 Bridge 独立连接飞书 |
 | Bot 之间真实 `@` | 已实现 | 每个飞书应用配置 bot-to-bot 消息权限和独立群准入 |
-| 共享文字任务上下文 | 计划 P0 | worker 通过 `publicUrl` 连接同一个中央 Hub |
-| dispatch、所有权和可见性 | 计划 P0 加固 | 每个认证主体只能操作自己的 Agent 身份 |
-| 共享 PPT/PDF/Word 等文件 | 计划 P0 | Artifact 优先引用飞书文件，并在接收节点本地落盘 |
-| 共享代码工作区状态 | 计划 P0 | Artifact 引用 Git repository、branch 和 commit |
+| 共享文字任务上下文 | 已实现 | `all` 和 `worker` 通过 `publicUrl` 连接同一个中央 Hub |
+| dispatch、所有权和可见性 | 已实现 P0 | 每个认证主体只能操作自己的 Agent 身份 |
+| 共享 PPT/PDF/Word 等文件 | 已实现 locator；计划自动下载 | Artifact 优先引用飞书文件，并在接收节点本地落盘 |
+| 共享代码工作区状态 | 已实现登记；计划自动取得 | Artifact 引用 Git repository、commit 和 path |
 | 安全远程部署 | 计划 P0/P2 | 私网 MVP；TLS、轮换、限流和审计完成生产化 |
-| 开箱即用跨机启停 | 计划 P0 | Pilot 明确支持 `hub`、`worker` 和 `all` 角色 |
+| 开箱即用跨机启停 | 已实现 P0 | Pilot 支持 `hub`、`worker`、`all`，默认保持单机 `all` |
 
 ## 当前设计中已经可复用的基础
 
@@ -84,14 +84,12 @@ Agent 不需要互相开放端口。每台执行电脑只需要主动连接飞�
 GitHub 和飞书分别保存代码与普通文件；Hub 保存它们属于哪个任务、由谁交付、怎样
 验证和怎样取得。
 
-## 计划中的改造
+## 已实现基础与后续改进
 
-### Pilot 把监听地址和访问地址混为一谈
+### Pilot 部署角色和地址
 
-当前 `hub.host` 同时被用于 Hub 监听和 Agent 拼接 URL；`0.0.0.0` 又会被脚本转换为
-`127.0.0.1`。远程节点还会创建自己的 token、tenant key、账本并自动启动本机 Hub。
-
-目标配置应明确拆开：
+Pilot 使用 `bindHost` 控制中央 Hub 监听，使用 `publicUrl` 控制本机或远程 Bridge
+访问地址。省略 `role` 时自动使用 `all`，保持旧清单的一台电脑完整运行方式：
 
 ```json
 {
@@ -104,32 +102,28 @@ GitHub 和飞书分别保存代码与普通文件；Hub 保存它们属于哪个
 }
 ```
 
-Hub 节点则配置 `bindHost`、`port` 和 `publicUrl`。部署角色至少支持 `hub`、`worker`
-和兼容当前行为的 `all`；worker 模式绝不能自动启动本机 Hub。
+`worker` 不创建账本和中央 token，也不会启动本机 Hub。`all` 同时运行 Hub 和本机 Bot；
+`runOnThisNode: false` 可让主节点登记将来运行在别处的 Agent。
 
-### 一个共享 Token 不能证明调用者是谁
+### 每 Agent 凭据证明调用者是谁
 
-当前 Hub 只检查统一 Bearer token，然后相信请求体里的 `agentId`。公网环境中，拿到
-token 的调用者理论上可以冒充其他 Agent。
-
-目标是每 Agent 独立凭据，并从认证主体推导身份：
+Hub 为每个 Agent 生成独立凭据，并从认证主体约束 identity、context、dispatch、ack、
+action 和 artifact 的 Agent ID；admin token 留给中央启动与诊断：
 
 ```text
 world credential       -> 只能以 world 身份领取和回写
 chariot credential     -> 只能以 chariot 身份领取和回写
-coordinator credential -> 只能写入规范化飞书消息
-admin credential       -> 只用于配置和诊断
+coordinator            -> 与中央 Hub 同进程写入规范化飞书消息
+admin credential       -> 只用于中央启动、配置和诊断
 ```
 
 第一阶段优先使用 Tailscale、WireGuard 或企业 VPN 形成私网；正式公网入口需要 TLS、
 凭据轮换、限流、请求大小限制和审计。共享 token 不能仅靠隐藏 URL 保护。
 
-### 固定 500ms 等待不适合跨网
+### 跨网等待与下一步可靠调度
 
-Coordinator 和执行 Bot 可能几乎同时收到飞书事件。当前执行 Bridge 只短暂轮询待处理
-dispatch，跨地区延迟、Hub 抖动或事件乱序都可能让一次合法唤醒被忽略。
-
-目标接口应支持原子 claim、执行 lease 和可恢复等待：
+Coordinator 模式现按可配置等待窗口轮询 dispatch，默认 10 秒并逐步退避，覆盖普通
+跨网乱序。生产级目标仍是原子 claim、执行 lease 和可恢复等待，对应接口可演进为：
 
 ```text
 POST /v1/dispatches/:id/claim
@@ -221,22 +215,22 @@ Artifact 是交付件登记协议，不是新的文件服务器。推荐默认�
 
 ## 分阶段实施
 
-### P0：跨机文字协作 MVP
+### P0：跨机文字协作 MVP（代码已实现，待第二台真机验收）
 
-- 拆分 `bindHost`、`publicUrl` 和 `role`；
+- 已拆分 `bindHost`、`publicUrl` 和 `role`；
 - worker 连接远程 Hub，不启动本机 Hub；
 - 统一分发 tenant key，使用每 Agent 独立凭据；
 - 先通过私有 VPN 连接，不开放裸 HTTP 公网端口；
-- 增加两台机器/两个隔离节点的文字交接集成测试。
+- 已增加两个独立 Agent 凭据客户端经同一 HTTP Hub 交接的集成测试；第二台真机待验收。
 
 验收：电脑 A 的 World 在飞书正式交接后，电脑 B 的 Chariot 能取得相同 taskId、
 筛选后的前序结论和自己的 dispatch，且未授权 Agent 不能读取。
 
 ### P0：跨机文件交付
 
-- 定义 `git`、`feishu` 和可选 `object` Artifact provider；
-- 代码通过 Git commit locator，普通交付件优先通过飞书 locator；
-- Hub 只共享 locator、任务归属、可见性和完整性信息；
+- 已定义 `git`、`feishu`、`local` 和可选 `object` Artifact provider；
+- 已支持登记 Git commit locator，并在标识齐全时登记飞书 locator；
+- Hub 共享 locator、任务归属、可见性和完整性信息；
 - Bridge 下载后生成当前节点的 `materializedPath`；
 - 测试跨 Bot 飞书下载权限、断线重试、重复登记、哈希错误和大文件限制。
 

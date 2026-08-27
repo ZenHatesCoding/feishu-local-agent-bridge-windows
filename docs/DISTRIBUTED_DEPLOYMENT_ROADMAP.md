@@ -15,9 +15,9 @@ criteria pass.
 one another. The missing work is in the local Hub, Pilot, authentication,
 dispatch waiting and file sharing behind Feishu.**
 
-The supported baseline is the single-machine Pilot. Bridge-to-Hub communication
-already uses HTTP as the protocol foundation; the complete remote shape adds
-remote workers, downloadable artifacts, per-Agent identity and secure transport.
+The single-machine Pilot remains the compatible default. The same Pilot now
+supports a main PC in `all` mode plus additional remote workers. Automatic
+cross-node artifact retrieval and production-grade dispatch remain roadmap work.
 
 ## Capability Status And Target
 
@@ -25,12 +25,12 @@ remote workers, downloadable artifacts, per-Agent identity and secure transport.
 | --- | --- | --- |
 | Bots send/receive in one Feishu group | Implemented | Every Bridge connects to Feishu independently |
 | Real Bot-to-Bot mentions | Implemented | Each app configures bot-message permission and group admission |
-| Shared text task context | Planned P0 | Workers use `publicUrl` to reach one central Hub |
-| Dispatch, ownership and visibility | Planned P0 hardening | Each authenticated principal operates only its Agent identity |
-| PPT/PDF/Word artifact sharing | Planned P0 | Feishu locator plus receiver-side materialization |
-| Shared code workspace state | Planned P0 | Git repository, branch and commit locator |
+| Shared text task context | Implemented | `all` and `worker` nodes use one Hub `publicUrl` |
+| Dispatch, ownership and visibility | P0 implemented | Each authenticated principal operates only its Agent identity |
+| PPT/PDF/Word artifact sharing | Locator implemented; download planned | Feishu locator plus receiver-side materialization |
+| Shared code workspace state | Registration implemented; retrieval planned | Git repository, commit and path locator |
 | Secure remote deployment | Planned P0/P2 | Private-network MVP followed by TLS, rotation, limits and audit |
-| Turnkey remote operations | Planned P0 | Explicit `hub`, `worker` and `all` Pilot roles |
+| Turnkey remote operations | P0 implemented | `hub`, `worker`, and backward-compatible `all` roles |
 
 ## Foundation To Preserve
 
@@ -84,27 +84,28 @@ In every shape there is one authoritative task/owner/dispatch/idempotency/
 visibility state. GitHub and Feishu hold code and ordinary files; the Hub records
 their task relationship, producer, integrity and retrieval locator.
 
-## Planned Changes
+## Implemented Foundation And Planned Hardening
 
 ### Separate Process Role, Bind Address And Public URL
 
-Add `hub`, `worker` and backward-compatible `all` roles. A worker receives a
+Pilot supports `hub`, `worker` and backward-compatible `all` roles. A worker receives a
 `publicUrl`, shared tenant key and its own credential; it must never create or
 start a local Hub. A Hub receives distinct `bindHost`, `port` and `publicUrl`
-settings.
+settings. `runOnThisNode: false` registers a future remote Agent without
+launching it on the main PC.
 
 ### Bind Credentials To Agent Identity
 
-Replace the shared bearer capability with credentials scoped to World,
-Chariot, coordinator and administrator roles. The server derives the principal
+Each registered Agent has a separate credential, while the central token is
+reserved for administration. The server derives the principal
 from authentication instead of trusting `actorAgentId` in the request body.
 Use Tailscale, WireGuard or an enterprise VPN for the first release; a public
 endpoint additionally requires TLS, rotation, limits and audit.
 
-### Replace The Fixed Dispatch Race With Recoverable Claiming
+### Continue From Bounded Waiting To Recoverable Claiming
 
-Coordinator and execution Bot events may arrive in either order. Replace the
-short fixed polling window with atomic `claim`, execution heartbeat/lease and
+Coordinator and execution Bot events may arrive in either order. The Bridge now
+uses a configurable 10-second backoff window. Continue with atomic `claim`, execution heartbeat/lease and
 completion endpoints plus long polling, SSE or a background dispatcher. Agent
 registration should carry `nodeId`, `instanceId`, `lastSeenAt`, version and
 capabilities so restart and duplicate instances are observable.
@@ -150,13 +151,14 @@ MVP; SQLite or PostgreSQL later provides transactions and uniqueness constraints
 
 ## Delivery Phases
 
-### P0: Text-Only Remote MVP
+### P0: Text-Only Remote MVP (implemented in code; second-PC acceptance pending)
 
-- split `bindHost`, `publicUrl` and process role;
+- split `bindHost`, `publicUrl` and process role (implemented);
 - prevent workers from starting a local Hub;
 - provision a common tenant key and per-Agent credentials;
 - run over a private VPN, not bare public HTTP;
-- add a two-isolated-node handoff integration test.
+- use the implemented two-credential HTTP handoff integration test; complete
+  the second physical-PC acceptance test.
 
 Acceptance: World on computer A transfers through Feishu, Chariot on computer B
 receives the same task ID, filtered conclusions and its own dispatch, while an
@@ -164,8 +166,8 @@ unauthorized Agent cannot read them.
 
 ### P0: Remote Artifacts
 
-- define `git`, `feishu` and optional `object` Artifact providers;
-- use Git commit locators for code and Feishu locators for ordinary deliverables;
+- `git`, `feishu`, `local`, and optional `object` providers are defined;
+- Git commit registration and Feishu locator registration are implemented;
 - share locator, task ownership, visibility and integrity metadata only;
 - materialize a local cache path on the receiving node;
 - test cross-Bot Feishu download permission, retry, duplicate registration,

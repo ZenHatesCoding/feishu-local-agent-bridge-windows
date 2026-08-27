@@ -6,6 +6,14 @@
   },
   "ledgerPath": "../data/collaboration.jsonl",
   "tokenEnv": "LARK_COLLAB_HUB_TOKEN",
+  "auth": {
+    "agentTokenEnvs": {
+      "world": "LARK_COLLAB_AGENT_TOKEN_WORLD",
+      "justice": "LARK_COLLAB_AGENT_TOKEN_JUSTICE",
+      "chariot": "LARK_COLLAB_AGENT_TOKEN_CHARIOT",
+      "fool": "LARK_COLLAB_AGENT_TOKEN_FOOL"
+    }
+  },
   "leaseMinutes": 30,
   "maxCausalDepth": 8,
   "coordinator": {

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { CollaborationHub } from './hub';
 import type { HubInput } from './types';
@@ -7,6 +8,7 @@ export interface HubServerOptions {
   host?: string;
   port?: number;
   token: string;
+  agentTokens?: Record<string, string>;
   maxBodyBytes?: number;
 }
 
@@ -41,11 +43,13 @@ export class CollaborationHubServer {
       if (req.method === 'GET' && url.pathname === '/health') {
         return json(res, 200, { ok: true });
       }
-      if (req.headers.authorization !== `Bearer ${this.options.token}`) {
+      const principal = this.authenticate(req);
+      if (!principal) {
         return json(res, 401, { error: 'unauthorized' });
       }
       if (req.method === 'POST' && url.pathname === '/v1/events') {
         const body = await readJson(req, this.options.maxBodyBytes ?? 256 * 1024) as HubInput;
+        authorizeEvent(principal, body);
         return json(res, 200, await this.hub.submit(body));
       }
       if (req.method === 'GET' && url.pathname === '/v1/agents') {
@@ -53,13 +57,27 @@ export class CollaborationHubServer {
       }
       const identityMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)\/identity$/);
       if (req.method === 'POST' && identityMatch) {
-        const body = await readJson(req, this.options.maxBodyBytes ?? 256 * 1024) as { openId?: string };
+        const agentId = decodeURIComponent(identityMatch[1]!);
+        authorizeAgent(principal, agentId);
+        const body = await readJson(req, this.options.maxBodyBytes ?? 256 * 1024) as {
+          openId?: string;
+          nodeId?: string;
+          instanceId?: string;
+          version?: string;
+        };
         if (!body.openId) throw new Error('openId is required');
-        return json(res, 200, { agent: this.hub.registerAgentIdentity(decodeURIComponent(identityMatch[1]!), body.openId) });
+        return json(res, 200, {
+          agent: this.hub.registerAgentIdentity(agentId, body.openId, {
+            ...(body.nodeId ? { nodeId: body.nodeId } : {}),
+            ...(body.instanceId ? { instanceId: body.instanceId } : {}),
+            ...(body.version ? { version: body.version } : {}),
+          }),
+        });
       }
       const contextMatch = url.pathname.match(/^\/v1\/tasks\/([^/]+)\/context$/);
       if (req.method === 'GET' && contextMatch) {
         const agentId = requiredQuery(url, 'agentId');
+        authorizeAgent(principal, agentId);
         const after = numberQuery(url, 'after');
         const taskId = decodeURIComponent(contextMatch[1]!);
         const task = this.hub.getTask(taskId);
@@ -73,6 +91,7 @@ export class CollaborationHubServer {
       const dispatchListMatch = url.pathname.match(/^\/v1\/dispatches\/agents\/([^/]+)$/);
       if (req.method === 'GET' && dispatchListMatch) {
         const agentId = decodeURIComponent(dispatchListMatch[1]!);
+        authorizeAgent(principal, agentId);
         return json(res, 200, { dispatches: this.hub.listDispatches(agentId, numberQuery(url, 'after')) });
       }
       const ackMatch = url.pathname.match(/^\/v1\/dispatches\/([^/]+)\/ack$/);
@@ -83,6 +102,7 @@ export class CollaborationHubServer {
           idempotencyKey?: string;
         };
         if (!body.agentId || !body.status || !body.idempotencyKey) throw new Error('invalid ack body');
+        authorizeAgent(principal, body.agentId);
         const dispatch = await this.hub.acknowledge(
           decodeURIComponent(ackMatch[1]!), body.agentId, body.status, body.idempotencyKey,
         );
@@ -90,10 +110,49 @@ export class CollaborationHubServer {
       }
       return json(res, 404, { error: 'not found' });
     } catch (err) {
+      if (err instanceof AuthorizationError) return json(res, 403, { error: err.message });
       return json(res, 400, { error: err instanceof Error ? err.message : String(err) });
     }
   }
+
+  private authenticate(req: IncomingMessage): Principal | undefined {
+    const raw = req.headers.authorization;
+    if (!raw?.startsWith('Bearer ')) return undefined;
+    const token = raw.slice('Bearer '.length);
+    if (sameSecret(token, this.options.token)) return { kind: 'admin' };
+    for (const [agentId, agentToken] of Object.entries(this.options.agentTokens ?? {})) {
+      if (sameSecret(token, agentToken)) return { kind: 'agent', agentId };
+    }
+    return undefined;
+  }
 }
+
+type Principal = { kind: 'admin' } | { kind: 'agent'; agentId: string };
+
+function authorizeAgent(principal: Principal, agentId: string): void {
+  if (principal.kind === 'agent' && principal.agentId !== agentId) {
+    throw new AuthorizationError('agent credential cannot act as another agent');
+  }
+}
+
+function authorizeEvent(principal: Principal, input: HubInput): void {
+  if (principal.kind === 'admin') return;
+  if (input.type === 'message') {
+    if (input.targetAgentIds.some((id) => id !== principal.agentId)) {
+      throw new AuthorizationError('agent credential can only route an observed message to itself');
+    }
+    return;
+  }
+  authorizeAgent(principal, input.actorAgentId);
+}
+
+function sameSecret(left: string, right: string): boolean {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+class AuthorizationError extends Error {}
 
 async function readJson(req: IncomingMessage, maxBytes: number): Promise<unknown> {
   const chunks: Buffer[] = [];

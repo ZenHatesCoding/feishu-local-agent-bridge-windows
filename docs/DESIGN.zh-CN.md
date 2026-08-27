@@ -340,7 +340,8 @@ Fool 使用同样的协议，但通过一个隔离 Hermes 源码副本和可移�
 无论实现如何演进，以下原则不变：飞书是操作界面，Hub 是唯一任务真相，Agent
 保留各自能力，上下文按任务和权限投影，真实通知与正式授权必须对应。
 
-当前 Pilot 的正式部署范围仍是同一台 Windows 电脑。Bridge 与 Hub 已经通过 HTTP
-协议通信，所以跨电脑具备基础，但现有脚本会自动启动本机 Hub、所有调用者共享同一
-Bearer token、Artifact 暴露产出机器的绝对 `localPath`，固定短轮询也不适合跨网
-抖动。目标形态和分阶段验收见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+Pilot 默认继续以 `all` 角色在同一台 Windows 电脑运行 Hub 和全部本机 Bot；也支持
+主电脑兼任中心、额外 `worker` 通过私网连接。每 Agent 独立凭据约束调用身份，Artifact
+使用 provider locator 表达跨节点位置，Coordinator 等待窗口覆盖普通跨网乱序。
+接收端自动下载、原子 claim 和生产安全加固的状态见
+[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。

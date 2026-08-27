@@ -7,8 +7,9 @@
 本文面向从 GitHub 克隆项目的新电脑。新部署统一使用
 `feature/feishu-multi-agent-hub`，不再需要为不同 Agent 拉多份分支。
 
-本文命令管理的是**同一台 Windows 电脑上的 Pilot**。跨电脑的正确运维入口将使用
-远程 worker、每 Agent 身份和安全传输，状态与目标配置见
+Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台电脑连接同一个 Hub。
+推荐从 `role: "all"` 开始：主电脑既是中心，也是现有 Bot 的执行节点；以后再增加
+`worker`，不需要拆走主电脑上的 Bot。安全边界和后续计划见
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 
 ## 责任边界
@@ -79,11 +80,56 @@ notepad .\.runtime\pilot.local.json
 - 停止命令在“原 bridge 本来就没运行”时可能返回非零，可对 `original.stop` 设置 `"ignoreExitCode": true`；恢复命令不建议忽略失败。
 - `hermesHook` 仅用于 Hermes。启用后只复制本项目 Hook 到指定 Hermes Home，停止时只删除该 Hook，不修改源码、venv、配置、记忆或技能。
 - `enabled: false` 可保留尚未准备好的 Agent，不会加入 Hub 或被启动。
+- `runOnThisNode: false` 表示 Agent 会登记到中央 Hub，但不在这台机器启动，适合预先
+  登记另一台电脑上的 Bot；省略时保持原有行为，在本机启动。
 - `hub.maxCausalDepth` 限制单条 Agent 委派因果链的深度，不限制一个话题的累计工作轮数。旧 `maxHops` 仅用于读取旧清单；新配置应使用 `maxCausalDepth`。
 
 路径支持 `%USERPROFILE%`、`%PATH%`、`${REPO_ROOT}`、`${STATE_DIR}`、`${LOCALAPPDATA}`。JSON 中 Windows 反斜杠需要写成 `\\`。
 
 `larkCliJs` 是真实飞书 CLI 的 JavaScript 入口，用于让 Agent 发送共享文件。若所用 bridge 自己实现了文件发送，可以留空；否则应填写本机实际路径。
+
+## 单机兼容与多机角色
+
+旧清单不写 `role` 时等同于 `all`。三种角色为：
+
+| role | 本机运行 Hub | 本机运行 Bot | 用途 |
+| --- | --- | --- | --- |
+| `all` | 是 | 是 | 默认；一台电脑完整运行，或主电脑兼任中心和执行节点 |
+| `hub` | 是 | 否 | 只做中央服务 |
+| `worker` | 否 | 是 | 额外电脑连接已有中央 Hub |
+
+主电脑可使用以下网络配置。`bindHost` 决定 Hub 监听哪些网卡，`publicUrl` 是本机 Bot
+连接 Hub 的地址；额外 worker 在自己的清单中填写它能访问的同一地址：
+
+```json
+{
+  "role": "all",
+  "nodeId": "main-pc",
+  "hub": {
+    "bindHost": "100.x.y.z",
+    "publicUrl": "http://100.x.y.z:17321",
+    "port": 17321,
+    "tenantKey": "one-private-shared-domain"
+  }
+}
+```
+
+优先把 `100.x.y.z` 设为 Tailscale、WireGuard 或企业 VPN 私网地址。每个 Agent 使用
+独立的 256 位随机凭据；主节点保存在 `.runtime\agent-tokens.json`，Hub 从凭据推导
+调用者身份，Agent 不能靠修改请求体冒充另一个 Agent。
+
+为已经登记在主节点清单中的 Agent 生成 worker 清单：
+
+```powershell
+.\scripts\collab-pilot\Export-CollabWorkerConfig.ps1 `
+  -Agent reviewer `
+  -HubUrl http://100.x.y.z:17321 `
+  -OutputPath .\.runtime\worker-reviewer.local.json
+```
+
+导出文件含该 Agent 的一把凭据，只能私下传到目标电脑，不能提交 Git。目标电脑调整
+`nodeId`、启动路径、profile 和工作区后运行预检，再用 `-Config` 启动。手工配置时可用
+`config\collaboration-worker.example.json`，并通过 `credentialEnv` 注入凭据。
 
 ## 适配不同 Agent
 
@@ -200,7 +246,8 @@ Hub health、bridge 是否连接、Agent CLI 是否可执行、代理端口和�
 
 ```text
 .runtime\pilot.local.json       本机路径与启动配置
-.runtime\hub-token.txt          Hub bearer token
+.runtime\hub-token.txt          Hub 中央管理凭据
+.runtime\agent-tokens.json      每 Agent 独立 Hub 凭据
 .runtime\tenant-key.txt         本机协作域
 .runtime\hub-config.json        从本地清单生成的 Hub 配置
 .runtime\collaboration.jsonl    任务账本
@@ -209,11 +256,18 @@ Hub health、bridge 是否连接、Agent CLI 是否可执行、代理端口和�
 .runtime\pids.json              后台启动器 PID
 ```
 
-Hub 默认只监听 `127.0.0.1`。不要把 token、飞书 App Secret、profile 目录或 `pilot.local.json` 提交到仓库。任务产物可能含敏感内容，备份与清理策略由电脑所有者决定，普通停止和回退不会删除产物。
+单机清单可以让 Hub 只监听 `127.0.0.1`；需要额外 worker 时使用 VPN 私网地址和
+VPN 网卡监听；只有确实需要多个私网接口时才使用 `0.0.0.0`。不要把 token、飞书
+App Secret、profile 目录、导出的 worker 清单或
+`pilot.local.json` 提交到仓库。任务产物可能含敏感内容，普通停止和回退不会删除产物。
 
 ## 验收与回退
 
-启动后先看 `Hub health: True` 和各 Agent 的 `Running: True`、`Worker`。然后在同一飞书话题先 `@planner` 产出文件，再 `@reviewer` 接手修改。后者应看到共享摘要，并能读取 `.runtime\artifacts` 中前者的稳定快照；不同话题不能串线。
+启动后先看 `Hub health: True` 和各本机 Agent 的 `Running: True`、`Worker`。单机模式
+先验证本机 Bot 之间照常交接。多机模式再让 worker Bot 接手：它应取得同一 taskId、
+自己的 dispatch 和经过权限筛选的上下文；使用另一 Agent 的凭据读取时必须被拒绝。
+Git 交付件可用 `collab-artifact.cmd register-git` 登记 commit locator；飞书文件会在
+拿到 `messageId + fileKey` 时登记飞书 locator。本地路径始终只表示当前节点缓存。
 
 需要立即退出试验时：
 

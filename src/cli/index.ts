@@ -24,7 +24,13 @@ import {
   runServiceUnregister,
 } from './commands/service';
 import { runStart } from './commands/start';
-import { runArtifactPublish, runCollaborationAction, runCollaborationDelegate, runCollaborationHub } from './commands/hub';
+import {
+  runArtifactPublish,
+  runArtifactRegisterGit,
+  runCollaborationAction,
+  runCollaborationDelegate,
+  runCollaborationHub,
+} from './commands/hub';
 
 const program = new Command();
 
@@ -93,6 +99,18 @@ artifact
   .option('--reply-to <id>', 'message id to reply to')
   .option('--reply-in-thread', 'send the reply inside the Feishu topic')
   .action(runArtifactPublish);
+
+artifact
+  .command('register-git')
+  .description('Register a committed Git file as a portable task artifact')
+  .requiredOption('--task <id>', 'collaboration task id')
+  .requiredOption('--actor <agent>', 'publishing agent id')
+  .requiredOption('--path <path>', 'local path used to hash and cache the file')
+  .requiredOption('--repository <url>', 'Git repository clone URL')
+  .requiredOption('--commit <sha>', 'immutable Git commit SHA')
+  .option('--repo-path <path>', 'path to the file inside the repository')
+  .option('--name <name>', 'shared file name')
+  .action(runArtifactRegisterGit);
 
 // === process-level commands (work directly on bridge processes) ===
 

@@ -103,7 +103,7 @@ Artifact 把“文件或代码”与任务语义绑定在一起。它至少回�
 因此需要 Artifact 这个统一概念，但不等于必须再部署一套 Artifact 服务器。GitHub、
 飞书、对象存储和当前本机目录都可以是它的后端。
 
-### 当前单机实现
+### 当前实现
 
 当前单机 Pilot 会把文件快照到：
 
@@ -111,13 +111,15 @@ Artifact 把“文件或代码”与任务语义绑定在一起。它至少回�
 .runtime\artifacts\<taskId>\<sha256>\<file-name>
 ```
 
-Hub 记录文件名、类型、本机路径、大小、SHA-256 和可用的飞书消息/文件标识。
+Hub 记录文件名、类型、本机缓存路径、大小、SHA-256 和 provider locator。收到的飞书
+附件在具备 `messageId + fileKey` 时登记为飞书 locator；已经提交的代码或 Markdown 可用
+`collab-artifact.cmd register-git` 登记 repository + commit + path。
 SHA-256 类似文件指纹，用于去重和检查文件是否损坏。同一台电脑上的后续 Agent 可以
 直接读取这个稳定快照。
 
-这里也解释了当前跨电脑的最大限制：电脑 A 的 `C:\...` 路径对电脑 B 没有意义。
-跨电脑计划把共享协议升级为 provider + locator；每台机器根据 locator 从 GitHub、
-飞书或可选对象存储取得内容，再落成本机缓存。详细方案见
+电脑 A 的 `C:\...` 路径对电脑 B 没有意义，因此协议已经使用 provider + locator 作为
+跨节点位置，本地路径只是一份缓存。接收节点自动从 GitHub、飞书或对象存储下载并
+验签仍在继续实现。详细状态见
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 
 ## Pilot 是运维脚本，不参与思考
@@ -138,8 +140,9 @@ Pilot：把所有程序正确启动和停止
 Hub：程序运行期间管理任务和交接
 ```
 
-当前 Pilot 默认认为 Hub 和所有 Agent 都在同一台 Windows 电脑上。这是跨电脑部署
-需要修改 Pilot 的根本原因，而不是飞书本身不允许异地 Bot。
+Pilot 默认使用 `all`：Hub 和所有本机 Agent 在同一台 Windows 电脑上，保持原有体验。
+同一套脚本也支持 `worker` 只连接远程 Hub，以及 `hub` 只运行中心；所以主电脑可以
+同时是中心和现有几个 Bot 的节点，其他电脑只是以后增加的执行节点。
 
 ## 为什么还需要一个逻辑中央 Hub
 

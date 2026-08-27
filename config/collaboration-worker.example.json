@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "role": "worker",
+  "nodeId": "second-pc",
+  "hub": {
+    "publicUrl": "http://100.x.y.z:17321",
+    "tenantKey": "same-private-key-as-the-main-node"
+  },
+  "larkCliJs": "",
+  "commonEnvironment": { "LARK_CHANNEL_DISABLE_PROXY": "1" },
+  "unsetEnvironment": ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"],
+  "agents": [
+    {
+      "id": "reviewer",
+      "displayName": "Reviewer",
+      "aliases": ["custom-agent"],
+      "enabled": true,
+      "credentialEnv": "LARK_COLLAB_REVIEWER_TOKEN",
+      "launch": {
+        "filePath": "node.exe",
+        "arguments": ["C:\\path\\to\\bridge\\dist\\cli.js", "run", "--profile", "reviewer"],
+        "workingDirectory": "C:\\agent-workspace",
+        "environment": {}
+      }
+    }
+  ]
+}

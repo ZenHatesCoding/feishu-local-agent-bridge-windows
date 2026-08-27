@@ -22,7 +22,7 @@ export function buildCollaborationContext(input: {
         'For an ask, the target records its answer with hub return, then really @ mentions the current owner.',
         'Complete only the assigned objective and return structured results and artifact paths.',
         `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>" --reply-in-thread. Do not use raw lark-cli --file in a collaboration task.`,
-        'Files listed in artifacts are durable shared copies. Read localPath directly and verify sha256 when integrity matters.',
+        'Artifacts use locator as the portable source. localPath, when present, is only this node\'s cache. Verify sha256 when integrity matters.',
       ],
     },
     artifacts: input.artifacts ?? [],

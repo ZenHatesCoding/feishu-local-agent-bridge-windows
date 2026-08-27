@@ -21,7 +21,18 @@ export async function runCollaborationHub(options: { config: string }): Promise<
     maxCausalDepth: config.maxCausalDepth,
   });
   await hub.initialize();
-  const server = new CollaborationHubServer(hub, { ...config.listen, token });
+  const agentTokens = Object.fromEntries(
+    Object.entries(config.auth?.agentTokenEnvs ?? {}).map(([agentId, envName]) => {
+      const agentToken = process.env[envName];
+      if (!agentToken) throw new Error(`agent token environment variable is not set: ${envName}`);
+      return [agentId, agentToken];
+    }),
+  );
+  const uniqueTokens = new Set([token, ...Object.values(agentTokens)]);
+  if (uniqueTokens.size !== 1 + Object.keys(agentTokens).length) {
+    throw new Error('Hub admin and Agent credentials must all be unique');
+  }
+  const server = new CollaborationHubServer(hub, { ...config.listen, token, agentTokens });
   const address = await server.listen();
   console.log(`Feishu collaboration hub listening on http://${address.host}:${address.port}`);
   console.log(`Ledger: ${config.ledgerPath}`);
@@ -203,6 +214,13 @@ export async function runArtifactPublish(options: {
     ...optionalStringField(output, ['message_id', 'messageId'], 'sourceMessageId'),
     ...optionalStringField(output, ['file_key', 'fileKey'], 'sourceFileKey'),
   };
+  if (published.sourceMessageId && published.sourceFileKey) {
+    published.locator = {
+      provider: 'feishu',
+      messageId: published.sourceMessageId,
+      fileKey: published.sourceFileKey,
+    };
+  }
   const client = new CollaborationClient({ baseUrl, token });
   await client.submit({
     type: 'artifact',
@@ -212,6 +230,41 @@ export async function runArtifactPublish(options: {
     artifact: published,
   });
   process.stdout.write(`${JSON.stringify({ sharedArtifact: published }, null, 2)}\n`);
+}
+
+export async function runArtifactRegisterGit(options: {
+  task: string;
+  actor: string;
+  path: string;
+  repository: string;
+  commit: string;
+  repoPath?: string;
+  name?: string;
+}): Promise<void> {
+  const client = new CollaborationClient({
+    baseUrl: requiredEnv('LARK_COLLAB_HUB_URL'),
+    token: requiredEnv('LARK_COLLAB_HUB_TOKEN'),
+  });
+  const artifact = await snapshotArtifact({
+    sourcePath: resolve(options.path),
+    root: requiredEnv('LARK_COLLAB_ARTIFACT_ROOT'),
+    taskId: options.task,
+    originalName: options.name,
+  });
+  artifact.locator = {
+    provider: 'git',
+    repository: options.repository,
+    commit: options.commit,
+    ...(options.repoPath ? { path: options.repoPath } : {}),
+  };
+  await client.submit({
+    type: 'artifact',
+    idempotencyKey: `artifact-git:${options.task}:${options.actor}:${artifact.id}:${options.commit}`,
+    taskId: options.task,
+    actorAgentId: options.actor,
+    artifact,
+  });
+  process.stdout.write(`${JSON.stringify({ sharedArtifact: artifact }, null, 2)}\n`);
 }
 
 function requiredEnv(name: string): string {

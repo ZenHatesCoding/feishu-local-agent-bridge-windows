@@ -59,9 +59,13 @@ export class CollaborationClient {
     return this.request('/v1/agents');
   }
 
-  registerIdentity(agentId: string, openId: string): Promise<{ agent: AgentIdentity }> {
+  registerIdentity(
+    agentId: string,
+    openId: string,
+    runtime: Pick<AgentIdentity, 'nodeId' | 'instanceId' | 'version'> = {},
+  ): Promise<{ agent: AgentIdentity }> {
     return this.request(`/v1/agents/${encodeURIComponent(agentId)}/identity`, {
-      method: 'POST', body: { openId },
+      method: 'POST', body: { openId, ...runtime },
     });
   }
 

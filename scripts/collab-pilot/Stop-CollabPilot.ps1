@@ -4,11 +4,13 @@ $ErrorActionPreference = 'Stop'
 if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
 
-$agents = @(Get-CollabAgents)
+$agents = @(Get-CollabLocalAgents)
 [array]::Reverse($agents)
 foreach ($agent in $agents) { & (Join-Path $PSScriptRoot 'Stop-CollabAgent.ps1') -Agent $agent.id }
-Stop-CollabComponent 'hub'
-Write-Output 'Collaboration Hub stopped.'
+if (Test-CollabRunsHub) {
+  Stop-CollabComponent 'hub'
+  Write-Output 'Collaboration Hub stopped.'
+}
 
 if ($RestoreOriginals) {
   [array]::Reverse($agents)

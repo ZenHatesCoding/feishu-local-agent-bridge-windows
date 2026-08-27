@@ -24,7 +24,17 @@ export interface AgentIdentity {
   id: AgentId;
   displayName: string;
   openId: string;
+  nodeId?: string;
+  instanceId?: string;
+  version?: string;
+  lastSeenAt?: string;
 }
+
+export type ArtifactLocator =
+  | { provider: 'local'; path: string; nodeId?: string }
+  | { provider: 'feishu'; messageId: string; fileKey: string }
+  | { provider: 'git'; repository: string; commit: string; path?: string }
+  | { provider: 'object'; uri: string };
 
 export interface MessageInput {
   type: 'message';
@@ -56,7 +66,10 @@ export interface SharedArtifact {
   id: string;
   name: string;
   kind: string;
-  localPath: string;
+  /** Node-local cache path. It is never the cross-node source of truth. */
+  localPath?: string;
+  /** Portable location from which another node can obtain this artifact. */
+  locator?: ArtifactLocator;
   sha256: string;
   size: number;
   mime?: string;

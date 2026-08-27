@@ -7,6 +7,7 @@ export interface HubConfig {
   listen: { host: string; port: number };
   ledgerPath: string;
   tokenEnv: string;
+  auth?: { agentTokenEnvs: Record<string, string> };
   leaseMinutes: number;
   maxCausalDepth: number;
   agents: AgentRegistration[];
@@ -31,6 +32,10 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
     if (ids.has(agent.id)) throw new Error(`duplicate agent id: ${agent.id}`);
     ids.add(agent.id);
   }
+  for (const [agentId, envName] of Object.entries(parsed.auth?.agentTokenEnvs ?? {})) {
+    if (!ids.has(agentId)) throw new Error(`auth token configured for unknown agent: ${agentId}`);
+    if (!envName?.trim()) throw new Error(`auth token environment variable is required for agent: ${agentId}`);
+  }
   if (parsed.coordinator?.enabled) {
     const coordinator = parsed.coordinator;
     if (!coordinator.appId || !coordinator.appSecretEnv || !coordinator.tenantKey) {
@@ -49,6 +54,7 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
     },
     ledgerPath: resolve(base, parsed.ledgerPath),
     tokenEnv: parsed.tokenEnv,
+    ...(parsed.auth ? { auth: parsed.auth } : {}),
     leaseMinutes: parsed.leaseMinutes ?? 30,
     maxCausalDepth: parsed.maxCausalDepth ?? (parsed as Partial<HubConfig> & { maxHops?: number }).maxHops ?? 8,
     agents: parsed.agents,

@@ -97,11 +97,21 @@ export class CollaborationHub {
       .map((item) => ({ ...item }));
   }
 
-  registerAgentIdentity(agentId: string, openId: string): AgentIdentity {
+  registerAgentIdentity(
+    agentId: string,
+    openId: string,
+    runtime: Pick<AgentIdentity, 'nodeId' | 'instanceId' | 'version'> = {},
+  ): AgentIdentity {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error(`unknown agent: ${agentId}`);
     if (!openId.trim()) throw new Error('agent openId is required');
-    const identity = { id: agent.id, displayName: agent.displayName, openId: openId.trim() };
+    const identity = {
+      id: agent.id,
+      displayName: agent.displayName,
+      openId: openId.trim(),
+      ...runtime,
+      lastSeenAt: this.now().toISOString(),
+    };
     this.agentIdentities.set(agentId, identity);
     return { ...identity };
   }
@@ -399,11 +409,20 @@ export class CollaborationHub {
       }
     } else if (input.type === 'artifact') {
       const artifact = input.artifact;
-      if (!artifact.id.trim() || !artifact.name.trim() || !artifact.localPath.trim()) {
-        throw new Error('artifact id, name, and localPath are required');
+      if (!artifact.id.trim() || !artifact.name.trim() || (!artifact.localPath?.trim() && !artifact.locator)) {
+        throw new Error('artifact id, name, and localPath or locator are required');
       }
       if (!/^[a-f0-9]{64}$/i.test(artifact.sha256)) throw new Error('artifact sha256 is invalid');
       if (!Number.isSafeInteger(artifact.size) || artifact.size < 0) throw new Error('artifact size is invalid');
+      if (artifact.locator?.provider === 'feishu' && (!artifact.locator.messageId || !artifact.locator.fileKey)) {
+        throw new Error('Feishu artifact locator requires messageId and fileKey');
+      }
+      if (artifact.locator?.provider === 'git' && (!artifact.locator.repository || !artifact.locator.commit)) {
+        throw new Error('Git artifact locator requires repository and commit');
+      }
+      if (artifact.locator?.provider === 'object' && !artifact.locator.uri) {
+        throw new Error('object artifact locator requires uri');
+      }
     }
   }
 

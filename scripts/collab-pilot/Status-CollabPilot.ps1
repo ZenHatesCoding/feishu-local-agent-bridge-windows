@@ -4,10 +4,12 @@ $ErrorActionPreference = 'Stop'
 if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
 
-$health = try { (Invoke-RestMethod -Uri "$(Get-CollabHubUrl)/health" -TimeoutSec 2).ok } catch { $false }
+$health = Test-CollabHubHealth -TimeoutSeconds 2
 Write-Output "Hub health: $health"
 $pids = Read-CollabPidTable
-$knownNames = @('hub') + @(Get-CollabAgents | ForEach-Object { $_.id })
+$knownNames = @()
+if (Test-CollabRunsHub) { $knownNames += 'hub' }
+if (Test-CollabRunsAgents) { $knownNames += @(Get-CollabLocalAgents | ForEach-Object { $_.id }) }
 if ($Agent -and $knownNames -notcontains $Agent) { throw "Unknown component '$Agent'." }
 $names = if ($Agent) { @($Agent) } else { $knownNames }
 foreach ($name in $names) {

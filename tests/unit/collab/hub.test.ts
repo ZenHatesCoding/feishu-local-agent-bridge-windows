@@ -45,11 +45,12 @@ describe('CollaborationHub', () => {
     const { hub } = await fixture();
     expect(hub.registerAgentIdentity('chariot', 'ou_chariot')).toEqual({
       id: 'chariot', displayName: 'Chariot', openId: 'ou_chariot',
+      lastSeenAt: '2026-08-22T08:00:00.000Z',
     });
     hub.registerAgentIdentity('world', 'ou_world');
     expect(hub.listAgentIdentities()).toEqual([
-      { id: 'chariot', displayName: 'Chariot', openId: 'ou_chariot' },
-      { id: 'world', displayName: 'World', openId: 'ou_world' },
+      { id: 'chariot', displayName: 'Chariot', openId: 'ou_chariot', lastSeenAt: '2026-08-22T08:00:00.000Z' },
+      { id: 'world', displayName: 'World', openId: 'ou_world', lastSeenAt: '2026-08-22T08:00:00.000Z' },
     ]);
   });
 
@@ -230,6 +231,25 @@ describe('CollaborationHub', () => {
     });
     expect(hub.getArtifacts(assigned.task.id, 'world')).toHaveLength(1);
     expect(hub.getArtifacts(assigned.task.id, 'chariot')).toEqual([]);
+  });
+
+  it('accepts a portable Git artifact without treating a local path as shared truth', async () => {
+    const { hub } = await fixture();
+    const assigned = await hub.submit(humanMessage());
+    await hub.submit({
+      type: 'artifact', idempotencyKey: 'artifact-git', taskId: assigned.task.id,
+      actorAgentId: 'world',
+      artifact: {
+        id: 'artifact_git', name: 'README.md', kind: 'document', sha256: 'c'.repeat(64), size: 42,
+        locator: {
+          provider: 'git', repository: 'https://github.com/example/project.git',
+          commit: '0123456789abcdef', path: 'README.md',
+        },
+      },
+    });
+    const [artifact] = hub.getArtifacts(assigned.task.id, 'world');
+    expect(artifact?.localPath).toBeUndefined();
+    expect(artifact?.locator).toMatchObject({ provider: 'git', commit: '0123456789abcdef' });
   });
 
   it('rejects actions after the owner lease expires', async () => {

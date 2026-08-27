@@ -146,8 +146,9 @@ lark-channel-bridge profile remove <name> --purge --yes
 
 - profile 和 App Secret 只保存在本机并被 Git 忽略。
 - Hub 默认只监听 `127.0.0.1`。
-- 当前 Pilot 正式支持同一台 Windows 电脑；跨电脑的远程 Artifact、每 Agent 鉴权
-  和 worker 运维标记为计划 P0，见[跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+- Pilot 默认继续支持一台 Windows 电脑运行 Hub 和全部 Bot，也已支持额外 worker 通过
+  私网连接同一个 Hub 和每 Agent 独立鉴权；文件自动下载状态见
+  [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 - 协作可见性是协议隔离，不是操作系统强隔离。
 - 不重装、不升级 Hermes，只增加/移除有明确名称的项目 Hook。
 - `Stop-CollabPilot.ps1 -RestoreOriginals` 可以恢复清单中的独立 bridge，不删除

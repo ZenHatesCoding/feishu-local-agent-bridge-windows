@@ -8,9 +8,11 @@ $agentConfig = Get-CollabAgent $Agent
 $commandDir = Join-Path $script:CollabRepoRoot 'scripts\collab-pilot\bin'
 
 $env:LARK_COLLAB_HUB_URL = Get-CollabHubUrl
-$env:LARK_COLLAB_HUB_TOKEN = (Get-Content -LiteralPath $script:CollabTokenFile -Raw).Trim()
-$env:LARK_COLLAB_TENANT_KEY = (Get-Content -LiteralPath $script:CollabTenantFile -Raw).Trim()
+$env:LARK_COLLAB_HUB_TOKEN = Get-CollabAgentToken $agentConfig
+$env:LARK_COLLAB_TENANT_KEY = Get-CollabTenantKey
 $env:LARK_COLLAB_AGENT_ID = $Agent
+$env:LARK_COLLAB_NODE_ID = if ($pilot.nodeId) { [string]$pilot.nodeId } else { [Environment]::MachineName }
+$env:LARK_COLLAB_INSTANCE_ID = "$($env:LARK_COLLAB_NODE_ID):$Agent"
 $env:LARK_COLLAB_EVENT_SOURCE = 'distributed'
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir

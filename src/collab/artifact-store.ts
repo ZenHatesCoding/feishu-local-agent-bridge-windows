@@ -15,7 +15,9 @@ export interface SnapshotArtifactInput {
   sourceFileKey?: string;
 }
 
-export async function snapshotArtifact(input: SnapshotArtifactInput): Promise<SharedArtifact> {
+export type MaterializedArtifact = SharedArtifact & { localPath: string };
+
+export async function snapshotArtifact(input: SnapshotArtifactInput): Promise<MaterializedArtifact> {
   const sourceStat = await stat(input.sourcePath);
   if (!sourceStat.isFile()) throw new Error(`artifact source is not a file: ${input.sourcePath}`);
   const sha256 = await hashFile(input.sourcePath);
@@ -41,6 +43,9 @@ export async function snapshotArtifact(input: SnapshotArtifactInput): Promise<Sh
     name,
     kind: input.kind ?? kindFromName(name),
     localPath,
+    locator: input.sourceMessageId && input.sourceFileKey
+      ? { provider: 'feishu', messageId: input.sourceMessageId, fileKey: input.sourceFileKey }
+      : { provider: 'local', path: localPath },
     sha256,
     size: sourceStat.size,
     ...(input.mime ? { mime: input.mime } : {}),

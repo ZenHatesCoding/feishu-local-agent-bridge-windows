@@ -91,7 +91,7 @@ The project needs one Artifact abstraction, but it does not require a separate
 Artifact server. GitHub, Feishu, object storage and the current local directory
 are all possible backends.
 
-### Current Single-Machine Implementation
+### Current Implementation
 
 The current single-machine Pilot snapshots files under:
 
@@ -99,11 +99,12 @@ The current single-machine Pilot snapshots files under:
 .runtime\artifacts\<taskId>\<sha256>\<file-name>
 ```
 
-The Hub records name, type, local path, size, SHA-256 and available Feishu
-message/file identifiers. This is durable on one machine, but a `C:\...` path
-from computer A is meaningless on computer B. Distributed deployment therefore
-uses provider + locator so each node can retrieve from GitHub, Feishu or optional
-object storage and materialize a local cache. See the
+The Hub records name, type, local cache path, size, SHA-256, and a provider
+locator. Feishu attachments use `messageId + fileKey`; committed code and
+Markdown can be registered with `collab-artifact.cmd register-git` using a
+repository, commit, and path. A `C:\...` path from computer A is meaningless on
+computer B, so locator is shared truth and local path is only a node cache.
+Automatic receiver-side retrieval remains roadmap work. See the
 [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 
 ## Pilot Is Operations, Not Reasoning
@@ -118,8 +119,10 @@ Pilot: starts and stops the system correctly
 Hub: manages tasks and handoffs while the system is running
 ```
 
-Today Pilot assumes the Hub and all Agents live on one Windows computer. That
-assumption—not Feishu—is why remote workers are not yet a supported deployment.
+Pilot defaults to `all`, keeping the Hub and all local Agents on one Windows
+computer. It also supports `worker` for Bots that connect to a remote Hub and
+`hub` for a center-only node. The main PC can therefore remain both the center
+and an execution node while other computers are added later.
 
 ## Why A Logically Central Hub Still Exists
 

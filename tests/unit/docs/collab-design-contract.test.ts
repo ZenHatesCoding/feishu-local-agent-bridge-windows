@@ -22,13 +22,13 @@ describe('collaboration design and Windows operations contract', () => {
       'collab-artifact.cmd publish',
       'SHA-256',
       '同一个长期话题',
-      '当前 Pilot 的正式部署范围仍是同一台 Windows 电脑',
+      'Pilot 默认继续以 `all` 角色',
     ]) {
       expect(design).toContain(phrase);
     }
   });
 
-  it('keeps current remote limits separate from planned distributed support', async () => {
+  it('tracks implemented remote foundations separately from planned hardening', async () => {
     const [concepts, roadmap] = await Promise.all([
       readFile(new URL('../../../docs/COLLABORATION_CONCEPTS.zh-CN.md', import.meta.url), 'utf8'),
       readFile(new URL('../../../docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md', import.meta.url), 'utf8'),
@@ -46,7 +46,7 @@ describe('collaboration design and Windows operations contract', () => {
     }
     for (const phrase of [
       '能力状态与目标',
-      '当前正式基线是单机 Pilot',
+      '单机 Pilot 仍是默认兼容基线',
       '每 Agent 独立凭据',
       '共享协议使用远程 locator 作为跨节点真相',
       '中央表示一份逻辑真相，不表示一台专用机器',

@@ -10,7 +10,13 @@ if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
 $agentConfig = Get-CollabAgent $Agent
 
-& (Join-Path $PSScriptRoot 'Start-CollabHub.ps1') -Quiet
+Initialize-CollabRuntimeState
+if (Test-CollabRunsHub) {
+  & (Join-Path $PSScriptRoot 'Start-CollabHub.ps1') -Quiet
+} else {
+  $healthy = Test-CollabHubHealth -TimeoutSeconds 3
+  if (!$healthy) { throw "Remote Hub is unavailable: $(Get-CollabHubUrl)" }
+}
 $table = Read-CollabPidTable
 if (Test-CollabPid $table[$Agent]) {
   Write-Output "$Agent is already running (PID $($table[$Agent]))."

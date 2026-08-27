@@ -248,9 +248,9 @@ interface, the Hub is task truth, agents preserve their individual abilities,
 context is projected by task and visibility, and visible wake-up must match
 formal authorization.
 
-Pilot's supported deployment remains one Windows computer. Bridge and Hub
-already communicate over HTTP, but current scripts start a local Hub, all
-callers share one bearer token, artifacts expose the producing computer's
-absolute `localPath`, and short fixed dispatch polling is not WAN-resilient.
-See the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for the target
-shape and phased acceptance criteria.
+Pilot keeps `all` as the default one-PC Hub-plus-local-Bots behavior and also
+supports a main PC as the center with additional private-network workers.
+Per-Agent credentials constrain caller identity, Artifact provider locators
+express portable locations, and bounded backoff covers ordinary event-order
+jitter. See the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for
+automatic materialization, atomic claiming, and production hardening status.
