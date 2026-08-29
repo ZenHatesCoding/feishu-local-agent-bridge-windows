@@ -37,7 +37,7 @@ profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项�
 | Claude Code | 原生 `claude` 适配器 | 已安装并登录 `claude` CLI |
 | Codex | 原生 `codex` 适配器 | 已安装并登录 Codex CLI |
 | Google Antigravity | `antigravity` 适配器的 `agy` 模式 | 已在交互终端登录 `agy` |
-| DeepSeek Harness | 同一适配器的显式 Harness 模式 | Node.js 22+，Harness CLI 已构建 |
+| DeepSeek Harness | 独立 `deepseek-harness` 适配器 | Node.js 22+，Harness CLI 已构建 |
 | Hermes | 隔离协作 Hook | 使用既有 Hermes，绝不重装 |
 
 ## 独立使用或协作使用

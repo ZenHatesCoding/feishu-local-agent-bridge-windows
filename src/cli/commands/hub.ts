@@ -105,14 +105,14 @@ export async function runCollaborationAction(
 /** Authorize a delegation and visibly wake the target bot in the current topic. */
 export async function runCollaborationDelegate(
   type: 'handoff' | 'ask',
-  options: { target: string; content: string },
+  options: { target: string; content: string; task?: string; actor?: string; replyTo?: string; causedByDispatch?: string },
 ): Promise<void> {
   const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');
   const token = requiredEnv('LARK_COLLAB_HUB_TOKEN');
-  const taskId = requiredEnv('LARK_COLLAB_TASK_ID');
-  const actor = requiredEnv('LARK_COLLAB_AGENT_ID');
-  const replyTo = requiredEnv('LARK_COLLAB_REPLY_TO');
-  const causedByDispatchId = requiredEnv('LARK_COLLAB_DISPATCH_ID');
+  const taskId = options.task ?? requiredEnv('LARK_COLLAB_TASK_ID');
+  const actor = options.actor ?? requiredEnv('LARK_COLLAB_AGENT_ID');
+  const replyTo = options.replyTo ?? requiredEnv('LARK_COLLAB_REPLY_TO');
+  const causedByDispatchId = options.causedByDispatch ?? requiredEnv('LARK_COLLAB_DISPATCH_ID');
   const client = new CollaborationClient({ baseUrl, token });
   const target = options.target.trim();
   const content = options.content.trim();

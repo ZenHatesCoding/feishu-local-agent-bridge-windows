@@ -11,7 +11,8 @@ function Initialize-DeepSeekHarnessEnvironment {
   }
 
   $env:LARK_CHANNEL_HOME = Join-Path $Root '.lark-channel-deepseek'
-  $env:LARK_CHANNEL_ANTIGRAVITY_BIN = (Get-Command node -ErrorAction Stop).Source
+  $env:LARK_CHANNEL_NODE_BIN = (Get-Command node -ErrorAction Stop).Source
+  Remove-Item Env:LARK_CHANNEL_ANTIGRAVITY_BIN -ErrorAction SilentlyContinue
   $env:LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = $HarnessEntry
   $env:LARK_CHANNEL_DISABLE_PROXY = '1'
   $env:PATH = "$(Join-Path $Root 'bin');$env:PATH"

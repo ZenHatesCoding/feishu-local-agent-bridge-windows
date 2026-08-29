@@ -2,7 +2,7 @@ import type { AccessMode } from '../config/permissions';
 import type { ProfileConfig } from '../config/profile-schema';
 import { BRIDGE_SYSTEM_PROMPT } from './bridge-system-prompt';
 
-export type AgentCapabilityId = 'claude' | 'codex' | 'antigravity';
+export type AgentCapabilityId = 'claude' | 'codex' | 'antigravity' | 'deepseek-harness';
 export type AgentSessionKind = 'claude-session' | 'codex-thread' | 'stateless';
 export type PromptInjectionMode = 'append-system-prompt' | 'stdin-prefix';
 
@@ -72,5 +72,12 @@ export function antigravityCapability(profile: Pick<ProfileConfig, 'permissions'
     permissions: {
       maxAccess,
     },
+  };
+}
+
+export function deepSeekHarnessCapability(profile: Pick<ProfileConfig, 'permissions'>): AgentCapability {
+  return {
+    ...antigravityCapability(profile),
+    agentId: 'deepseek-harness',
   };
 }

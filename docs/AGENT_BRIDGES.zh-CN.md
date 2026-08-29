@@ -66,13 +66,13 @@ node .\dist\cli.js run `
   --workspace C:\workspaces\antigravity
 ```
 
-没有 `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` 时，`antigravity` 适配器使用 `agy`
-参数协议，显示名称是 `Antigravity CLI`。
+`antigravity` 适配器始终只使用 `agy` 协议，不再由环境变量切换成其他 Agent。
 
 ## DeepSeek Harness
 
-DeepSeek Harness 与 Antigravity 共用 bridge 的配置类型，但运行协议由
-`LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` 显式切换，不会靠机器人名字猜测。
+DeepSeek Harness 使用独立的 `deepseek-harness` Agent 类型和适配器。
+`LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` 只提供 Harness 入口路径，不再切换
+Antigravity 的运行模式。
 
 最省事的完整安装：
 
@@ -94,14 +94,14 @@ $env:DEEPSEEK_HARNESS_ROOT = 'D:\src\deepseek-harness'
 脚本最终设置的关键变量是：
 
 ```powershell
-$env:LARK_CHANNEL_ANTIGRAVITY_BIN = (Get-Command node).Source
+$env:LARK_CHANNEL_NODE_BIN = (Get-Command node).Source
 $env:LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = `
   'D:\src\deepseek-harness\apps\cli\lib\bin.js'
 ```
 
-两者同时存在时，适配器以 Node 启动 Harness 的 headless profile，显示名称为
-`DeepSeek Harness`。同一份 `dist\cli.js` 因而可以分别启动 Justice/Antigravity 和
-Chariot/DeepSeek 两个进程。
+独立适配器使用 Node 启动 Harness 的 headless profile，并通过 stdin 传递
+prompt，长话题不再受 Windows 命令行长度限制。Justice/Antigravity 与
+Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。
 
 ## Hermes
 
@@ -111,6 +111,12 @@ Chariot/DeepSeek 两个进程。
 
 Hermes 的 venv、源码、配置、会话、记忆、技能和其他 Hook 都不属于本项目部署范围。
 清单中的 `launch` 应指向现有 venv 的 `python.exe -m hermes_cli.main gateway run`。
+
+Hook 只接受真实 `@Hermes` 的人类群消息；bot 发来的消息还必须在同一话题中存在
+待处理的 Hub dispatch。授权运行时，Hermes 会收到当前 Agent 目录，以及与 Node
+bridge 相同的 `collab-delegate ask|handoff` 命令约定，因此所有已维护 bot 都能互相
+委派。Hook 会先把该 dispatch 标记为 accepted，并在运行结束时为同一个 dispatch
+记录结果，再明确标记 completed 或 failed。
 
 ## 写入协作清单
 
@@ -142,13 +148,13 @@ DeepSeek 协作进程示例：
     "arguments": [
       "${REPO_ROOT}\\dist\\cli.js", "run",
       "--profile", "deepseek",
-      "--agent", "antigravity",
+      "--agent", "deepseek-harness",
       "--workspace", "C:\\workspaces\\deepseek"
     ],
     "workingDirectory": "C:\\workspaces\\deepseek",
     "environment": {
       "LARK_CHANNEL_HOME": "C:\\feishu-profiles\\deepseek",
-      "LARK_CHANNEL_ANTIGRAVITY_BIN": "node.exe",
+      "LARK_CHANNEL_NODE_BIN": "node.exe",
       "LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY": "D:\\src\\deepseek-harness\\apps\\cli\\lib\\bin.js"
     }
   }

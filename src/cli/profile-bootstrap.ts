@@ -15,6 +15,8 @@ export interface BootstrapProfileInput {
   defaultWorkspace?: string;
   codexBinaryPath?: string;
   antigravityBinaryPath?: string;
+  deepseekHarnessBinaryPath?: string;
+  deepseekHarnessEntryPath?: string;
   profileDir?: string;
 }
 
@@ -34,6 +36,13 @@ export async function createBootstrapProfileConfig(
     input.agentKind === 'antigravity'
       ? await createBootstrapAntigravityConfig(input.antigravityBinaryPath)
       : undefined;
+  const deepseekHarness =
+    input.agentKind === 'deepseek-harness'
+      ? await createBootstrapDeepSeekHarnessConfig(
+          input.deepseekHarnessBinaryPath,
+          input.deepseekHarnessEntryPath,
+        )
+      : undefined;
   const profile = createDefaultProfileConfig({
     agentKind: input.agentKind,
     accounts: input.accounts,
@@ -41,6 +50,7 @@ export async function createBootstrapProfileConfig(
     secrets: input.secrets,
     ...(codex ? { codex } : {}),
     ...(antigravity ? { antigravity } : {}),
+    ...(deepseekHarness ? { deepseekHarness } : {}),
   });
   if (workspace) {
     profile.workspaces = {
@@ -107,12 +117,30 @@ export async function createBootstrapAntigravityConfig(binaryPath: string | unde
   }
   return {
     binaryPath: resolvedBinary,
-    ...(process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY
-      ? { project: process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY }
-      : {}),
     printTimeout: '10m',
     dangerouslySkipPermissions: true,
   };
+}
+
+export async function createBootstrapDeepSeekHarnessConfig(
+  binaryPath: string | undefined,
+  entryPath: string | undefined,
+) {
+  const command = binaryPath ?? process.env.LARK_CHANNEL_NODE_BIN ?? 'node';
+  const entry = entryPath ?? process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY;
+  if (!entry) throw new Error('LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY is required for deepseek-harness');
+  const resolvedBinary = await resolveExecutablePath(command).catch((err: NodeJS.ErrnoException) => {
+    const errno = err.code;
+    throw new AgentPreflightError({
+      code: codexBootstrapBinaryErrorCode(errno),
+      agentId: 'deepseek-harness',
+      agentName: 'DeepSeek Harness',
+      command,
+      binaryPath: command,
+      errno,
+    });
+  });
+  return { binaryPath: resolvedBinary, entryPath: entry };
 }
 
 function codexBootstrapBinaryErrorCode(errno: string | undefined) {

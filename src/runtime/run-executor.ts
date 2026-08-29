@@ -129,7 +129,8 @@ export class RunExecutor {
     } catch (err) {
       release();
       releaseScope();
-      throw new SpawnFailed('agent spawn failed', err);
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      throw new SpawnFailed(`agent spawn failed: ${detail}`, err);
     }
     const dimensions = {
       runId,

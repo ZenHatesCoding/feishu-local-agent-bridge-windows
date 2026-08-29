@@ -1,5 +1,5 @@
 import type { NormalizedMessage } from '@larksuite/channel';
-import { antigravityCapability, claudeCapability, codexCapability } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability } from '../agent/capability';
 import type { Controls } from '../commands';
 import type { AccessDecision } from '../policy/access';
 import { evaluateRunPolicy } from '../policy/run-policy';
@@ -26,7 +26,9 @@ export async function commandSessionCatalogIdentity(input: {
       ? codexCapability(input.controls.profileConfig)
       : input.controls.profileConfig.agentKind === 'antigravity'
         ? antigravityCapability(input.controls.profileConfig)
-      : claudeCapability(input.controls.profileConfig);
+        : input.controls.profileConfig.agentKind === 'deepseek-harness'
+          ? deepSeekHarnessCapability(input.controls.profileConfig)
+        : claudeCapability(input.controls.profileConfig);
   const policy = evaluateRunPolicy({
     scope: {
       source: 'im',

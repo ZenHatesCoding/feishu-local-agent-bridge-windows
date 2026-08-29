@@ -79,7 +79,11 @@ for (const action of ['handoff', 'ask'] as const) {
     .description(`Authorize and visibly @ an agent for a collaboration ${action}`)
     .requiredOption('--target <agent>', 'target agent id')
     .requiredOption('--content <text>', 'objective or question')
-    .action(async (opts: { target: string; content: string }) => {
+    .option('--task <id>', 'collaboration task id; defaults to bridge environment')
+    .option('--actor <agent>', 'calling agent id; defaults to bridge environment')
+    .option('--reply-to <id>', 'Feishu message to reply to; defaults to bridge environment')
+    .option('--caused-by-dispatch <id>', 'active dispatch; defaults to bridge environment')
+    .action(async (opts: { target: string; content: string; task?: string; actor?: string; replyTo?: string; causedByDispatch?: string }) => {
       await runCollaborationDelegate(action, opts);
     });
 }
@@ -119,7 +123,7 @@ program
   .description('Run the bridge in the foreground (was `start` in older versions)')
   .option('-c, --config <path>', 'path to config file')
   .option('--profile <name>', 'profile name to run')
-  .option('--agent <kind>', 'agent kind for a new profile (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind for a new profile (claude, codex, antigravity, or deepseek-harness)')
   .option('--workspace <path>', 'initial working directory for first-run profile bootstrap')
   .option('--app-id <id>', 'use an existing Lark/Feishu app instead of QR app creation')
   .option('--app-secret <secret>', 'App Secret for --app-id; prefer interactive input on shared machines')
@@ -143,7 +147,7 @@ program
   .description('Migrate legacy bridge config/state into the current profile layout')
   .option('-c, --config <path>', 'path to config file')
   .option('--profile <name>', 'target profile name for legacy v1 config migration')
-  .option('--agent <kind>', 'agent kind for legacy v1 profile migration (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind for legacy v1 profile migration (claude, codex, antigravity, or deepseek-harness)')
   .action(async (opts: { config?: string; profile?: string; agent?: string }) => {
     await runMigrate(opts);
   });
@@ -162,7 +166,7 @@ profile
 profile
   .command('create <name>')
   .description('Create a profile from QR registration or existing app credentials')
-  .option('--agent <kind>', 'agent kind (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind (claude, codex, antigravity, or deepseek-harness)')
   .option('--workspace <path>', 'initial working directory for this profile')
   .option('--app-id <id>', 'use an existing Lark/Feishu app instead of QR app creation')
   .option('--app-secret <secret>', 'App Secret for --app-id; prefer interactive input on shared machines')
@@ -234,7 +238,7 @@ program
   .command('start')
   .description('Install (if needed) and start the bridge as an OS-managed daemon')
   .option('--profile <name>', 'profile name (defaults to active profile)')
-  .option('--agent <kind>', 'agent kind for first-run profile bootstrap (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind for first-run profile bootstrap (claude, codex, antigravity, or deepseek-harness)')
   .option('--workspace <path>', 'initial working directory for first-run profile bootstrap')
   .option('--app-id <id>', 'use an existing Lark/Feishu app instead of QR app creation')
   .option('--app-secret <secret>', 'App Secret for --app-id; prefer interactive input on shared machines')

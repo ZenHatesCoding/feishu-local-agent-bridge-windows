@@ -3,6 +3,7 @@ import os from 'node:os';
 import { createInterface } from 'node:readline';
 import pkg from '../../../package.json';
 import { AntigravityAdapter } from '../../agent/antigravity/adapter';
+import { DeepSeekHarnessAdapter } from '../../agent/deepseek-harness/adapter';
 import { ClaudeAdapter } from '../../agent/claude/adapter';
 import { CodexAdapter } from '../../agent/codex/adapter';
 import {
@@ -380,9 +381,11 @@ async function checkRuntimeAgentAvailability(agent: AgentAdapter): Promise<Agent
         ? 'codex' as const
         : agent.id === 'antigravity'
           ? 'antigravity' as const
+          : agent.id === 'deepseek-harness'
+            ? 'deepseek-harness' as const
           : 'claude' as const,
     agentName: agent.displayName,
-    command: agent.id === 'codex' ? 'codex' : agent.id === 'antigravity' ? 'agy' : 'claude',
+    command: agent.id === 'codex' ? 'codex' : agent.id === 'antigravity' ? 'agy' : agent.id === 'deepseek-harness' ? 'node' : 'claude',
   };
   return {
     ok: false,
@@ -452,6 +455,17 @@ export function createRuntimeAgent(
       ...(antigravity.printTimeout ? { printTimeout: antigravity.printTimeout } : {}),
       dangerouslySkipPermissions: antigravity.dangerouslySkipPermissions === true,
       sandbox: antigravity.sandbox === true,
+      larkChannel,
+    });
+  }
+  if (profileConfig.agentKind === 'deepseek-harness') {
+    const harness = profileConfig.deepseekHarness;
+    if (!harness?.binaryPath || !harness.entryPath) {
+      throw new Error('deepseek-harness profile requires deepseekHarness.binaryPath and entryPath');
+    }
+    return new DeepSeekHarnessAdapter({
+      binary: harness.binaryPath,
+      entry: harness.entryPath,
       larkChannel,
     });
   }

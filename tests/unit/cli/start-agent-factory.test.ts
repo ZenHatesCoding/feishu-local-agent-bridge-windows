@@ -87,28 +87,21 @@ describe('start runtime agent factory', () => {
     expect(agent.displayName).toBe('Antigravity CLI');
   });
 
-  it('uses DeepSeek Harness mode when the profile project matches the harness entry', () => {
-    const previous = process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY;
-    process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = 'C:\\deepseek-harness\\apps\\cli\\lib\\bin.js';
-    try {
-      const agent = createRuntimeAgent(
-        createDefaultProfileConfig({
-          agentKind: 'antigravity',
-          accounts: appAccount(),
-          antigravity: {
-            binaryPath: 'node',
-            project: process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY,
-          },
-        }),
-        { profileDir: '/tmp/lark-channel-bridge/profiles/deepseek-e2e' },
-      );
+  it('creates an independent DeepSeek Harness runtime agent', () => {
+    const agent = createRuntimeAgent(
+      createDefaultProfileConfig({
+        agentKind: 'deepseek-harness',
+        accounts: appAccount(),
+        deepseekHarness: {
+          binaryPath: 'node',
+          entryPath: 'C:\\deepseek-harness\\apps\\cli\\lib\\bin.js',
+        },
+      }),
+      { profileDir: '/tmp/lark-channel-bridge/profiles/deepseek-e2e' },
+    );
 
-      expect(agent.id).toBe('antigravity');
-      expect(agent.displayName).toBe('DeepSeek Harness');
-    } finally {
-      if (previous === undefined) delete process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY;
-      else process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = previous;
-    }
+    expect(agent.id).toBe('deepseek-harness');
+    expect(agent.displayName).toBe('DeepSeek Harness');
   });
 
   it('seeds a default Antigravity binary when bootstrapping a new Antigravity profile', () => {

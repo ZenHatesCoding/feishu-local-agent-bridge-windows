@@ -50,13 +50,13 @@ $env:LARK_CHANNEL_ANTIGRAVITY_BIN = "$env:LOCALAPPDATA\agy\bin\agy.exe"
 node .\dist\cli.js run --profile antigravity --agent antigravity --workspace C:\workspaces\antigravity
 ```
 
-Without `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY`, the adapter uses the `agy`
-argument protocol and identifies itself as `Antigravity CLI`.
+The Antigravity adapter always uses the `agy` protocol. It never selects another
+agent implementation from environment variables.
 
 ## DeepSeek Harness
 
-Harness mode is selected explicitly by `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY`,
-not guessed from a bot name.
+DeepSeek Harness has its own `deepseek-harness` agent kind and adapter. The
+entry path is configuration for that adapter, not a mode switch on Antigravity.
 
 ```powershell
 .\scripts\bootstrap-deepseek-bridge.ps1
@@ -73,9 +73,9 @@ $env:DEEPSEEK_HARNESS_ROOT = 'D:\src\deepseek-harness'
 .\scripts\setup-deepseek-feishu.ps1
 ```
 
-Harness mode runs Node with the built `apps\cli\lib\bin.js` entry and the
-headless profile. The same `dist\cli.js` can therefore run Antigravity and
-DeepSeek bridge processes at the same time.
+The adapter runs Node with the built `apps\cli\lib\bin.js` entry and the
+headless profile. Prompts are carried over stdin so long topics never depend on
+the Windows command-line limit.
 
 ## Hermes
 
@@ -85,6 +85,14 @@ only `adapters\hermes\HOOK.yaml` and `handler.py` into the explicitly configured
 
 Point the manifest launch command at the existing Hermes venv and
 `python.exe -m hermes_cli.main gateway run`.
+
+The Hook accepts a human group message only when Hermes was actually mentioned.
+For bot-originated messages it additionally requires a pending Hub dispatch for
+the same topic. During an authorized run Hermes receives the current agent
+directory and the same `collab-delegate ask|handoff` command contract as the
+Node bridges, so every maintained bot can delegate to every other bot. The Hook
+acks the dispatch as accepted, then records and completes or fails that exact
+dispatch when the run ends.
 
 ## Collaboration Manifest
 
@@ -105,13 +113,13 @@ DeepSeek example:
     "filePath": "node.exe",
     "arguments": [
       "${REPO_ROOT}\\dist\\cli.js", "run",
-      "--profile", "deepseek", "--agent", "antigravity",
+      "--profile", "deepseek", "--agent", "deepseek-harness",
       "--workspace", "C:\\workspaces\\deepseek"
     ],
     "workingDirectory": "C:\\workspaces\\deepseek",
     "environment": {
       "LARK_CHANNEL_HOME": "C:\\feishu-profiles\\deepseek",
-      "LARK_CHANNEL_ANTIGRAVITY_BIN": "node.exe",
+      "LARK_CHANNEL_NODE_BIN": "node.exe",
       "LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY": "D:\\src\\deepseek-harness\\apps\\cli\\lib\\bin.js"
     }
   }

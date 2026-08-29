@@ -1,12 +1,13 @@
 --- a/gateway/run.py
 +++ b/gateway/run.py
-@@ -11800,8 +11800,15 @@
+@@ -11800,8 +11800,16 @@
                  "chat_type": getattr(source, "chat_type", "") or "",
                  "session_id": session_entry.session_id,
                  "message": message_text[:500],
 +                "message_full": message_text,
 +                "message_id": getattr(source, "message_id", None) or getattr(event, "message_id", None) or "",
 +                "is_bot": bool(getattr(source, "is_bot", False)),
++                "mentioned_bot": bool(getattr(source, "mentioned_bot", False)),
              }
              await self.hooks.emit("agent:start", hook_ctx)
 +            if hook_ctx.get("cancel"):
@@ -16,9 +17,18 @@
  
              # Run the agent. Capture the session id that this run was launched
              # against so post-run compression publication can be identity-guarded
-@@ -12037,6 +12044,7 @@
+@@ -12037,4 +12045,5 @@
              await self.hooks.emit("agent:end", {
                  **hook_ctx,
                  "response": (response or "")[:500],
 +                "response_full": response or "",
              })
+
+--- a/plugins/platforms/feishu/adapter.py
++++ b/plugins/platforms/feishu/adapter.py
+@@ -3294,4 +3294,5 @@
+             user_id_alt=sender_profile["user_id_alt"],
+             is_bot=is_bot,
+         )
++        setattr(source, "mentioned_bot", self._mentions_self(message))
+         normalized = MessageEvent(

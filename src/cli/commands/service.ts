@@ -471,5 +471,6 @@ async function maybeResolveProfileRuntime(
 function agentDisplay(agentKind: ProcessEntry['agentKind']): { id: string; displayName: string } {
   if (agentKind === 'codex') return { id: 'codex', displayName: 'Codex CLI' };
   if (agentKind === 'antigravity') return { id: 'antigravity', displayName: 'Antigravity CLI' };
+  if (agentKind === 'deepseek-harness') return { id: 'deepseek-harness', displayName: 'DeepSeek Harness' };
   return { id: 'claude', displayName: 'Claude Code' };
 }

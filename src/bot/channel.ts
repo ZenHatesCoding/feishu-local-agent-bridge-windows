@@ -5,7 +5,7 @@ import type {
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
-import { antigravityCapability, claudeCapability, codexCapability } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability } from '../agent/capability';
 import {
   buildAgentPrompt,
   type BridgePromptInteractiveCard,
@@ -835,8 +835,12 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       ? codexCapability(controls.profileConfig)
       : controls.profileConfig.agentKind === 'antigravity'
         ? antigravityCapability(controls.profileConfig)
-      : claudeCapability(controls.profileConfig);
-  const flow = await startRunFlow({
+        : controls.profileConfig.agentKind === 'deepseek-harness'
+          ? deepSeekHarnessCapability(controls.profileConfig)
+        : claudeCapability(controls.profileConfig);
+  let flow: Awaited<ReturnType<typeof startRunFlow>>;
+  try {
+    flow = await startRunFlow({
     scopeId: scope,
     scope: scopeContext,
     prompt,
@@ -863,7 +867,19 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       source: 'im',
       stage: 'submit',
     },
-  });
+    });
+  } catch (err) {
+    if (collaboration && collaborationRun?.dispatchId) {
+      await collaboration.finishRun(
+        collaborationRun.taskId,
+        '',
+        `spawn-failed:${lastMsg.messageId}`,
+        collaborationRun.dispatchId,
+        false,
+      ).catch((ackErr) => log.fail('collab-finalize', ackErr));
+    }
+    throw err;
+  }
   if (!flow.ok) {
     log.info('run-flow', 'rejected', { scope, code: flow.rejectReason.code });
     log.warn('policy', 'denied', {

@@ -1,4 +1,4 @@
-import type { Readable } from 'node:stream';
+import type { Readable, Writable } from 'node:stream';
 import { createInterface } from 'node:readline';
 import { delimiter, dirname, join } from 'node:path';
 import { mergeProcessEnv, spawnProcess, type SpawnedProcessByStdio } from '../../platform/spawn';
@@ -25,7 +25,7 @@ export interface AntigravityAdapterOptions {
   larkChannel?: LarkChannelEnvContext;
 }
 
-type AntigravityChild = SpawnedProcessByStdio<null, Readable, Readable>;
+type AntigravityChild = SpawnedProcessByStdio<Writable, Readable, Readable>;
 
 export class AntigravityAdapter implements AgentAdapter {
   readonly id = 'antigravity';
@@ -39,7 +39,6 @@ export class AntigravityAdapter implements AgentAdapter {
   private readonly sandbox: boolean;
   private readonly defaultStopGraceMs: number;
   private readonly larkChannel: LarkChannelEnvContext | undefined;
-  private readonly deepSeekHarness: boolean;
   private botIdentity: AgentBotIdentity | undefined;
 
   constructor(opts: AntigravityAdapterOptions) {
@@ -51,11 +50,7 @@ export class AntigravityAdapter implements AgentAdapter {
     this.sandbox = opts.sandbox === true;
     this.defaultStopGraceMs = opts.stopGraceMs ?? 5000;
     this.larkChannel = opts.larkChannel;
-    this.deepSeekHarness = Boolean(
-      process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY &&
-      opts.project === process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY,
-    );
-    this.displayName = this.deepSeekHarness ? 'DeepSeek Harness' : 'Antigravity CLI';
+    this.displayName = 'Antigravity CLI';
   }
 
   setBotIdentity(identity: AgentBotIdentity): void {
@@ -67,13 +62,11 @@ export class AntigravityAdapter implements AgentAdapter {
   }
 
   async checkAvailability(): Promise<AgentAvailability> {
-    const entryScript = this.deepSeekHarness ? this.project : undefined;
     return checkAgentAvailability({
       agentId: 'antigravity',
       agentName: this.displayName,
       command: this.binary,
       binaryPath: this.binary,
-      ...(entryScript ? { args: [entryScript, '--version'] } : {}),
     });
   }
 
@@ -94,40 +87,41 @@ export class AntigravityAdapter implements AgentAdapter {
       throw new Error('cwd is required for AntigravityAdapter.run');
     }
 
-    if (this.deepSeekHarness && !this.project) {
-      throw new Error('DeepSeek Harness CLI entry script is required');
-    }
-
     const prompt = prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
-    const args = this.deepSeekHarness
-      ? [this.project!, '--profile', 'headless', prompt]
-      : [
-          '--print',
-          prompt,
-          '--print-timeout',
-          this.printTimeout,
-          ...(this.project ? ['--project', this.project] : []),
-          ...(opts.model ?? this.model ? ['--model', opts.model ?? this.model!] : []),
-          ...(this.dangerouslySkipPermissions ? ['--dangerously-skip-permissions'] : []),
-          ...(this.sandbox ? ['--sandbox'] : []),
-          '--add-dir',
-          opts.cwd,
-        ];
+    const args = [
+      '--input-format',
+      'stream-json',
+      '--output-format',
+      'stream-json',
+      '--print-timeout',
+      this.printTimeout,
+      ...(this.project ? ['--project', this.project] : []),
+      ...(opts.model ?? this.model ? ['--model', opts.model ?? this.model!] : []),
+      ...(this.dangerouslySkipPermissions ? ['--dangerously-skip-permissions'] : []),
+      ...(this.sandbox ? ['--sandbox'] : []),
+      '--add-dir',
+      opts.cwd,
+    ];
 
     const child = spawnProcess(this.binary, args, {
       cwd: opts.cwd,
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.larkChannel),
         ...opts.env,
-        LARK_CHANNEL_ANTIGRAVITY_BRIDGE: this.deepSeekHarness ? undefined : '1',
-        LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: this.deepSeekHarness ? '1' : undefined,
-        DSH_CWD: this.deepSeekHarness ? opts.cwd : undefined,
+        LARK_CHANNEL_ANTIGRAVITY_BRIDGE: '1',
+        LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: undefined,
+        DSH_CWD: undefined,
         PATH: antigravityPath(this.larkChannel, process.env.PATH),
         HERMES_HOME: undefined,
         HERMES_GIT_BASH_PATH: undefined,
       }),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     }) as AntigravityChild;
+
+    child.stdin.end(`${JSON.stringify({
+      event: 'user',
+      message: { role: 'user', content: prompt },
+    })}\n`);
 
     const stderrChunks: Buffer[] = [];
     let runtimeError: Error | null = null;
@@ -142,7 +136,7 @@ export class AntigravityAdapter implements AgentAdapter {
 
     return {
       runId: opts.runId,
-      events: createEventStream(child, stderrChunks, () => runtimeError, this.displayName),
+      events: createEventStream(child, stderrChunks, () => runtimeError),
       async stop() {
         if (child.exitCode !== null || child.signalCode !== null) return;
         child.kill('SIGTERM');
@@ -188,13 +182,12 @@ async function* createEventStream(
   child: AntigravityChild,
   stderrChunks: Buffer[],
   getError: () => Error | null,
-  displayName = 'Antigravity CLI',
 ): AsyncGenerator<AgentEvent> {
   if (!child.pid) {
     const err = getError();
     yield {
       type: 'error',
-      message: err ? `failed to spawn ${displayName}: ${err.message}` : 'spawn returned no pid',
+      message: err ? `failed to spawn Antigravity CLI: ${err.message}` : 'spawn returned no pid',
       terminationReason: 'failed',
     };
     return;
@@ -202,9 +195,13 @@ async function* createEventStream(
 
   const rl = createInterface({ input: child.stdout, crlfDelay: Infinity });
   let text = '';
+  let resultError: string | undefined;
   try {
     for await (const line of rl) {
-      const delta = `${line}\n`;
+      const parsed = parseStreamJsonLine(line);
+      if (parsed?.error) resultError = parsed.error;
+      const delta = parsed?.delta ?? '';
+      if (!delta) continue;
       text += delta;
       yield { type: 'text', delta };
     }
@@ -215,11 +212,15 @@ async function* createEventStream(
   const exitCode = await waitForExitCode(child);
   const runtimeError = getError();
   const stderr = Buffer.concat(stderrChunks).toString('utf8').trim();
+  if (resultError) {
+    yield { type: 'error', message: resultError, terminationReason: 'failed' };
+    return;
+  }
   if (exitCode !== 0 && exitCode !== null) {
     const detail = stderr ? `: ${truncateForReply(stderr)}` : '';
     yield {
       type: 'error',
-      message: `${displayName} exited with code ${exitCode}${detail}`,
+      message: `Antigravity CLI exited with code ${exitCode}${detail}`,
       terminationReason: 'failed',
     };
     return;
@@ -227,7 +228,7 @@ async function* createEventStream(
   if (runtimeError) {
     yield {
       type: 'error',
-      message: `${displayName} runtime error: ${runtimeError.message}`,
+      message: `Antigravity CLI runtime error: ${runtimeError.message}`,
       terminationReason: 'failed',
     };
     return;
@@ -235,12 +236,31 @@ async function* createEventStream(
   if (text.trim().length === 0 && stderr.length > 0) {
     yield {
       type: 'error',
-      message: `${displayName} produced no reply. stderr: ${truncateForReply(stderr)}`,
+      message: `Antigravity CLI produced no reply. stderr: ${truncateForReply(stderr)}`,
       terminationReason: 'failed',
     };
     return;
   }
   yield { type: 'done', terminationReason: 'normal' };
+}
+
+function parseStreamJsonLine(line: string): { delta?: string; error?: string } | undefined {
+  try {
+    const value = JSON.parse(line) as {
+      event?: string;
+      step_update?: { step_type?: string; text_delta?: string };
+      result?: { status?: string; error?: string };
+    };
+    if (value.event === 'step_update' && value.step_update?.step_type === 'agent_response') {
+      return value.step_update.text_delta ? { delta: value.step_update.text_delta } : {};
+    }
+    if (value.event === 'result' && value.result?.status && value.result.status !== 'SUCCESS') {
+      return { error: value.result.error || `Antigravity CLI returned ${value.result.status}` };
+    }
+    return {};
+  } catch {
+    return {};
+  }
 }
 
 async function waitForExitCode(child: AntigravityChild): Promise<number | null> {

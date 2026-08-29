@@ -13,7 +13,7 @@ import {
   type PermissionSource,
 } from './permissions';
 
-export type AgentKind = 'claude' | 'codex' | 'antigravity';
+export type AgentKind = 'claude' | 'codex' | 'antigravity' | 'deepseek-harness';
 export type SandboxMode = CodexSandboxMode;
 export type { AccessMode, PermissionConfig, PermissionSource };
 
@@ -53,6 +53,11 @@ export interface AntigravityConfig {
   printTimeout?: string;
   dangerouslySkipPermissions?: boolean;
   sandbox?: boolean;
+}
+
+export interface DeepSeekHarnessConfig {
+  binaryPath: string;
+  entryPath: string;
 }
 
 export interface AttachmentConfig {
@@ -102,6 +107,7 @@ export interface ProfileConfig {
   permissionSource?: PermissionSource;
   codex?: CodexConfig;
   antigravity?: AntigravityConfig;
+  deepseekHarness?: DeepSeekHarnessConfig;
   attachments: AttachmentConfig;
   comments: CommentConfig;
   larkCli: LarkCliConfig;
@@ -129,6 +135,7 @@ export interface CreateDefaultProfileConfigInput {
   permissions?: Partial<PermissionConfig>;
   codex?: CodexConfig;
   antigravity?: AntigravityConfig;
+  deepseekHarness?: DeepSeekHarnessConfig;
   secrets?: SecretsConfig;
 }
 
@@ -164,6 +171,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     permissions?: Partial<PermissionConfig>;
     codex?: CodexConfig & { flags?: unknown };
     antigravity?: AntigravityConfig;
+    deepseekHarness?: DeepSeekHarnessConfig;
     attachments?: Partial<AttachmentConfig>;
     comments?: unknown;
     larkCli?: unknown;
@@ -172,8 +180,8 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
   if (raw.schemaVersion !== 2) {
     throw new Error('profile schemaVersion must be 2');
   }
-  if (raw.agentKind !== 'claude' && raw.agentKind !== 'codex' && raw.agentKind !== 'antigravity') {
-    throw new Error('agentKind must be claude, codex, or antigravity');
+  if (raw.agentKind !== 'claude' && raw.agentKind !== 'codex' && raw.agentKind !== 'antigravity' && raw.agentKind !== 'deepseek-harness') {
+    throw new Error('agentKind must be claude, codex, antigravity, or deepseek-harness');
   }
   const accounts = normalizeAccounts(raw.accounts);
   if (raw.agentKind === 'codex' && !raw.codex) {
@@ -181,6 +189,9 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
   }
   if (raw.agentKind === 'antigravity' && !raw.antigravity) {
     throw new Error('antigravity profile requires antigravity configuration');
+  }
+  if (raw.agentKind === 'deepseek-harness' && !raw.deepseekHarness) {
+    throw new Error('deepseek-harness profile requires deepseekHarness configuration');
   }
 
   const preferences = normalizePreferences(raw.preferences);
@@ -210,6 +221,7 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     permissionSource,
     ...(raw.codex ? { codex: normalizeCodex(raw.codex) } : {}),
     ...(raw.antigravity ? { antigravity: normalizeAntigravity(raw.antigravity) } : {}),
+    ...(raw.deepseekHarness ? { deepseekHarness: normalizeDeepSeekHarness(raw.deepseekHarness) } : {}),
     attachments: {
       maxCount: numberOr(raw.attachments?.maxCount, 10),
       maxBytes: numberOr(raw.attachments?.maxBytes, 100 * 1024 * 1024),
@@ -221,6 +233,13 @@ export function normalizeProfileConfig(input: unknown): ProfileConfig {
     comments,
     larkCli,
   };
+}
+
+function normalizeDeepSeekHarness(input: DeepSeekHarnessConfig): DeepSeekHarnessConfig {
+  if (!input.binaryPath || !input.entryPath) {
+    throw new Error('deepseekHarness.binaryPath and deepseekHarness.entryPath are required');
+  }
+  return { binaryPath: input.binaryPath, entryPath: input.entryPath };
 }
 
 function normalizeAccounts(input: unknown): ProfileConfig['accounts'] {

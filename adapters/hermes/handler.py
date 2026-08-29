@@ -18,7 +18,7 @@ import urllib.request
 from typing import Any
 
 
-_TASK_BY_SESSION: dict[str, str] = {}
+_RUN_BY_SESSION: dict[str, tuple[str, str]] = {}
 
 _FILE_PATTERNS = (
     re.compile(r"MEDIA:\s*([^\r\n]+)", re.IGNORECASE),
@@ -165,6 +165,8 @@ def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dic
     is_bot = bool(context.get("is_bot"))
     if is_bot:
         return _pending_dispatch(task_id, agent_id)
+    if not bool(context.get("mentioned_bot")):
+        return _pending_dispatch(task_id, agent_id)
 
     _, _, tenant, _ = _settings()
     stable_id = message_id or hashlib.sha256(
@@ -199,8 +201,7 @@ def _on_start(context: dict[str, Any]) -> None:
     task_id = _task_id(tenant, str(context.get("chat_id") or ""), str(context.get("thread_id")))
     dispatch = _submit_inbound(context, task_id, agent_id)
     if dispatch is None:
-        if context.get("is_bot"):
-            context["cancel"] = True
+        context["cancel"] = True
         return
 
     message = str(context.get("message_full") or context.get("message") or "")
@@ -209,15 +210,29 @@ def _on_start(context: dict[str, Any]) -> None:
     encoded_task = urllib.parse.quote(task_id)
     encoded_agent = urllib.parse.quote(agent_id)
     shared = _request(f"/v1/tasks/{encoded_task}/context?agentId={encoded_agent}&after=0")
+    identities = _request("/v1/agents").get("agents", [])
+    dispatch_id = str(dispatch["id"])
+    reply_to = str(context.get("message_id") or "")
+    delegate = (
+        "collab-delegate.cmd ask|handoff --target TARGET_ID --content TEXT "
+        f'--task "{task_id}" --actor "{agent_id}" --reply-to "{reply_to}" '
+        f'--caused-by-dispatch "{dispatch_id}"'
+    )
     collaboration = {
         "task": shared.get("task"),
         "dispatch": dispatch,
+        "availableAgents": [
+            {"id": item.get("id"), "displayName": item.get("displayName")}
+            for item in identities if item.get("id") != agent_id
+        ],
         "entries": shared.get("entries", []),
         "artifacts": shared.get("artifacts", []),
         "rules": [
             "Continue from accepted shared conclusions and artifacts.",
             "Do not reveal private chain-of-thought or secrets.",
             "Your final visible answer will be recorded into shared task context.",
+            f"To ask or hand off to another bot, run: {delegate}",
+            "A text-only @ is never delegation; the command must create Hub authorization and a real Feishu mention.",
             "Files listed in artifacts are durable shared copies; read localPath directly.",
             "When you create a file, include its absolute path in the final response so Hermes sends it and the Hub registers it.",
         ],
@@ -230,7 +245,7 @@ def _on_start(context: dict[str, Any]) -> None:
     )
     session_id = str(context.get("session_id") or "")
     if session_id:
-        _TASK_BY_SESSION[session_id] = task_id
+        _RUN_BY_SESSION[session_id] = (task_id, dispatch_id)
     _request(f"/v1/dispatches/{urllib.parse.quote(str(dispatch['id']))}/ack", body={
         "agentId": agent_id,
         "status": "accepted",
@@ -240,11 +255,19 @@ def _on_start(context: dict[str, Any]) -> None:
 
 def _on_end(context: dict[str, Any]) -> None:
     session_id = str(context.get("session_id") or "")
-    task_id = _TASK_BY_SESSION.pop(session_id, None)
+    run = _RUN_BY_SESSION.pop(session_id, None)
     response = str(context.get("response_full") or context.get("response") or "").strip()
-    if not task_id or not response:
+    if not run:
         return
+    task_id, dispatch_id = run
     _, _, _, agent_id = _settings()
+    if not response:
+        _request(f"/v1/dispatches/{urllib.parse.quote(dispatch_id)}/ack", body={
+            "agentId": agent_id,
+            "status": "failed",
+            "idempotencyKey": f"fail:{dispatch_id}:{session_id}",
+        })
+        return
     _register_artifacts(task_id, agent_id, response, "outbound")
     digest = hashlib.sha256(response.encode("utf-8")).hexdigest()[:24]
     _request("/v1/events", body={
@@ -252,7 +275,13 @@ def _on_end(context: dict[str, Any]) -> None:
         "idempotencyKey": f"agent-result:{agent_id}:{session_id}:{digest}",
         "taskId": task_id,
         "actorAgentId": agent_id,
+        "causedByDispatchId": dispatch_id,
         "content": response[:100_000],
+    })
+    _request(f"/v1/dispatches/{urllib.parse.quote(dispatch_id)}/ack", body={
+        "agentId": agent_id,
+        "status": "completed",
+        "idempotencyKey": f"complete:{dispatch_id}:{session_id}",
     })
 
 

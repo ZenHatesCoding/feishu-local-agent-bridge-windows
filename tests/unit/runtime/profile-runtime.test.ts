@@ -267,7 +267,7 @@ describe('profile runtime resolver', () => {
       expect(message).toContain(codex);
       expect(message).toContain('antigravity');
       expect(message).toContain(antigravity);
-      expect(message).toContain('--agent <claude|codex|antigravity>');
+      expect(message).toContain('--agent <claude|codex|antigravity|deepseek-harness>');
     } finally {
       process.env.PATH = oldPath;
       if (oldClaude === undefined) {

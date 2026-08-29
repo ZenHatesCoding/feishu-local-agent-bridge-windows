@@ -16,8 +16,10 @@ import {
   buildBridgeSystemPrompt,
   prefixBridgeSystemPrompt,
 } from '../../../src/agent/bridge-system-prompt';
+import { AntigravityAdapter } from '../../../src/agent/antigravity/adapter';
 import { ClaudeAdapter } from '../../../src/agent/claude/adapter';
 import { CodexAdapter } from '../../../src/agent/codex/adapter';
+import { DeepSeekHarnessAdapter } from '../../../src/agent/deepseek-harness/adapter';
 
 interface FakeChild extends EventEmitter {
   pid: number;
@@ -112,6 +114,48 @@ describe('CodexAdapter system prompt wiring', () => {
 
     const stdin = await readAll(child.stdin);
     expect(stdin).toBe(prefixBridgeSystemPrompt('hi', undefined));
+  });
+});
+
+describe('AntigravityAdapter system prompt wiring', () => {
+  it('sends a long prompt through stream-json stdin instead of process argv', async () => {
+    const child = fakeChild();
+    spawnMock.spawnProcess.mockReturnValue(child);
+    const adapter = new AntigravityAdapter({ binary: 'agy' });
+    const prompt = 'long prompt '.repeat(4_000);
+
+    adapter.run({ runId: 'r1', prompt, cwd: '/tmp' });
+
+    const args = spawnMock.spawnProcess.mock.calls[0]?.[1] as string[];
+    expect(args).toContain('stream-json');
+    expect(args).not.toContain(expect.stringContaining('long prompt'));
+    const input = JSON.parse((await readAll(child.stdin)).trim()) as {
+      event: string;
+      message: { role: string; content: string };
+    };
+    expect(input.event).toBe('user');
+    expect(input.message.role).toBe('user');
+    expect(input.message.content).toBe(prefixBridgeSystemPrompt(prompt, undefined));
+  });
+});
+
+describe('DeepSeekHarnessAdapter system prompt wiring', () => {
+  it('keeps the independent Harness entry and sends a long prompt through stdin', async () => {
+    const child = fakeChild();
+    spawnMock.spawnProcess.mockReturnValue(child);
+    const adapter = new DeepSeekHarnessAdapter({
+      binary: 'node',
+      entry: 'C:/deepseek-harness/dist/cli.js',
+    });
+    const prompt = 'long prompt '.repeat(4_000);
+
+    adapter.run({ runId: 'r1', prompt, cwd: '/tmp' });
+
+    const args = spawnMock.spawnProcess.mock.calls[0]?.[1] as string[];
+    expect(args[0]).toBe('-e');
+    expect(args.at(-1)).toBe('C:/deepseek-harness/dist/cli.js');
+    expect(args).not.toContain(expect.stringContaining('long prompt'));
+    expect(await readAll(child.stdin)).toBe(prefixBridgeSystemPrompt(prompt, undefined));
   });
 });
 
