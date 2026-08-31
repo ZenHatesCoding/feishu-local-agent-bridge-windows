@@ -101,7 +101,10 @@ $env:LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = `
 
 独立适配器使用 Node 启动 Harness 的 headless profile，并通过 stdin 传递
 prompt，长话题不再受 Windows 命令行长度限制。Justice/Antigravity 与
-Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。
+Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。Harness 的答案是最终
+批量输出，不是可靠的增量流。因此 bridge 会先发送一条用户可见的“已收到”，任务
+完成后再用普通话题回复一次性交付最终答案，不再为长研究任务维持空白 markdown
+stream。
 
 ## Hermes
 

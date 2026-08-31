@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BRIDGE_SYSTEM_PROMPT } from '../../../src/agent/bridge-system-prompt';
-import { claudeCapability, codexCapability } from '../../../src/agent/capability';
+import { claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode } from '../../../src/agent/capability';
 import { createDefaultProfileConfig } from '../../../src/config/profile-schema';
 
 describe('agent capability contract', () => {
@@ -71,5 +71,19 @@ describe('agent capability contract', () => {
     });
 
     expect(codexCapability(profile).permissions.maxAccess).toBe('read-only');
+  });
+
+  it('marks DeepSeek Harness as final-output so delivery never relies on a long-lived stream', () => {
+    const profile = createDefaultProfileConfig({
+      agentKind: 'deepseek-harness',
+      accounts: { app: { id: 'cli_test', secret: '${APP_SECRET}', tenant: 'feishu' } },
+      deepseekHarness: { binaryPath: 'node', entryPath: '/harness/cli.js' },
+    });
+
+    expect(deepSeekHarnessCapability(profile)).toMatchObject({
+      agentId: 'deepseek-harness',
+      outputDelivery: 'final',
+    });
+    expect(effectiveReplyMode(deepSeekHarnessCapability(profile), 'markdown')).toBe('text');
   });
 });

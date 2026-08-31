@@ -149,9 +149,49 @@ export class CollaborationHub {
     this.validateInput(input);
     const previousTaskId = this.idempotency.get(input.idempotencyKey);
     if (previousTaskId) {
-      const task = this.tasks.get(previousTaskId);
+      let task = this.tasks.get(previousTaskId);
       if (!task) throw new Error('idempotency index references a missing task');
       const sourceRecord = this.records.find((record) => record.idempotencyKey === input.idempotencyKey);
+      if (input.type === 'message' && sourceRecord?.event.kind === 'message') {
+        const existingTargets = new Set(
+          [...this.dispatches.values()]
+            .filter((dispatch) => dispatch.taskId === previousTaskId && dispatch.sourceSequence === sourceRecord.sequence)
+            .map((dispatch) => dispatch.targetAgentId),
+        );
+        const addedTargets = [...new Set(input.targetAgentIds)].filter((agentId) => !existingTargets.has(agentId));
+        if (input.actor.type === 'human' && addedTargets.length > 0) {
+          const fanout = existingTargets.size + addedTargets.length > 1;
+          const routing = this.record(`${input.idempotencyKey}:routing:${addedTargets.sort().join(',')}`, previousTaskId, {
+            kind: 'message-routing',
+            messageId: input.messageId,
+            targetAgentIds: addedTargets,
+            fanout,
+            occurredAt: input.occurredAt ?? this.now().toISOString(),
+            visibility: { kind: 'task-public' },
+          });
+          await this.commit([
+            routing,
+            ...(!fanout && existingTargets.size === 0
+              ? [this.record(`${input.idempotencyKey}:lease`, previousTaskId, {
+                  kind: 'lease',
+                  ownerAgentId: addedTargets[0]!,
+                  reason: 'mention',
+                  expiresAt: this.leaseExpiry(),
+                })]
+              : []),
+            ...addedTargets.map((target) => this.dispatchRecord(
+              input.idempotencyKey,
+              previousTaskId,
+              target,
+              fanout ? 'fanout' : 'assign',
+              input.content,
+              sourceRecord.sequence,
+              1,
+            )),
+          ]);
+          task = this.tasks.get(previousTaskId)!;
+        }
+      }
       const dispatches = sourceRecord
         ? [...this.dispatches.values()]
             .filter((dispatch) => dispatch.taskId === previousTaskId && dispatch.sourceSequence === sourceRecord.sequence)
@@ -366,6 +406,12 @@ export class CollaborationHub {
     if (event.kind === 'message') {
       for (const agentId of event.targetAgentIds) addParticipant(task, agentId);
       if (event.actor.type === 'agent') addParticipant(task, event.actor.id);
+    } else if (event.kind === 'message-routing') {
+      for (const agentId of event.targetAgentIds) addParticipant(task, agentId);
+      if (event.fanout) {
+        task.ownerAgentId = undefined;
+        task.leaseExpiresAt = undefined;
+      }
     } else if (event.kind === 'lease') {
       task.ownerAgentId = event.ownerAgentId;
       task.leaseExpiresAt = event.expiresAt;

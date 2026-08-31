@@ -86,6 +86,14 @@ assignment starts a new root at depth 1, so a long-lived topic never becomes
 unusable merely because it has accumulated legitimate work. The causal-depth
 ceiling only stops unbounded Agent-to-Agent recursion.
 
+When one human message mentions several bots, Feishu delivers that same message
+through each bot application's independent event connection. The Hub merges
+those authenticated observations by Feishu message ID. Each bridge may assert
+only its own real mention; the append-only routing expansion creates one
+dispatch per newly observed target and clears single-owner state once the
+message becomes fanout. Arrival order therefore cannot make only the first bot
+respond, including when Hermes reaches the Hub later than the Node bridges.
+
 Dispatches have an explicit lifecycle: `pending -> accepted -> completed` or
 `pending -> accepted -> failed`. A child action must name an accepted parent
 dispatch for the same task and actor. This prevents stale work from spawning

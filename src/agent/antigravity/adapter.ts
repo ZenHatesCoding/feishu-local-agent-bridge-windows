@@ -199,7 +199,7 @@ async function* createEventStream(
   try {
     for await (const line of rl) {
       const parsed = parseStreamJsonLine(line);
-      if (parsed?.error) resultError = parsed.error;
+      if (parsed?.error) resultError ??= parsed.error;
       const delta = parsed?.delta ?? '';
       if (!delta) continue;
       text += delta;
@@ -249,13 +249,18 @@ function parseStreamJsonLine(line: string): { delta?: string; error?: string } |
     const value = JSON.parse(line) as {
       event?: string;
       step_update?: { step_type?: string; text_delta?: string };
-      result?: { status?: string; error?: string };
+      result?: { status?: string; error?: string; response?: string };
     };
     if (value.event === 'step_update' && value.step_update?.step_type === 'agent_response') {
       return value.step_update.text_delta ? { delta: value.step_update.text_delta } : {};
     }
+    if (value.event === 'step_update' && value.step_update?.step_type === 'error_message') {
+      return value.step_update.text_delta ? { error: value.step_update.text_delta } : {};
+    }
     if (value.event === 'result' && value.result?.status && value.result.status !== 'SUCCESS') {
-      return { error: value.result.error || `Antigravity CLI returned ${value.result.status}` };
+      return {
+        error: value.result.error || value.result.response || `Antigravity CLI returned ${value.result.status}`,
+      };
     }
     return {};
   } catch {

@@ -101,6 +101,15 @@ export type LedgerEvent =
       occurredAt: string;
     }
   | {
+      /** Additional real mentions observed by another independently connected bot. */
+      kind: 'message-routing';
+      messageId: string;
+      targetAgentIds: AgentId[];
+      fanout: boolean;
+      occurredAt: string;
+      visibility: { kind: 'task-public' };
+    }
+  | {
       kind: 'lease';
       ownerAgentId: AgentId;
       reason: 'mention' | 'handoff';

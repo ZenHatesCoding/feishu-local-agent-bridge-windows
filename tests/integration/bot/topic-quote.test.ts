@@ -175,11 +175,35 @@ describe('topic message quote handling', () => {
       expect.objectContaining({ cardContentType: 'user_card_content' }),
     );
   });
+
+  it('acknowledges DeepSeek Harness immediately and does not open a markdown stream', async () => {
+    const h = await createHarness({ agentKind: 'deepseek-harness' });
+    await startTestBridge(h);
+
+    await h.channel.handlers.message?.(
+      message({
+        messageId: 'om_harness',
+        rootId: 'om_topic_root',
+        parentId: 'om_topic_root',
+        threadId: 'omt_topic',
+        content: '@Bridge 做一个长任务',
+      }),
+    );
+
+    await waitFor(() => h.channel.sent.length >= 1);
+    expect(h.channel.sent[0]).toMatchObject({
+      content: { markdown: '已收到，正在处理。完成后会在本话题发送最终结果。' },
+      options: { replyTo: 'om_harness', replyInThread: true },
+    });
+    await waitFor(() => h.agent.runOptions.length === 1);
+    expect(h.channel.streams).toHaveLength(0);
+  });
 });
 
 async function createHarness(options: {
   chatMode?: 'group' | 'topic';
   quotedMessages?: Record<string, string>;
+  agentKind?: 'claude' | 'deepseek-harness';
 } = {}): Promise<{
   tmp: TmpProfile;
   channel: FakeLarkChannel & { handlers: MessageHandlerMap };
@@ -192,7 +216,7 @@ async function createHarness(options: {
   const tmp = await createTmpProfile('topic-quote-');
   const workspace = await realpath(tmp.workspace);
   const baseProfileConfig = createDefaultProfileConfig({
-    agentKind: 'claude',
+    agentKind: options.agentKind ?? 'claude',
     accounts: {
       app: {
         id: 'cli_test',
@@ -204,6 +228,9 @@ async function createHarness(options: {
       allowedChats: ['oc_topic_chat'],
       allowedUsers: ['ou_user'],
     },
+    ...(options.agentKind === 'deepseek-harness'
+      ? { deepseekHarness: { binaryPath: 'node', entryPath: '/harness/cli.js' } }
+      : {}),
   });
   const profileConfig = {
     ...baseProfileConfig,

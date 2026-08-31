@@ -137,6 +137,12 @@ tenantKey + chatId + threadId -> taskId
 - 机器人互相引用、回复或误 `@` 不会无限循环；
 - 用户直接选择 Agent 的操作仍然自然，只需要正常 `@`。
 
+一条人类消息同时 `@` 多个 bot 时，飞书会通过每个 bot 应用各自独立的事件连接
+投递同一个 message ID。Hub 按 message ID 合并这些经过认证的观察：每个 bridge
+只能声明“自己确实被 `@`”，Hub 用追加式 routing expansion 为每个新目标创建独立
+dispatch；一旦目标数超过一个，就清除单负责人状态并按 fanout 处理。因此事件到达
+顺序不会再导致只有第一个 bot 响应，Hermes 即使晚于 Node bridge 到达也不例外。
+
 Agent 自主委派使用一个原子化入口完成这两个步骤。它接收稳定的 Hub Agent ID，
 先写入带父 dispatch 的 `ask` 或 `handoff`，再从 Hub 的运行时身份注册表取得目标
 bot 的飞书 `open_id` 并发送真实 mention。Agent 不需要、也不允许从群成员列表猜测

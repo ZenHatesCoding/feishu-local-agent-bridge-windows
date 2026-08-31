@@ -83,6 +83,24 @@ describe('CollaborationHub', () => {
     ]);
   });
 
+  it('merges independently observed mentions for the same Feishu message into fanout', async () => {
+    const { hub, path, options } = await fixture();
+    const first = await hub.submit(humanMessage({ targetAgentIds: ['world'] }));
+    const second = await hub.submit(humanMessage({ targetAgentIds: ['chariot'] }));
+
+    expect(first.dispatches.map((item) => item.targetAgentId)).toEqual(['world']);
+    expect(second.duplicate).toBe(true);
+    expect(second.dispatches.map((item) => item.targetAgentId).sort()).toEqual(['chariot', 'world']);
+    expect(second.task.ownerAgentId).toBeUndefined();
+    expect(second.task.participants.sort()).toEqual(['chariot', 'world']);
+
+    const replayed = new CollaborationHub(new JsonlLedger(path), options);
+    await replayed.initialize();
+    expect(replayed.getTask(second.task.id)?.ownerAgentId).toBeUndefined();
+    expect(replayed.listDispatches('world')).toHaveLength(1);
+    expect(replayed.listDispatches('chariot')).toHaveLength(1);
+  });
+
   it('moves the lease on handoff and keeps ask ownership unchanged', async () => {
     const { hub } = await fixture();
     const assigned = await hub.submit(humanMessage());

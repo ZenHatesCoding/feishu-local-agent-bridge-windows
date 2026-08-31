@@ -75,7 +75,11 @@ $env:DEEPSEEK_HARNESS_ROOT = 'D:\src\deepseek-harness'
 
 The adapter runs Node with the built `apps\cli\lib\bin.js` entry and the
 headless profile. Prompts are carried over stdin so long topics never depend on
-the Windows command-line limit.
+the Windows command-line limit. Harness produces its answer as a final batch
+rather than a dependable incremental stream. The bridge therefore sends an
+immediate visible acknowledgement, then posts the completed answer once as a
+normal topic reply; it does not keep an empty markdown stream open for a long
+research run.
 
 ## Hermes
 

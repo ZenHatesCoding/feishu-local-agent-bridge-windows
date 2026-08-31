@@ -5,7 +5,7 @@ import type {
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
-import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode } from '../agent/capability';
 import {
   buildAgentPrompt,
   type BridgePromptInteractiveCard,
@@ -695,6 +695,20 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
 
   const size = pending.push(scope, msg);
   log.info('intake', 'queued', { scope, queueSize: size, debounceMs: DEBOUNCE_MS });
+  if (controls.profileConfig.agentKind === 'deepseek-harness') {
+    const sendOpts = {
+      replyTo: msg.messageId,
+      ...(chatMode === 'topic' && msg.threadId ? { replyInThread: true } : {}),
+    };
+    void channel.send(
+      msg.chatId,
+      { markdown: '已收到，正在处理。完成后会在本话题发送最终结果。' },
+      sendOpts,
+    ).then(
+      (result) => log.info('outbound', 'sent', outboundLogFields({ scope, replyMode: 'text', sendOpts }, 'ack', '', result)),
+      (err) => log.warn('outbound', 'ack-failed', { err: err instanceof Error ? err.message : String(err) }),
+    );
+  }
 }
 
 interface RunBatchDeps {
@@ -930,7 +944,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     log.info('flush', 'idle-watchdog', { idleTimeoutMs });
   }
 
-  const replyMode = getMessageReplyMode(controls.cfg);
+  const replyMode = effectiveReplyMode(capability, getMessageReplyMode(controls.cfg));
   log.info('flush', 'reply-mode', { mode: replyMode });
   const cotMessages = getCotMessages(controls.cfg);
   const cotEnabled = cotMessages !== 'off';
