@@ -176,8 +176,8 @@ describe('topic message quote handling', () => {
     );
   });
 
-  it('acknowledges DeepSeek Harness immediately and does not open a markdown stream', async () => {
-    const h = await createHarness({ agentKind: 'deepseek-harness' });
+  it.each(['antigravity', 'deepseek-harness'] as const)('acknowledges final-output %s immediately and does not open a markdown stream', async (agentKind) => {
+    const h = await createHarness({ agentKind });
     await startTestBridge(h);
 
     await h.channel.handlers.message?.(
@@ -203,7 +203,7 @@ describe('topic message quote handling', () => {
 async function createHarness(options: {
   chatMode?: 'group' | 'topic';
   quotedMessages?: Record<string, string>;
-  agentKind?: 'claude' | 'deepseek-harness';
+  agentKind?: 'claude' | 'antigravity' | 'deepseek-harness';
 } = {}): Promise<{
   tmp: TmpProfile;
   channel: FakeLarkChannel & { handlers: MessageHandlerMap };
@@ -230,7 +230,9 @@ async function createHarness(options: {
     },
     ...(options.agentKind === 'deepseek-harness'
       ? { deepseekHarness: { binaryPath: 'node', entryPath: '/harness/cli.js' } }
-      : {}),
+      : options.agentKind === 'antigravity'
+        ? { antigravity: { binaryPath: 'agy', printTimeout: '60m' } }
+        : {}),
   });
   const profileConfig = {
     ...baseProfileConfig,

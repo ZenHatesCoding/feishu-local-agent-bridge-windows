@@ -70,7 +70,7 @@ export function antigravityCapability(profile: Pick<ProfileConfig, 'permissions'
     promptInjection: 'stdin-prefix',
     systemPrompt: BRIDGE_SYSTEM_PROMPT,
     supportsNativeHistory: false,
-    outputDelivery: 'incremental',
+    outputDelivery: 'final',
     callback: {
       marker: '__bridge_cb',
       legacyMarkers: [],
@@ -94,4 +94,8 @@ export function effectiveReplyMode(
   configured: MessageReplyMode,
 ): MessageReplyMode {
   return capability.outputDelivery === 'final' ? 'text' : configured;
+}
+
+export function usesFinalOutputDelivery(agentKind: ProfileConfig['agentKind']): boolean {
+  return agentKind === 'antigravity' || agentKind === 'deepseek-harness';
 }

@@ -5,7 +5,7 @@ import type {
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
-import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode, usesFinalOutputDelivery } from '../agent/capability';
 import {
   buildAgentPrompt,
   type BridgePromptInteractiveCard,
@@ -695,7 +695,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
 
   const size = pending.push(scope, msg);
   log.info('intake', 'queued', { scope, queueSize: size, debounceMs: DEBOUNCE_MS });
-  if (controls.profileConfig.agentKind === 'deepseek-harness') {
+  if (usesFinalOutputDelivery(controls.profileConfig.agentKind)) {
     const sendOpts = {
       replyTo: msg.messageId,
       ...(chatMode === 'topic' && msg.threadId ? { replyInThread: true } : {}),

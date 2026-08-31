@@ -1,6 +1,7 @@
 import { mkdir, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AgentPreflightError } from '../agent/preflight';
+import { DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT } from '../agent/antigravity/adapter';
 import { createDefaultProfileConfig, type AgentKind, type ProfileConfig } from '../config/profile-schema';
 import type { AppConfig } from '../config/schema';
 import { resolveWorkingDirectory } from '../policy/workspace';
@@ -117,7 +118,7 @@ export async function createBootstrapAntigravityConfig(binaryPath: string | unde
   }
   return {
     binaryPath: resolvedBinary,
-    printTimeout: '10m',
+    printTimeout: DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT,
     dangerouslySkipPermissions: true,
   };
 }

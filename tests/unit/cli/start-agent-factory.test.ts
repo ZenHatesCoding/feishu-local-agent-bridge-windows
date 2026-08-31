@@ -111,7 +111,7 @@ describe('start runtime agent factory', () => {
     });
 
     expect(profile.antigravity?.binaryPath).toContain('agy');
-    expect(profile.antigravity?.printTimeout).toBe('10m');
+    expect(profile.antigravity?.printTimeout).toBe('60m');
     expect(profile.antigravity?.dangerouslySkipPermissions).toBe(true);
   });
 

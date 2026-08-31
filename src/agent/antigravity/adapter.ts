@@ -25,6 +25,8 @@ export interface AntigravityAdapterOptions {
   larkChannel?: LarkChannelEnvContext;
 }
 
+export const DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT = '60m';
+
 type AntigravityChild = SpawnedProcessByStdio<Writable, Readable, Readable>;
 
 export class AntigravityAdapter implements AgentAdapter {
@@ -45,7 +47,7 @@ export class AntigravityAdapter implements AgentAdapter {
     this.binary = opts.binary;
     this.project = opts.project;
     this.model = opts.model;
-    this.printTimeout = opts.printTimeout ?? '10m';
+    this.printTimeout = opts.printTimeout ?? DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT;
     this.dangerouslySkipPermissions = opts.dangerouslySkipPermissions === true;
     this.sandbox = opts.sandbox === true;
     this.defaultStopGraceMs = opts.stopGraceMs ?? 5000;

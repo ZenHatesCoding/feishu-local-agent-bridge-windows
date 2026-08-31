@@ -2,6 +2,7 @@ import { mkdir, readFile, realpath } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import * as p from '@clack/prompts';
 import { runRegistrationWizard } from '../bot/wizard';
+import { DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT } from '../agent/antigravity/adapter';
 import { detectInstalledAgents, type DetectedAgent } from '../cli/agent-detection';
 import {
   createBootstrapAntigravityConfig,
@@ -95,7 +96,7 @@ export function createRuntimeProfileConfig(
       ? {
           antigravity: input.antigravity ?? {
             binaryPath: process.env.LARK_CHANNEL_ANTIGRAVITY_BIN ?? defaultAgyCommand(),
-            printTimeout: '10m',
+            printTimeout: DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT,
             dangerouslySkipPermissions: true,
           },
         }

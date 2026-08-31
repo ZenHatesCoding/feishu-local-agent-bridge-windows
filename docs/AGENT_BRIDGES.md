@@ -52,6 +52,12 @@ node .\dist\cli.js run --profile antigravity --agent antigravity --workspace C:\
 
 The Antigravity adapter always uses the `agy` protocol. It never selects another
 agent implementation from environment variables.
+The default `agy --print` wait ceiling is 60 minutes. It is a leaked-process
+safety limit rather than a normal task duration, and can be overridden through
+`antigravity.printTimeout`. Because Antigravity does not provide dependable
+incremental text while researching or building documents, the bridge first
+acknowledges the request in its topic and sends the final answer once as a
+normal reply instead of keeping an apparently blank stream open.
 
 ## DeepSeek Harness
 

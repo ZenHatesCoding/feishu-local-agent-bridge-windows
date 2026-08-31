@@ -67,6 +67,10 @@ node .\dist\cli.js run `
 ```
 
 `antigravity` 适配器始终只使用 `agy` 协议，不再由环境变量切换成其他 Agent。
+`agy --print` 的等待上限默认是 60 分钟；这是防止遗留进程的安全上限，不是普通任务
+时限。Antigravity 在研究、找图和文档制作期间通常没有可靠的增量文本，因此 bridge
+会先在原话题发送“已收到”，完成后再一次性发送最终回复，避免空白流式消息让长任务
+看起来像卡死。可在 profile 的 `antigravity.printTimeout` 中明确覆盖该上限。
 
 ## DeepSeek Harness
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BRIDGE_SYSTEM_PROMPT } from '../../../src/agent/bridge-system-prompt';
-import { claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode } from '../../../src/agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode, usesFinalOutputDelivery } from '../../../src/agent/capability';
 import { createDefaultProfileConfig } from '../../../src/config/profile-schema';
 
 describe('agent capability contract', () => {
@@ -85,5 +85,20 @@ describe('agent capability contract', () => {
       outputDelivery: 'final',
     });
     expect(effectiveReplyMode(deepSeekHarnessCapability(profile), 'markdown')).toBe('text');
+  });
+
+  it('marks Antigravity as final-output and acknowledges it at intake', () => {
+    const profile = createDefaultProfileConfig({
+      agentKind: 'antigravity',
+      accounts: { app: { id: 'cli_test', secret: '${APP_SECRET}', tenant: 'feishu' } },
+      antigravity: { binaryPath: 'agy' },
+    });
+
+    expect(antigravityCapability(profile)).toMatchObject({
+      agentId: 'antigravity',
+      outputDelivery: 'final',
+    });
+    expect(effectiveReplyMode(antigravityCapability(profile), 'markdown')).toBe('text');
+    expect(usesFinalOutputDelivery('antigravity')).toBe(true);
   });
 });
