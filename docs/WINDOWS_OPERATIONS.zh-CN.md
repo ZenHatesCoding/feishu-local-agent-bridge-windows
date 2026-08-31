@@ -205,6 +205,25 @@ Hub health、bridge 是否连接、Agent CLI 是否可执行、代理端口和�
 
 ## 后台启停
 
+正式常驻使用 Windows 登录启动任务。它属于当前用户，不要求把 GitHub、Agent 或飞书
+认证改成机器级凭据；登录后会运行长期监督进程，独立于启动它的 PowerShell、Codex 或
+ChatGPT 窗口，并每 15 秒检查一次 Hub 和本机 Bot，发现进程退出就重新拉起：
+
+```powershell
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
+```
+
+`-StartNow` 会先停止当前临时 Pilot，再让 Windows 任务启动整组进程，确保新的进程树
+真正由后台任务持有。任务采用当前用户交互登录令牌，因此仍能读取该用户自己的 Agent
+登录态、profile 和代理设置。它不保存额外密码。卸载常驻任务并停止 Pilot：
+
+```powershell
+.\scripts\collab-pilot\Uninstall-CollabPilotStartup.ps1
+```
+
+下面的 `Start-CollabPilot.ps1` 是临时运行和调试入口；它使用隐藏子进程，但不承诺在
+启动它的终端宿主被回收后继续存活。
+
 一行启动全部启用的 Agent：
 
 ```powershell
@@ -257,6 +276,9 @@ Hub health、bridge 是否连接、Agent CLI 是否可执行、代理端口和�
 .runtime\logs\                 stdout/stderr
 .runtime\pids.json              后台启动器 PID
 ```
+
+监督进程的修复记录写入 `.runtime\logs\supervisor.log`；Windows 任务本身不包含 token、
+App Secret 或本机清单内容，只保存监督脚本与 Git 忽略配置文件的绝对路径。
 
 单机清单可以让 Hub 只监听 `127.0.0.1`；需要额外 worker 时使用 VPN 私网地址和
 VPN 网卡监听；只有确实需要多个私网接口时才使用 `0.0.0.0`。不要把 token、飞书

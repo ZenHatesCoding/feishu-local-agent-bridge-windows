@@ -19,11 +19,25 @@ central Hub and a center-only `hub` role; a worker never starts another Hub.
 .\scripts\collab-pilot\Setup-CollabPilot.ps1
 notepad .\.runtime\pilot.local.json
 .\scripts\collab-pilot\Test-CollabPilotConfig.ps1
-.\scripts\collab-pilot\Start-CollabPilot.ps1
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
 ```
+
+`Install-CollabPilotStartup.ps1` creates a logon task for the current Windows
+user and runs a long-lived supervisor. The Hub and Bots therefore do not depend
+on a PowerShell, Codex, or ChatGPT window, and an exited component is started
+again automatically. `Start-CollabPilot.ps1` remains useful for temporary runs
+and development, but is not the durable cross-terminal startup path.
 
 The repository supplies the Hub and orchestration. Users supply installed and
 logged-in agents, Feishu apps/profiles and real launch commands.
+
+Common lifecycle commands:
+
+```powershell
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
+.\scripts\collab-pilot\Status-CollabPilot.ps1
+.\scripts\collab-pilot\Uninstall-CollabPilotStartup.ps1
+```
 
 When Antigravity uses `agy.exe`, the launcher reads the current Windows user
 proxy and passes it only to Antigravity. The Feishu connection remains direct

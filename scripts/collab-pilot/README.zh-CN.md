@@ -18,8 +18,13 @@
 .\scripts\collab-pilot\Setup-CollabPilot.ps1
 notepad .\.runtime\pilot.local.json
 .\scripts\collab-pilot\Test-CollabPilotConfig.ps1
-.\scripts\collab-pilot\Start-CollabPilot.ps1
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
 ```
+
+`Install-CollabPilotStartup.ps1` 会为当前 Windows 用户创建登录启动任务，并运行一个
+长期存活的监督进程。Hub 和 Bot 因此不依赖 PowerShell、Codex 或 ChatGPT 窗口；某个
+组件意外退出后，监督进程会自动重新拉起。`Start-CollabPilot.ps1` 仍可用于临时运行和
+开发调试，但不承担跨终端的常驻保证。
 
 仓库负责 Hub 和运行编排；使用者负责安装并登录自己的 Agent、准备飞书应用与 profile，并填写实际启动命令。完整说明见 [`docs/WINDOWS_OPERATIONS.zh-CN.md`](../../docs/WINDOWS_OPERATIONS.zh-CN.md)。
 
@@ -31,5 +36,7 @@ Antigravity 使用 `agy.exe` 时，启动器会自动读取 Windows 当前用户
 .\scripts\collab-pilot\Start-CollabAgent.ps1 -Agent <id>
 .\scripts\collab-pilot\Status-CollabPilot.ps1
 .\scripts\collab-pilot\Get-CollabPilotLog.ps1 -Name <id> -Tail 200
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
+.\scripts\collab-pilot\Uninstall-CollabPilotStartup.ps1
 .\scripts\collab-pilot\Stop-CollabPilot.ps1 -RestoreOriginals
 ```

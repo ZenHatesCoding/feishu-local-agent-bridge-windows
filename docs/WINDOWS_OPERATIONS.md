@@ -152,6 +152,28 @@ expired authentication.
 
 ## Start, Status And Logs
 
+For durable operation, install the current-user Windows logon task. It runs a
+long-lived supervisor independently of the PowerShell, Codex, or ChatGPT window
+that installed it. Every 15 seconds the supervisor checks the Hub and local Bot
+launcher processes and starts any exited component again:
+
+```powershell
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
+```
+
+`-StartNow` first stops a temporary Pilot and then starts the Windows task, so
+the new process tree is owned by the background task. The task uses the current
+user's interactive logon token, preserving that user's Agent sessions, profiles,
+and proxy settings without storing another password. Remove the task and stop
+the Pilot with:
+
+```powershell
+.\scripts\collab-pilot\Uninstall-CollabPilotStartup.ps1
+```
+
+`Start-CollabPilot.ps1` remains the temporary development entry point. Its
+hidden child processes are not the durable cross-terminal lifecycle contract.
+
 ```powershell
 # all enabled agents
 .\scripts\collab-pilot\Start-CollabPilot.ps1
@@ -192,6 +214,10 @@ does not delete the ledger or shared artifacts. Hermes stop removes only
 .runtime\logs\                 stdout and stderr
 .runtime\pids.json              tracked launcher PIDs
 ```
+
+Supervisor repair events are written to `.runtime\logs\supervisor.log`. The
+Windows task stores only absolute paths to the supervisor and Git-ignored local
+manifest; it does not embed tokens, App Secrets, or manifest contents.
 
 A single-PC manifest can bind only to `127.0.0.1`. For workers, bind on the VPN
 interface and use its private URL. Never commit tokens, worker exports, App

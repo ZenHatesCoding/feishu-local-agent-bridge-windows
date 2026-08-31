@@ -1,4 +1,6 @@
 $script:CollabRepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$httpClientType = 'System.Net.Http.HttpClient' -as [type]
+if (!$httpClientType) { Add-Type -AssemblyName System.Net.Http }
 $script:CollabStateDir = Join-Path $script:CollabRepoRoot '.runtime'
 $script:CollabLogDir = Join-Path $script:CollabStateDir 'logs'
 $script:CollabTokenFile = Join-Path $script:CollabStateDir 'hub-token.txt'
