@@ -24,6 +24,19 @@ Codex、Antigravity、DeepSeek Harness 的 bridge 能力，以及 Hermes Hook �
 飞书应用需要启用机器人能力和长连接消息事件。首次 profile 创建时按终端流程提供
 App ID/App Secret；秘密进入本地加密存储，不写进脚本和 Git。
 
+## 无人值守交付件
+
+所有由 bridge 启动的 Agent 都是无人值守后台进程。bridge 会设置
+`LARK_CHANNEL_UNATTENDED=1`，并向每个已维护 Agent 注入相同的运行约定：使用
+非交互式库或命令行工具生成交付件，以无界面方式完成校验，再通过飞书回传；协作任务
+则使用 `collab-artifact.cmd publish` 发布。
+
+Agent 不得启动或自动化 WPS、Microsoft Office、文件选择器、保存确认框等交互式桌面
+程序。即使设置成隐藏窗口，也不得使用 `PowerPoint.Application`、
+`New-Object -ComObject`、`win32com` 等 Office/WPS COM 自动化生成、保存、导出或
+检查交付件，因为系统注册的 COM 服务仍可能在用户桌面弹窗。缺少可靠的无界面生成器
+或校验工具时，Agent 应明确报告缺失能力，不能要求用户在电脑上接着完成。
+
 ## Claude Code
 
 前置：`claude --version` 和交互登录可用。

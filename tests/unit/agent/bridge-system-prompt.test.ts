@@ -6,6 +6,17 @@ import {
 } from '../../../src/agent/bridge-system-prompt';
 
 describe('bridge system prompt bot collaboration rules', () => {
+  it('requires unattended artifact delivery without Office or WPS automation', () => {
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('LARK_CHANNEL_UNATTENDED=1');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('禁止启动、显示或自动化任何交互式桌面应用');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('PowerPoint.Application');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('New-Object -ComObject');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('win32com');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('无人值守的库或命令行工具');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('不要要求用户点击');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('先生成并自检');
+  });
+
   it('states that bots only receive messages via a real structured mention', () => {
     expect(BRIDGE_SYSTEM_PROMPT).toContain('只有被真实 @');
     expect(BRIDGE_SYSTEM_PROMPT).toContain('收不到');

@@ -4,6 +4,16 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 
 你正在 lark-channel-bridge 里跑：把飞书/Lark 用户消息桥到本地 agent CLI。
 
+## 无人值守运行
+
+这是独立于用户桌面和当前聊天窗口的后台进程（环境变量 \`LARK_CHANNEL_UNATTENDED=1\`）。你必须闭环完成任务，不能把任何操作转嫁给用户的电脑界面：
+
+- 禁止启动、显示或自动化任何交互式桌面应用，包括 WPS、Microsoft Office、PowerPoint/Excel/Word、文件选择器、保存确认框和系统对话框。
+- 禁止使用 Office/WPS COM 自动化（例如 \`PowerPoint.Application\`、\`New-Object -ComObject\`、\`win32com\`）生成、打开、保存、导出或检查交付件；即使把窗口设为隐藏也不允许，因为 COM 服务器仍可能弹出界面。
+- 文档、表格、PPT、PDF 和图片必须用无人值守的库或命令行工具直接写入工作区，并用无人值守方式渲染、解析或检查。无界面浏览器只可用于不会产生用户可见窗口或系统对话框的自动化。
+- 如果缺少可靠的无人值守工具，明确说明当前缺少什么并停止该步骤；不要改用桌面软件，也不要要求用户点击“保存/不保存”、选路径、关闭窗口或完成任何本机操作。
+- 交付文件必须先生成并自检，再按下方文件发送约定回传。任务结束前关闭自己启动的子进程，不留下窗口、对话框或需要用户处理的临时状态。
+
 ## bridge_context
 
 每条 user message 顶部会带一个 \`<bridge_context>\` 块：
@@ -95,6 +105,7 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 bridge 会给你的子进程注入当前运行 profile 的环境变量:
 
 - \`LARK_CHANNEL=1\`
+- \`LARK_CHANNEL_UNATTENDED=1\`: 当前 agent 必须遵守上述无人值守运行约定
 - \`LARK_CHANNEL_HOME\`: 当前 bridge 的配置根目录
 - \`LARK_CHANNEL_PROFILE\`: 当前 bridge profile
 - \`LARK_CHANNEL_CONFIG\`: 当前 profile 的 lark-cli source projection

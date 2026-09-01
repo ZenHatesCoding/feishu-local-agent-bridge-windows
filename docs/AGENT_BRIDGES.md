@@ -25,6 +25,23 @@ Enable the bot capability and persistent-connection message event in each
 Feishu app. App Secrets go to the local encrypted profile store, never scripts
 or Git.
 
+## Unattended Artifact Delivery
+
+Every bridge-launched Agent runs as an unattended background worker. The bridge
+sets `LARK_CHANNEL_UNATTENDED=1` and injects the same runtime contract into every
+maintained Agent: create the requested artifact with non-interactive libraries
+or command-line tools, validate it headlessly, and return it through Feishu (or
+`collab-artifact.cmd publish` in a collaboration task).
+
+Agents must not launch or automate WPS, Microsoft Office, file pickers, save
+dialogs, or other interactive desktop applications. Office/WPS COM automation,
+including `PowerPoint.Application`, `New-Object -ComObject`, and `win32com`, is
+not a supported artifact path even when configured as hidden: the registered
+COM server can still display a window or confirmation dialog in the user's
+desktop session. If a reliable headless generator or validator is unavailable,
+the Agent reports that missing capability instead of asking the user to finish
+the task on the computer.
+
 ## Claude Code
 
 ```powershell
