@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnProcessSync } from '../../platform/spawn';
 import { CollaborationClient } from '../../collab/client';
-import type { ActionInput } from '../../collab/types';
+import type { ActionInput, SharedArtifact } from '../../collab/types';
 import { snapshotArtifact } from '../../collab/artifact-store';
 import { startFeishuCoordinator } from '../../collab/coordinator';
 import { loadHubConfig } from '../../collab/config';
@@ -265,6 +265,44 @@ export async function runArtifactRegisterGit(options: {
     artifact,
   });
   process.stdout.write(`${JSON.stringify({ sharedArtifact: artifact }, null, 2)}\n`);
+}
+
+export async function runArtifactResolve(options: {
+  task: string;
+  actor: string;
+  id?: string;
+  name?: string;
+  list?: boolean;
+}): Promise<void> {
+  const client = new CollaborationClient({
+    baseUrl: requiredEnv('LARK_COLLAB_HUB_URL'),
+    token: requiredEnv('LARK_COLLAB_HUB_TOKEN'),
+  });
+  const context = await client.context(options.task, options.actor);
+  if (options.list) {
+    process.stdout.write(`${JSON.stringify({ artifacts: context.artifacts.map(artifactCatalogItem) }, null, 2)}\n`);
+    return;
+  }
+  const id = options.id?.trim().toLocaleLowerCase();
+  const name = options.name?.trim().toLocaleLowerCase();
+  if (!id && !name) throw new Error('artifact resolve requires --id, --name, or --list');
+  const matches = context.artifacts.filter((artifact) =>
+    (id && artifact.id.toLocaleLowerCase() === id) ||
+    (name && artifact.name.toLocaleLowerCase() === name),
+  );
+  if (matches.length === 0) throw new Error('artifact not found in the current task visibility');
+  if (matches.length > 1) throw new Error('artifact selector is ambiguous; use --id');
+  process.stdout.write(`${JSON.stringify({ artifact: matches[0] }, null, 2)}\n`);
+}
+
+function artifactCatalogItem(artifact: SharedArtifact): Record<string, unknown> {
+  return {
+    id: artifact.id,
+    name: artifact.name,
+    kind: artifact.kind,
+    size: artifact.size,
+    ...(artifact.mime ? { mime: artifact.mime } : {}),
+  };
 }
 
 function requiredEnv(name: string): string {

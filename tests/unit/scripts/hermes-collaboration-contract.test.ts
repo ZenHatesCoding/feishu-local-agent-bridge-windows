@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const handler = readFileSync('adapters/hermes/handler.py', 'utf8');
 const gatewayPatch = readFileSync('adapters/hermes/gateway-run.patch', 'utf8');
+const sharedContext = readFileSync('src/collab/context.ts', 'utf8');
 
 describe('Hermes collaboration Hook contract', () => {
   it('gates human runs on a real self mention and bot runs on Hub authorization', () => {
@@ -14,9 +15,10 @@ describe('Hermes collaboration Hook contract', () => {
   });
 
   it('exposes formal ask and handoff delegation to Hermes', () => {
-    expect(handler).toContain('_request("/v1/agents")');
-    expect(handler).toContain('collab-delegate.cmd ask|handoff');
-    expect(handler).toContain('--caused-by-dispatch');
+    expect(handler).toContain('/prompt-context');
+    expect(handler).not.toContain('/context?agentId=');
+    expect(sharedContext).toContain('collab-delegate.cmd handoff|ask');
+    expect(sharedContext).toContain('yourDispatch');
   });
 
   it('closes the exact accepted dispatch on every terminal path', () => {

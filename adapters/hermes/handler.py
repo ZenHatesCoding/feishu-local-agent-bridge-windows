@@ -207,40 +207,19 @@ def _on_start(context: dict[str, Any]) -> None:
     message = str(context.get("message_full") or context.get("message") or "")
     _register_artifacts(task_id, agent_id, message, "inbound")
 
+    dispatch_id = str(dispatch["id"])
     encoded_task = urllib.parse.quote(task_id)
     encoded_agent = urllib.parse.quote(agent_id)
-    shared = _request(f"/v1/tasks/{encoded_task}/context?agentId={encoded_agent}&after=0")
-    identities = _request("/v1/agents").get("agents", [])
-    dispatch_id = str(dispatch["id"])
-    reply_to = str(context.get("message_id") or "")
-    delegate = (
-        "collab-delegate.cmd ask|handoff --target TARGET_ID --content TEXT "
-        f'--task "{task_id}" --actor "{agent_id}" --reply-to "{reply_to}" '
-        f'--caused-by-dispatch "{dispatch_id}"'
+    encoded_dispatch = urllib.parse.quote(dispatch_id)
+    projection = _request(
+        f"/v1/tasks/{encoded_task}/prompt-context"
+        f"?agentId={encoded_agent}&dispatchId={encoded_dispatch}"
     )
-    collaboration = {
-        "task": shared.get("task"),
-        "dispatch": dispatch,
-        "availableAgents": [
-            {"id": item.get("id"), "displayName": item.get("displayName")}
-            for item in identities if item.get("id") != agent_id
-        ],
-        "entries": shared.get("entries", []),
-        "artifacts": shared.get("artifacts", []),
-        "rules": [
-            "Continue from accepted shared conclusions and artifacts.",
-            "Do not reveal private chain-of-thought or secrets.",
-            "Your final visible answer will be recorded into shared task context.",
-            f"To ask or hand off to another bot, run: {delegate}",
-            "A text-only @ is never delegation; the command must create Hub authorization and a real Feishu mention.",
-            "Files listed in artifacts are durable shared copies; read localPath directly.",
-            "When you create a file, include its absolute path in the final response so Hermes sends it and the Hub registers it.",
-        ],
-    }
+    prompt_context = str(projection.get("promptContext") or "")
+    if not prompt_context:
+        raise RuntimeError("Hub returned an empty collaboration prompt context")
     context["message_full"] = (
-        "<collaboration_context>\n"
-        f"{json.dumps(collaboration, ensure_ascii=False)}\n"
-        "</collaboration_context>\n\n"
+        f"{prompt_context}\n\n"
         f"{message}"
     )
     session_id = str(context.get("session_id") or "")

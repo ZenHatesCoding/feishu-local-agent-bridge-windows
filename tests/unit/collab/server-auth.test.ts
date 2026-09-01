@@ -51,6 +51,10 @@ describe('Collaboration Hub per-agent authentication', () => {
     const pending = await chariot.dispatches('chariot');
     expect(pending.dispatches).toMatchObject([{ id: handedOff.dispatches[0]!.id, objective: 'Implement it' }]);
     expect((await chariot.context(assigned.task.id, 'chariot')).entries.length).toBeGreaterThan(0);
+    const projected = await chariot.promptContext(assigned.task.id, 'chariot', handedOff.dispatches[0]!.id);
+    expect(projected.promptContext).toContain('bounded-semantic-on-demand-artifacts');
+    await expect(world.promptContext(assigned.task.id, 'world', handedOff.dispatches[0]!.id))
+      .rejects.toThrow('dispatch belongs to another agent');
   });
 
   it('prevents one agent credential from impersonating another', async () => {

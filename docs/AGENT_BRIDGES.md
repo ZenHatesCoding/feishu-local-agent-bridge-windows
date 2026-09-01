@@ -42,6 +42,13 @@ desktop session. If a reliable headless generator or validator is unavailable,
 the Agent reports that missing capability instead of asking the user to finish
 the task on the computer.
 
+All four maintained Agent paths receive the same Hub-generated collaboration
+prompt. Historical files appear first as a bounded metadata catalog; a complete
+path/locator record is supplied only when the current objective references that
+Artifact. An Agent can run `collab-artifact.cmd resolve --task TASK --actor
+AGENT --name "EXACT_NAME"` for one additional file, or `--list` when the catalog
+is insufficient. Hermes does not build a separate full-history prompt.
+
 ## Claude Code
 
 ```powershell

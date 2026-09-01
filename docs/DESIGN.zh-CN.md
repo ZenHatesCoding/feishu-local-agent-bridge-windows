@@ -219,7 +219,10 @@ collaboration_context
     currentOwner
     yourDispatch: reason, objective, hop（当前因果链深度）, status
     rules
-  entries: 仅对当前 Agent 可见的有序任务事件
+  projection: 覆盖序号、实际纳入序号和省略数量
+  entries: 原始需求和最近的可见语义事件
+  artifactCatalog: 不含路径与 locator 的精简目录
+  selectedArtifacts: 与本轮 dispatch 明确相关的完整文件记录
 
 bridge_context
   chatId, threadId, sender, mentions, messageIds...
@@ -232,25 +235,35 @@ bridge_context
 - `taskId` 告诉 Agent 正在处理哪个持续任务；
 - `currentOwner` 消除“现在到底谁负责”的歧义；
 - `yourDispatch` 是本轮唯一目标，不让共享历史淹没当前指令；
-- `entries` 提供经过权限过滤的事实和产物；
+- `entries` 提供经过权限过滤和有界投影的语义事实；
+- `artifactCatalog` 只用于识别文件，`selectedArtifacts` 才授权本轮取得完整文件记录；
 - `rules` 要求先做结构化动作，再真实 `@`，并禁止泄露思维链和秘密；
 - 用户原话保持原样放在最后，模型仍能理解自然语言意图。
 
 Agent 被要求输出结论、证据、产物路径和下一步，而不是输出私有推理过程。最终
 可见答复会自动记录回任务上下文，成为后来接手者可以复用的状态。
 
-上下文容量不能靠任意截断历史来解决。Hub 的账本是完整、追加式的事实来源；给
-Agent 的内容是按任务、参与关系和可见性生成的语义投影。当前实现保留全部可见
-事件。未来任务变长时，应增加带来源序号的摘要检查点，并允许按游标回读原事件；
-适配器则使用 stdin 或临时文件传递大提示，避免 Windows 命令行长度成为业务限制。
-无论采用哪种传输，都必须让 Agent 知道投影覆盖的序号范围和摘要来源，不能用固定
-字符预算静默丢掉中间决策。
+Hub 的账本仍是完整、追加式的事实来源。当前已经由 Hub 为所有 Bot 生成同一套确定性
+提示投影：原始任务消息、最多最近 8 条 message/action/complete 语义事件，以及本轮
+dispatch。routing、lease、dispatch、ack 和 artifact 登记等机械事件不再作为对话重复
+喂给模型。单条语义内容超过 3000 字符时会明确标记为摘录并给出原始长度；投影同时
+声明覆盖序号、实际纳入序号和省略数量，不做不可见的静默裁剪。
+因此，同一个长期话题也不会再把全部可见账本逐轮重复加入提示词。
 
-这也意味着当前版本存在明确的容量边界：JSONL 磁盘账本会持续追加，Hub 启动时会
-重放全部记录并把热索引保留在内存；不同话题互不进入对方提示词，但同一个长期话题
-会重复携带全部可见事件，逐渐增加模型 token。Agent 自己恢复的原生 session 还可能
-与 Hub 历史重复。摘要检查点、最近事件窗口、完成任务归档和热内存卸载在路线图中
-标记为计划 P1。详见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+文件按需进入，而不是按话题年龄累积。提示词最多携带 20 条精简目录，只含 ID、名称、
+创建者、种类和大小，不含本机路径、locator 或哈希。只有当前目标或来源明确引用文件
+ID/名称，或者提到文件类型、创建者、版本（例如“World 那版 PPT”）时，Hub 才把匹配
+的最新版完整记录放入 `selectedArtifacts`。Agent 若还需要别的文件，使用
+`collab-artifact.cmd resolve --name` 精确取得，禁止扫描整个 artifact 目录。这个判断由
+确定性 Hub 代码完成，因此不把 Hermes 变成每轮必经的秘书模型，也不额外付一次模型
+token 和故障依赖。
+
+容量边界仍需诚实说明：JSONL 会持续追加，Hub 启动时仍会重放完整账本并保留热索引。
+Claude、Codex 或 Hermes 自己恢复的原生 session 也可能保留先前对话；紧凑 Hub 交接包
+消除了“完整账本再次注入”，但不会抹掉模型提供方管理的 session 历史。带来源序号的
+语义摘要检查点、原生 session 压缩、完成任务归档和热内存卸载仍是计划 P1。未来可以
+让 Hermes 或其他 Agent 显式产出可审计摘要，但 Hub 本身不会调用 LLM 决定路由或基础
+上下文。详见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 
 ## 转发层级是因果链，不是话题寿命
 
@@ -292,7 +305,11 @@ PPT、Word、Excel、PDF、图片和压缩包不能只靠最终回复里的一�
 2. `collab-artifact.cmd publish` 计算哈希并复制到任务共享库。
 3. 命令使用当前 Agent 已绑定的飞书身份把文件回复到原话题。
 4. 只有发送成功后才向 Hub 追加 artifact 事件。
-5. 后续 Agent 的 `collaboration_context.artifacts` 直接给出共享路径和完整性信息。
+5. 后续 Agent 先看到有界文件目录；仅当本轮明确引用时，`selectedArtifacts` 才给出
+   共享路径、locator 和完整性信息。
+
+登记文件不等于每轮都把文件内容或完整路径塞进模型。若目录不足以定位，Agent 可用
+`collab-artifact.cmd resolve --list` 查看精简元数据，再以 `--name` 或 `--id` 精确取得一项。
 
 外部 API 的幂等键属于传输协议字段，必须满足平台长度限制。它由任务、Agent 和
 内容哈希的有界片段稳定生成，而不是把任意长度的任务 ID 直接拼接进去；完整

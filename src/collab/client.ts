@@ -39,6 +39,13 @@ export class CollaborationClient {
     );
   }
 
+  promptContext(taskId: string, agentId: string, dispatchId: string): Promise<{ promptContext: string }> {
+    return this.request(
+      `/v1/tasks/${encodeURIComponent(taskId)}/prompt-context?agentId=${encodeURIComponent(agentId)}` +
+      `&dispatchId=${encodeURIComponent(dispatchId)}`,
+    );
+  }
+
   dispatches(agentId: string, after = 0): Promise<{ dispatches: Dispatch[] }> {
     return this.request(
       `/v1/dispatches/agents/${encodeURIComponent(agentId)}?after=${after}`,

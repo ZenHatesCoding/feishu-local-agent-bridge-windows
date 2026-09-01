@@ -97,6 +97,11 @@ export class CollaborationHub {
       .map((item) => ({ ...item }));
   }
 
+  getDispatch(dispatchId: string): Dispatch | undefined {
+    const dispatch = this.dispatches.get(dispatchId);
+    return dispatch ? { ...dispatch } : undefined;
+  }
+
   registerAgentIdentity(
     agentId: string,
     openId: string,

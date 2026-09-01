@@ -1,5 +1,4 @@
 import type { NormalizedMessage } from '@larksuite/channel';
-import { buildCollaborationContext } from './context';
 import { CollaborationClient } from './client';
 import type { Dispatch } from './types';
 import type { NormalizedAttachment } from '../media/attachment';
@@ -155,8 +154,7 @@ export class BridgeCollaborationAdapter {
     taskId: string,
     dispatch: Dispatch,
   ): Promise<BridgeCollaborationDecision> {
-    const context = await this.client.context(taskId, this.agentId);
-    const identities = await this.client.identities();
+    const context = await this.client.promptContext(taskId, this.agentId, dispatch.id);
     await this.client.acknowledge(dispatch.id, {
       agentId: this.agentId,
       status: 'accepted',
@@ -165,13 +163,7 @@ export class BridgeCollaborationAdapter {
     return {
       managed: true,
       respond: true,
-      promptContext: buildCollaborationContext({
-      task: context.task,
-        dispatch,
-      entries: context.entries,
-      artifacts: context.artifacts,
-      agents: identities.agents,
-      }),
+      promptContext: context.promptContext,
       taskId,
       dispatchId: dispatch.id,
     };

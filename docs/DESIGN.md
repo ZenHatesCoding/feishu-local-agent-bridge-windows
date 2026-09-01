@@ -133,8 +133,10 @@ Before the original user message, an authorized bridge injects:
 ```text
 collaboration_context
   contract: taskId, currentOwner, yourDispatch, rules
-  entries: ordered events visible to this agent
-  artifacts: durable files visible to this agent
+  projection: coverage, included sequences, omission counts
+  entries: original requirement plus recent visible semantic events
+  artifactCatalog: compact metadata, without paths or locators
+  selectedArtifacts: files explicitly relevant to this dispatch
 
 bridge_context
   chatId, threadId, sender, mentions, message IDs
@@ -147,21 +149,33 @@ bury it. The model is asked for conclusions, evidence, artifact paths and next
 steps, not private reasoning. Its final visible response becomes a reusable
 task event for later authorized participants.
 
-Capacity must not be handled by silently chopping arbitrary ledger events. The
-ledger remains the complete append-only fact source and the Hub produces a
-semantic projection by task, participation and visibility. As tasks grow, the
-correct extension is a source-sequenced summary checkpoint with cursor access
-to original events, while adapters carry large prompts over stdin or files
-instead of treating Windows argv length as a business limit. Every projection
-must disclose its covered sequence range and provenance.
+The ledger remains the complete append-only fact source. The implemented Hub
+prompt endpoint produces one deterministic projection for every Bot: the
+original task message, at most eight recent semantic message/action/completion
+events, and the current dispatch. Routing, lease, dispatch, acknowledgement and
+artifact events are not repeated as conversation. A semantic entry longer than
+3,000 characters is explicitly marked as an excerpt with its original length.
+The projection reports its covered sequence, included sequences and omission
+counts, so reduction is observable rather than silent.
 
-This is also an explicit current capacity boundary. JSONL grows continuously,
-startup replays the complete ledger and hot indexes remain in memory. Topics do
-not pollute one another, but one long-lived topic repeatedly carries all visible
-events and therefore consumes progressively more model tokens. Native Agent
-session history may duplicate Hub history. Summary checkpoints, recent-event
-windows, cold-task archival and hot-memory unloading are Planned P1 in the
-[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
+Artifacts follow demand, not topic age. The prompt carries at most twenty
+catalog rows containing ID, name, producer, kind and size. Full path, locator
+and digest appear only in `selectedArtifacts` when the current objective or
+source references an exact ID/name, or refers to a file type, producer or
+version such as “World's latest PPT.” A Bot can resolve another exact catalog
+entry with `collab-artifact.cmd resolve`; it must not scan the artifact
+directory. This selection is deterministic Hub code, so Hermes is not a
+mandatory secretary model or a per-turn token dependency.
+
+JSONL still grows continuously, startup still replays the complete ledger and
+hot indexes remain in memory. Native Claude/Codex/Hermes sessions may also keep
+their own prior conversation; the compact Hub packet prevents duplicate ledger
+injection but does not erase provider-managed session history. Source-sequenced
+semantic checkpoints, native-session compaction, cold-task archival and
+hot-memory unloading remain Planned P1 in the
+[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md). An optional Agent,
+including Hermes, may later publish an auditable checkpoint, but the Hub never
+calls an LLM to decide routing or baseline context.
 
 ## Causal Depth, Not Topic Age
 
@@ -208,6 +222,11 @@ SHA-256, byte length, creator, visibility and available Feishu message/file
 keys. `collab-artifact.cmd publish` snapshots the file, sends it through the
 current bot identity, then records the event only after delivery succeeds.
 Inbound attachments are also snapshotted after bridge validation.
+
+Registration does not make file bytes part of every prompt. Catalog metadata is
+cheap and always bounded; a full Artifact record is exposed only when the
+current dispatch references that file. `collab-artifact.cmd resolve --name`
+provides explicit on-demand retrieval without replaying every old deliverable.
 
 Transport idempotency keys are bounded protocol fields. They are derived from
 bounded task/agent/content-hash components to satisfy the platform limit; the

@@ -74,6 +74,13 @@ risks and artifacts. It excludes private reasoning, secrets and unrelated
 tasks. One Feishu topic maps to one task, so another topic is not automatically
 included in the prompt.
 
+The current packet is bounded: the original requirement, up to eight recent
+semantic events and a compact catalog of up to twenty artifacts. Mechanical
+events are omitted. Catalog rows do not expose file paths or locators; full
+Artifact records are selected only when the current request refers to the file.
+An Agent resolves another exact item on demand with `collab-artifact.cmd
+resolve`, instead of opening every historical deliverable.
+
 ## Artifact Is A Registration Card, Not A Required File Server
 
 An Artifact binds a file or code revision to task semantics: task, producer,
@@ -167,10 +174,9 @@ The current implementation grows in three different ways:
 
 - **disk:** JSONL and artifact snapshots have no automatic retention yet;
 - **Hub memory:** startup replays the whole ledger and hot indexes remain loaded;
-- **Bot tokens:** topics are isolated, but a long-lived topic currently sends
-  all visible events again, so that topic becomes progressively more expensive.
+- **Bot tokens:** topics are isolated and the Hub packet is bounded to the
+  original requirement plus recent semantic events and on-demand Artifacts.
 
-An Agent's own resumed session may duplicate part of Hub history. The planned
-answer is a complete source ledger plus source-sequenced summary checkpoints,
-recent events and archival of cold completed tasks—not silent truncation. These
-are Planned P1 roadmap capabilities.
+An Agent's own resumed session may still retain earlier turns independently of
+the Hub packet. Source-sequenced summary checkpoints, native-session compaction
+and archival of cold completed tasks remain Planned P1 roadmap capabilities.

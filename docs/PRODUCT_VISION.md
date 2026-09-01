@@ -79,6 +79,8 @@ status and acceptance phases.
   model sessions.
 - Shared content contains task facts, conclusions and artifacts; private
   reasoning, tool noise and secrets remain isolated.
+- Complete history remains auditable, while model prompts use bounded semantic
+  context and retrieve file details only when the current request references them.
 - Auditable ownership, dispatch and routing enforce authority; prompts explain
   the rules to Agents.
 - The Hub maintains one task truth and every Bot works from its projection.

@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { CollaborationHub } from './hub';
 import type { HubInput } from './types';
+import { buildCollaborationContext } from './context';
 
 export interface HubServerOptions {
   host?: string;
@@ -86,6 +87,27 @@ export class CollaborationHubServer {
           task,
           entries: this.hub.getContext(taskId, agentId, after),
           artifacts: this.hub.getArtifacts(taskId, agentId),
+        });
+      }
+      const projectionMatch = url.pathname.match(/^\/v1\/tasks\/([^/]+)\/prompt-context$/);
+      if (req.method === 'GET' && projectionMatch) {
+        const agentId = requiredQuery(url, 'agentId');
+        authorizeAgent(principal, agentId);
+        const dispatchId = requiredQuery(url, 'dispatchId');
+        const taskId = decodeURIComponent(projectionMatch[1]!);
+        const task = this.hub.getTask(taskId);
+        if (!task) return json(res, 404, { error: 'task not found' });
+        const dispatch = this.hub.getDispatch(dispatchId);
+        if (!dispatch || dispatch.taskId !== taskId) return json(res, 404, { error: 'dispatch not found' });
+        if (dispatch.targetAgentId !== agentId) throw new AuthorizationError('dispatch belongs to another agent');
+        return json(res, 200, {
+          promptContext: buildCollaborationContext({
+            task,
+            dispatch,
+            entries: this.hub.getContext(taskId, agentId),
+            artifacts: this.hub.getArtifacts(taskId, agentId),
+            agents: this.hub.listAgentIdentities(),
+          }),
         });
       }
       const dispatchListMatch = url.pathname.match(/^\/v1\/dispatches\/agents\/([^/]+)$/);

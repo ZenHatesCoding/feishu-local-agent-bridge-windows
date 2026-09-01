@@ -37,6 +37,11 @@ Agent 不得启动或自动化 WPS、Microsoft Office、文件选择器、保存
 检查交付件，因为系统注册的 COM 服务仍可能在用户桌面弹窗。缺少可靠的无界面生成器
 或校验工具时，Agent 应明确报告缺失能力，不能要求用户在电脑上接着完成。
 
+四条已维护 Agent 路径统一使用 Hub 生成的同一份协作提示。历史文件先以有界精简目录
+出现；只有当前目标引用该 Artifact 时才给出完整路径/locator。Agent 如需额外一项，
+使用 `collab-artifact.cmd resolve --task TASK --actor AGENT --name "准确文件名"`；目录
+不足时才用 `--list`。Hermes 不再自行拼接一份完整历史提示。
+
 ## Claude Code
 
 前置：`claude --version` 和交互登录可用。

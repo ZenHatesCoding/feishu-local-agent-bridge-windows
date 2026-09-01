@@ -27,6 +27,7 @@ import { runStart } from './commands/start';
 import {
   runArtifactPublish,
   runArtifactRegisterGit,
+  runArtifactResolve,
   runCollaborationAction,
   runCollaborationDelegate,
   runCollaborationHub,
@@ -115,6 +116,16 @@ artifact
   .option('--repo-path <path>', 'path to the file inside the repository')
   .option('--name <name>', 'shared file name')
   .action(runArtifactRegisterGit);
+
+artifact
+  .command('resolve')
+  .description('Resolve one visible task artifact on demand, or list compact metadata')
+  .requiredOption('--task <id>', 'collaboration task id')
+  .requiredOption('--actor <agent>', 'requesting agent id')
+  .option('--id <artifact-id>', 'exact artifact id')
+  .option('--name <name>', 'exact artifact name')
+  .option('--list', 'list visible artifact metadata without paths or locators')
+  .action(runArtifactResolve);
 
 // === process-level commands (work directly on bridge processes) ===
 

@@ -26,6 +26,7 @@ cross-node artifact retrieval and production-grade dispatch remain roadmap work.
 | Bots send/receive in one Feishu group | Implemented | Every Bridge connects to Feishu independently |
 | Real Bot-to-Bot mentions | Implemented | Each app configures bot-message permission and group admission |
 | Shared text task context | Implemented | `all` and `worker` nodes use one Hub `publicUrl` |
+| Bounded prompt projection | Implemented | Original requirement, recent semantic events, on-demand Artifacts |
 | Dispatch, ownership and visibility | P0 implemented | Each authenticated principal operates only its Agent identity |
 | PPT/PDF/Word artifact sharing | Locator implemented; download planned | Feishu locator plus receiver-side materialization |
 | Shared code workspace state | Registration implemented; retrieval planned | Git repository, commit and path locator |
@@ -128,10 +129,10 @@ path may be a node cache path, never shared truth.
 ## Context, Memory And Token Scaling
 
 JSONL currently grows indefinitely, startup replays it and hot task/dispatch/
-idempotency indexes stay in memory. Topics are isolated, but all visible events
-in one long-lived topic are currently sent again to the Agent. Disk and Hub
-memory therefore grow with all tasks; prompt tokens mainly grow with the active
-topic. A resumed native Agent session may duplicate Hub history.
+idempotency indexes stay in memory. Topics are isolated. The implemented prompt
+projection keeps the original requirement, eight recent semantic events and a
+twenty-item Artifact catalog; complete Artifact records are selected on demand.
+A resumed native Agent session may still retain earlier turns independently.
 
 The target projection is:
 
@@ -143,9 +144,10 @@ complete append-only source ledger
   -> Agent prompt
 ```
 
-Add task cursors, explicit prompt limits, checkpoint provenance and cold-task
-archival. Mechanical projection can omit unhelpful repeated runtime events, but
-must not delete the source ledger. Semantic summaries record producer, covered
+The bounded recent-event window and mechanical-event omission are implemented.
+Add task cursors, token metrics, summary checkpoint provenance, native-session
+compaction and cold-task archival. The source ledger is never deleted by prompt
+projection. Semantic summaries record producer, covered
 sequence range and source cursor. JSONL remains sufficient for a single-Hub
 MVP; SQLite or PostgreSQL later provides transactions and uniqueness constraints.
 
@@ -183,8 +185,9 @@ persistent identity/presence and coordinator-order/restart tests.
 
 ### P1: Context Checkpoints And Archival
 
-Add cursors, summary checkpoints, recent-event windows, prompt-token metrics,
-cold-task unloading and protection against duplicate native-session history.
+The bounded recent-event window and on-demand Artifact selection are implemented.
+Add cursors, summary checkpoints, prompt-token metrics, cold-task unloading and
+protection against duplicate native-session history.
 
 ### P2: Production Hardening
 
