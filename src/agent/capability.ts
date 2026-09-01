@@ -95,7 +95,3 @@ export function effectiveReplyMode(
 ): MessageReplyMode {
   return capability.outputDelivery === 'final' ? 'text' : configured;
 }
-
-export function usesFinalOutputDelivery(agentKind: ProfileConfig['agentKind']): boolean {
-  return agentKind === 'antigravity' || agentKind === 'deepseek-harness';
-}

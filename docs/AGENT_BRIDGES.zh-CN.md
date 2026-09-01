@@ -82,8 +82,9 @@ node .\dist\cli.js run `
 `antigravity` 适配器始终只使用 `agy` 协议，不再由环境变量切换成其他 Agent。
 `agy --print` 的等待上限默认是 60 分钟；这是防止遗留进程的安全上限，不是普通任务
 时限。Antigravity 在研究、找图和文档制作期间通常没有可靠的增量文本，因此 bridge
-会先在原话题发送“已收到”，完成后再一次性发送最终回复，避免空白流式消息让长任务
-看起来像卡死。可在 profile 的 `antigravity.printTimeout` 中明确覆盖该上限。
+不会开启空白 markdown 流，而是在完成后一次性发送最终回复。入站时不会额外发送
+“已收到/正在处理”之类的固定消息；所有 Bot 一律使用飞书原生消息状态和 bridge 的
+公共运行状态机制。可在 profile 的 `antigravity.printTimeout` 中明确覆盖该上限。
 
 ## DeepSeek Harness
 
@@ -119,9 +120,8 @@ $env:LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = `
 独立适配器使用 Node 启动 Harness 的 headless profile，并通过 stdin 传递
 prompt，长话题不再受 Windows 命令行长度限制。Justice/Antigravity 与
 Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。Harness 的答案是最终
-批量输出，不是可靠的增量流。因此 bridge 会先发送一条用户可见的“已收到”，任务
-完成后再用普通话题回复一次性交付最终答案，不再为长研究任务维持空白 markdown
-stream。
+批量输出，不是可靠的增量流。因此 bridge 不维持空白 markdown stream，也不发送
+固定的入站确认；任务完成后用普通话题回复一次性交付最终答案。
 
 ## Hermes
 

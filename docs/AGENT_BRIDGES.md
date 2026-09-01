@@ -72,9 +72,11 @@ agent implementation from environment variables.
 The default `agy --print` wait ceiling is 60 minutes. It is a leaked-process
 safety limit rather than a normal task duration, and can be overridden through
 `antigravity.printTimeout`. Because Antigravity does not provide dependable
-incremental text while researching or building documents, the bridge first
-acknowledges the request in its topic and sends the final answer once as a
-normal reply instead of keeping an apparently blank stream open.
+incremental text while researching or building documents, the bridge sends the
+final answer once as a normal reply instead of opening a markdown stream. It
+does not post a synthetic “received/working” message at intake; Feishu's native
+message state and the bridge's common run-state mechanism apply equally to all
+Bots.
 
 ## DeepSeek Harness
 
@@ -99,10 +101,9 @@ $env:DEEPSEEK_HARNESS_ROOT = 'D:\src\deepseek-harness'
 The adapter runs Node with the built `apps\cli\lib\bin.js` entry and the
 headless profile. Prompts are carried over stdin so long topics never depend on
 the Windows command-line limit. Harness produces its answer as a final batch
-rather than a dependable incremental stream. The bridge therefore sends an
-immediate visible acknowledgement, then posts the completed answer once as a
-normal topic reply; it does not keep an empty markdown stream open for a long
-research run.
+rather than a dependable incremental stream. The bridge posts that completed
+answer once as a normal topic reply and does not open an empty markdown stream
+or post a synthetic intake acknowledgement.
 
 ## Hermes
 
