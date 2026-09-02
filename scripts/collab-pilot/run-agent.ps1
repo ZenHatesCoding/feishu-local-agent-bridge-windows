@@ -16,9 +16,25 @@ $env:LARK_COLLAB_INSTANCE_ID = "$($env:LARK_COLLAB_NODE_ID):$Agent"
 $env:LARK_COLLAB_EVENT_SOURCE = 'distributed'
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir
-$env:PATH = "$commandDir;$env:PATH"
 if ($pilot.larkCliJs) { $env:LARK_COLLAB_REAL_LARK_CLI_JS = Expand-CollabValue $pilot.larkCliJs }
 
+foreach ($name in @(
+  'LARK_CHANNEL',
+  'LARK_CHANNEL_UNATTENDED',
+  'LARK_CHANNEL_HOME',
+  'LARK_CHANNEL_PROFILE',
+  'LARK_CHANNEL_CONFIG',
+  'LARKSUITE_CLI_CONFIG_DIR',
+  'LARK_CHANNEL_CODEX_BIN',
+  'LARK_CHANNEL_NODE_BIN',
+  'LARK_CHANNEL_ANTIGRAVITY_BIN',
+  'LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY',
+  'LARK_CHANNEL_ANTIGRAVITY_BRIDGE',
+  'LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE',
+  'DSH_CWD'
+)) {
+  Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+}
 foreach ($name in @($pilot.unsetEnvironment)) {
   if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
@@ -31,6 +47,9 @@ if ([System.IO.Path]::GetFileName([string]$env:LARK_CHANNEL_ANTIGRAVITY_BIN) -ie
 foreach ($name in @($agentConfig.launch.unsetEnvironment)) {
   if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
+# Agent-specific PATH overrides are applied above. Put the Pilot's
+# identity-neutral commands first only after every override is complete.
+$env:PATH = "$commandDir;$env:PATH"
 
 $filePath = Expand-CollabValue $agentConfig.launch.filePath
 $arguments = @($agentConfig.launch.arguments | ForEach-Object { Expand-CollabValue $_ })

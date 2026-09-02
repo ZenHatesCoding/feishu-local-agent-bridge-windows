@@ -189,7 +189,9 @@ Pilot 还会把 `scripts\collab-pilot\bin` 放在每个 Agent 的 `PATH` 最前�
 `lark-cli.cmd` / `lark-cli.ps1` 是不绑定身份的统一入口：它们只调用清单中配置的真实
 `larkCliJs`，并保留当前 Agent 的 `LARK_CHANNEL_*` 和 `LARKSUITE_CLI_CONFIG_DIR`。因此即使
 某个外部 bridge 目录残留了写死其他 bot profile 的同名脚本，也不能劫持当前 bot 的发送
-身份。不要在这些统一入口中写死 profile 路径、App ID、`HOME` 或 `USERPROFILE`。
+身份。不要在这些统一入口中写死 profile 路径、App ID、`HOME` 或 `USERPROFILE`。统一
+命令目录会在清单环境覆盖全部完成后才最终放到 `PATH` 最前，因此清单里的 `PATH` 也不能
+让旧 shim 抢到前面。应用所选 Agent 环境前，Pilot 会先清除其他 Agent 遗留的路由变量。
 
 ## 网络环境边界
 
@@ -255,6 +257,11 @@ ChatGPT 窗口，并每 15 秒检查一次 Hub 和本机 Bot，发现进程退�
 .\scripts\collab-pilot\Stop-CollabPilot.ps1 -RestoreOriginals
 ```
 
+正常停止 Agent 时，Pilot 会先通过该 Agent 隔离的 `LARK_CHANNEL_HOME` 请求已登记的
+协作 bridge 退出，再以终止受管启动器作为兜底。如果 Windows 已从外部终止 bridge，
+运行时只会清理元数据仍指向该死亡 PID 的 profile/app 锁。因此停止后可以立即重启，
+无需等待锁超时，也不需要手工删除锁文件。
+
 也可让多个克隆或多套环境使用独立清单：
 
 ```powershell
@@ -292,6 +299,10 @@ App Secret、profile 目录、导出的 worker 清单或
 自己的 dispatch 和经过权限筛选的上下文；使用另一 Agent 的凭据读取时必须被拒绝。
 Git 交付件可用 `collab-artifact.cmd register-git` 登记 commit locator；飞书文件会在
 拿到 `messageId + fileKey` 时登记飞书 locator。本地路径始终只表示当前节点缓存。
+
+文件发布会自愈当前 Bot 的隔离 lark-cli 工作区：仅当准确收到“lark-channel 未绑定”
+错误时，自动按 `bot-only` 重绑一次并重试一次发送；绝不回退到其他 profile 或用户
+身份。重试仍失败时才保留准确命令错误和本机文件路径用于诊断。
 
 需要立即退出试验时：
 

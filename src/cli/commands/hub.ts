@@ -197,14 +197,19 @@ export async function runArtifactPublish(options: {
         sendIdempotencyKey,
         '--json',
       ];
-  const send = spawnProcessSync(process.execPath, args, {
-    cwd: dirname(artifact.localPath),
-    env: process.env,
-    encoding: 'utf8',
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  if (send.stdout) process.stdout.write(String(send.stdout));
-  if (send.stderr) process.stderr.write(String(send.stderr));
+  let send = runLarkCli(larkCliJs, args, dirname(artifact.localPath));
+  if (send.status !== 0 && isUnboundLarkChannel(send)) {
+    const repair = runLarkCli(larkCliJs, [
+      'config', 'bind', '--source', 'lark-channel', '--identity', 'bot-only',
+    ]);
+    if (repair.error) throw repair.error;
+    if (repair.status !== 0) {
+      emitProcessOutput(repair);
+      throw new Error(`lark-cli bot-only binding repair failed with exit code ${repair.status}`);
+    }
+    send = runLarkCli(larkCliJs, args, dirname(artifact.localPath));
+  }
+  emitProcessOutput(send);
   if (send.error) throw send.error;
   if (send.status !== 0) throw new Error(`lark-cli file send failed with exit code ${send.status}`);
 
@@ -230,6 +235,25 @@ export async function runArtifactPublish(options: {
     artifact: published,
   });
   process.stdout.write(`${JSON.stringify({ sharedArtifact: published }, null, 2)}\n`);
+}
+
+function runLarkCli(larkCliJs: string, args: string[], cwd?: string) {
+  return spawnProcessSync(process.execPath, [larkCliJs, ...args], {
+    ...(cwd ? { cwd } : {}),
+    env: process.env,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
+  });
+}
+
+function isUnboundLarkChannel(result: ReturnType<typeof runLarkCli>): boolean {
+  const output = `${String(result.stdout ?? '')}\n${String(result.stderr ?? '')}`;
+  return /lark-channel context detected but lark-cli is not bound to it/i.test(output);
+}
+
+function emitProcessOutput(result: ReturnType<typeof runLarkCli>): void {
+  if (result.stdout) process.stdout.write(String(result.stdout));
+  if (result.stderr) process.stderr.write(String(result.stderr));
 }
 
 export async function runArtifactRegisterGit(options: {

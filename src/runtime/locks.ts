@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import * as lockfile from 'proper-lockfile';
 import type { AppPaths } from '../config/app-paths';
@@ -132,6 +132,49 @@ export async function checkRuntimeLock(target: string): Promise<{
   }
 }
 
+/**
+ * Remove runtime locks left behind after an externally terminated bridge.
+ *
+ * The metadata is the ownership proof: cleanup is allowed only when every
+ * target still belongs to the expected PID and that PID is no longer alive.
+ * Sentinel target files remain in place because proper-lockfile locks the
+ * adjacent `<target>.lock` directory, not the target itself.
+ */
+export async function cleanupStoppedRuntimeLocks(
+  paths: Pick<AppPaths, 'profile' | 'profileLockFile' | 'appLockFile'>,
+  appId: string,
+  expectedPid: number,
+): Promise<string[]> {
+  if (isProcessAlive(expectedPid)) return [];
+
+  const targets: Array<{ kind: RuntimeLockKind; target: string }> = [
+    { kind: 'profile', target: paths.profileLockFile },
+    { kind: 'app', target: paths.appLockFile(appId) },
+  ];
+  const cleaned: string[] = [];
+  for (const { kind, target } of targets) {
+    const meta = await readRuntimeLockMeta(target);
+    if (
+      !meta ||
+      meta.kind !== kind ||
+      meta.target !== target ||
+      meta.profile !== paths.profile ||
+      meta.pid !== expectedPid
+    ) {
+      continue;
+    }
+    if (meta.kind === 'app' && meta.appId !== appId) continue;
+    if (meta.kind === 'profile' && meta.appId !== undefined) continue;
+
+    await rm(`${target}.lock`, { recursive: true, force: true });
+    await unlink(runtimeLockMetaFile(target)).catch((err: NodeJS.ErrnoException) => {
+      if (err.code !== 'ENOENT') throw err;
+    });
+    cleaned.push(target);
+  }
+  return cleaned;
+}
+
 async function acquireRuntimeLock(
   meta: Omit<RuntimeLockMeta, 'pid' | 'startedAt'>,
 ): Promise<AcquiredRuntimeLock> {
@@ -183,4 +226,13 @@ function isRuntimeLockMeta(value: unknown): value is RuntimeLockMeta {
     typeof meta.startedAt === 'string' &&
     (meta.appId === undefined || typeof meta.appId === 'string')
   );
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
 }

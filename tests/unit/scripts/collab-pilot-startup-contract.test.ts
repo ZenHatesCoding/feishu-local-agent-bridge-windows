@@ -29,4 +29,15 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(source).toContain('Start-ScheduledTask');
     expect(source).toContain('Timed out stopping existing Windows startup task');
   });
+
+  it('stops the registered collaboration bridge before terminating its launcher', () => {
+    const common = readPilotScript('Pilot.Common.ps1');
+    const stop = readPilotScript('Stop-CollabAgent.ps1');
+
+    expect(common).toContain('function Stop-CollabRegisteredBridge');
+    expect(common).toContain("(Join-Path $script:CollabRepoRoot 'dist\\cli.js') kill 1");
+    expect(common).toContain('$Agent.launch.environment.LARK_CHANNEL_HOME');
+    expect(stop).toContain('Stop-CollabRegisteredBridge $agentConfig');
+    expect(stop).not.toContain('Stop-OriginalAgent $agentConfig');
+  });
 });

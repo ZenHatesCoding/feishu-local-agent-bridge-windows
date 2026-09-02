@@ -49,6 +49,13 @@ Artifact. An Agent can run `collab-artifact.cmd resolve --task TASK --actor
 AGENT --name "EXACT_NAME"` for one additional file, or `--list` when the catalog
 is insufficient. Hermes does not build a separate full-history prompt.
 
+`collab-artifact.cmd publish` owns the complete delivery path. If the current
+private lark-channel workspace has lost its bot binding, the command repairs
+that isolated workspace as `bot-only` and retries once before failing. Agents
+must not substitute their native `.artifacts` staging directory or tell the
+user to restart/doctor the Bridge unless this delivery command itself still
+returns an exact error after the retry.
+
 ## Claude Code
 
 ```powershell
@@ -89,6 +96,13 @@ Bots.
 
 DeepSeek Harness has its own `deepseek-harness` agent kind and adapter. The
 entry path is configuration for that adapter, not a mode switch on Antigravity.
+
+Do not add an older DeepSeek or Antigravity bridge `bin` directory to this
+Agent's `PATH`. The Pilot supplies one identity-neutral command directory after
+all manifest environment overrides, and the adapter passes the current
+profile's explicit lark-channel context. On startup, lark-cli binding is
+accepted only when the current App is present in this profile's private target
+file; a zero exit code that wrote another profile is a failed preflight.
 
 ```powershell
 .\scripts\bootstrap-deepseek-bridge.ps1

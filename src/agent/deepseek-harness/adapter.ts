@@ -1,6 +1,6 @@
 import type { Readable, Writable } from 'node:stream';
 import { createInterface } from 'node:readline';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter } from 'node:path';
 import { mergeProcessEnv, spawnProcess, type SpawnedProcessByStdio } from '../../platform/spawn';
 import { SpawnFailed } from '../../runtime/errors';
 import { prefixBridgeSystemPrompt } from '../bridge-system-prompt';
@@ -76,7 +76,7 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
         LARK_CHANNEL_ANTIGRAVITY_BRIDGE: undefined,
         LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: '1',
         DSH_CWD: opts.cwd,
-        PATH: harnessPath(this.opts.larkChannel, process.env.PATH),
+        PATH: harnessPath(process.env.PATH),
         HERMES_HOME: undefined,
         HERMES_GIT_BASH_PATH: undefined,
       }),
@@ -116,10 +116,9 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
   }
 }
 
-function harnessPath(context: LarkChannelEnvContext | undefined, basePath: string | undefined): string | undefined {
+function harnessPath(basePath: string | undefined): string | undefined {
   const proxy = process.env.LARK_COLLAB_COMMAND_DIR;
-  if (!context?.rootDir) return [proxy, basePath].filter(Boolean).join(delimiter);
-  return [proxy, join(dirname(context.rootDir), 'bin'), basePath].filter(Boolean).join(delimiter);
+  return [proxy, basePath].filter(Boolean).join(delimiter);
 }
 
 async function* harnessEvents(

@@ -240,3 +240,21 @@ function Remove-CollabAgentHook([object]$Agent) {
 
 function Stop-OriginalAgent([object]$Agent) { Invoke-CollabCommand $Agent.original.stop "Stopping original bridge for $($Agent.id)" }
 function Start-OriginalAgent([object]$Agent) { Invoke-CollabCommand $Agent.original.start "Restoring original bridge for $($Agent.id)" }
+
+function Stop-CollabRegisteredBridge([object]$Agent) {
+  if (!$Agent.launch -or !$Agent.launch.environment -or !$Agent.launch.environment.LARK_CHANNEL_HOME) { return }
+  $previousHome = [Environment]::GetEnvironmentVariable('LARK_CHANNEL_HOME', 'Process')
+  try {
+    [Environment]::SetEnvironmentVariable(
+      'LARK_CHANNEL_HOME',
+      (Expand-CollabValue $Agent.launch.environment.LARK_CHANNEL_HOME),
+      'Process'
+    )
+    & node.exe (Join-Path $script:CollabRepoRoot 'dist\cli.js') kill 1
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "Current collaboration bridge for $($Agent.id) was not registered; the tracked launcher will be stopped as fallback."
+    }
+  } finally {
+    [Environment]::SetEnvironmentVariable('LARK_CHANNEL_HOME', $previousHome, 'Process')
+  }
+}

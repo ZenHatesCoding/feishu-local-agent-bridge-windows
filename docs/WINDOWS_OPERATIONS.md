@@ -134,7 +134,10 @@ only the real `larkCliJs` configured by the local manifest and preserve the
 current agent's `LARK_CHANNEL_*` and `LARKSUITE_CLI_CONFIG_DIR` environment.
 This prevents a stale same-name shim in an external bridge directory from
 sending as another bot. Never hard-code a profile path, App ID, `HOME`, or
-`USERPROFILE` in these pilot-owned entry points.
+`USERPROFILE` in these pilot-owned entry points. The prepend happens after
+manifest environment overrides, so a manifest `PATH` cannot place an old shim
+ahead of the Pilot command. Agent-specific routing variables are cleared before
+the selected Agent environment is applied.
 
 ## Network Boundary
 
@@ -201,6 +204,13 @@ Rollback invokes only commands explicitly present in the local manifest. It
 does not delete the ledger or shared artifacts. Hermes stop removes only
 `feishu-collaboration-hub` under the configured hooks directory.
 
+Normal Agent stop first asks the bridge registered in that Agent's isolated
+`LARK_CHANNEL_HOME` to exit, then terminates the tracked launcher only as a
+fallback. If Windows had to terminate the bridge externally, the runtime
+removes only profile/app locks whose metadata still names that dead PID. This
+makes an immediate Stop-to-Start cycle safe without waiting for lock expiry or
+manually deleting lock files.
+
 ## Local Data
 
 ```text
@@ -232,3 +242,9 @@ topic must not see that context.
 
 Status should show Hub health and one real worker process per enabled agent.
 Use the component log when a bot does not reply.
+
+Artifact publishing is self-healing for the current Bot's isolated lark-cli
+workspace: an exact “lark-channel not bound” result triggers one `bot-only`
+rebind and one delivery retry. It never falls back to another profile or user
+identity. A repeated failure is reported with the exact command error and local
+file path for diagnosis.

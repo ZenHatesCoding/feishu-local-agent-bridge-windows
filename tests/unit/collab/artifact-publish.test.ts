@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -67,6 +67,61 @@ describe('collaboration artifact publisher', () => {
       sourceMessageId: 'om_sent',
       sourceFileKey: 'file_sent',
       kind: 'presentation',
+    }]);
+  });
+
+  it('repairs a missing private lark-channel bot binding and retries delivery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'collab-publish-repair-'));
+    const source = join(root, 'assessment.md');
+    const marker = join(root, 'bound');
+    const fakeCli = join(root, 'fake-lark-cli.mjs');
+    await writeFile(source, 'assessment');
+    await writeFile(fakeCli, `
+      import fs from 'node:fs';
+      const args = process.argv.slice(2);
+      const marker = process.env.TEST_BIND_MARKER;
+      if (args[0] === 'config' && args[1] === 'bind') {
+        if (!args.includes('--source') || !args.includes('lark-channel') ||
+            !args.includes('--identity') || !args.includes('bot-only')) process.exit(9);
+        fs.writeFileSync(marker, 'bound');
+        process.exit(0);
+      }
+      if (args.includes('--file') && !fs.existsSync(marker)) {
+        console.error(JSON.stringify({ error: { message: 'lark-channel context detected but lark-cli is not bound to it' } }));
+        process.exit(3);
+      }
+      console.log(JSON.stringify({ data: { message_id: 'om_retried', file_key: 'file_retried' } }));
+    `);
+
+    const hub = new CollaborationHub(new JsonlLedger(join(root, 'ledger.jsonl')), {
+      agents: [{ id: 'chariot', displayName: 'Chariot' }],
+    });
+    await hub.initialize();
+    const assigned = await hub.submit({
+      type: 'message', idempotencyKey: 'assign-repair',
+      address: { tenantKey: 'tenant', chatId: 'chat', threadId: 'topic' },
+      messageId: 'om_user', actor: { type: 'human', id: 'user' },
+      content: 'Write an assessment', targetAgentIds: ['chariot'],
+    });
+    const server = new CollaborationHubServer(hub, { host: '127.0.0.1', port: 0, token: 'test' });
+    servers.push(server);
+    const address = await server.listen();
+    process.env.LARK_COLLAB_HUB_URL = `http://127.0.0.1:${address.port}`;
+    process.env.LARK_COLLAB_HUB_TOKEN = 'test';
+    process.env.LARK_COLLAB_ARTIFACT_ROOT = join(root, 'artifacts');
+    process.env.LARK_COLLAB_REAL_LARK_CLI_JS = fakeCli;
+    process.env.TEST_BIND_MARKER = marker;
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    await runArtifactPublish({
+      task: assigned.task.id, actor: 'chariot', path: source,
+      replyTo: 'om_user', replyInThread: true,
+    });
+
+    await expect(access(marker)).resolves.toBeUndefined();
+    expect(hub.getArtifacts(assigned.task.id, 'chariot')).toMatchObject([{
+      name: 'assessment.md', sourceMessageId: 'om_retried', sourceFileKey: 'file_retried',
     }]);
   });
 });

@@ -15,6 +15,9 @@ describe('bridge system prompt bot collaboration rules', () => {
     expect(BRIDGE_SYSTEM_PROMPT).toContain('无人值守的库或命令行工具');
     expect(BRIDGE_SYSTEM_PROMPT).toContain('不要要求用户点击');
     expect(BRIDGE_SYSTEM_PROMPT).toContain('先生成并自检');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('自动修复 bot-only 绑定并重试');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('不得根据其他命令的报错臆测');
+    expect(BRIDGE_SYSTEM_PROMPT).toContain('不得让用户重启 bridge');
   });
 
   it('states that bots only receive messages via a real structured mention', () => {

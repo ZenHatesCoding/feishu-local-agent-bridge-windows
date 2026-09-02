@@ -12,7 +12,7 @@ $agentConfig = Get-CollabAgent $Agent
 
 # Let each bridge clear its own registry and locks first. The tracked launcher
 # process is then terminated as a fallback if the bridge control did not exit it.
-Stop-OriginalAgent $agentConfig
+Stop-CollabRegisteredBridge $agentConfig
 Stop-CollabComponent $Agent
 Remove-CollabAgentHook $agentConfig
 Write-Output "$Agent collaboration bridge stopped."

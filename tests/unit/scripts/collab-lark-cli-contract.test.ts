@@ -25,11 +25,22 @@ describe('collaboration pilot lark-cli identity contract', () => {
     const commandDirAssignment = source.indexOf("$commandDir = Join-Path $script:CollabRepoRoot 'scripts\\collab-pilot\\bin'");
     const pathAssignment = source.indexOf('$env:PATH = "$commandDir;$env:PATH"');
     const cliAssignment = source.indexOf('$env:LARK_COLLAB_REAL_LARK_CLI_JS =');
+    const launchEnvironment = source.indexOf('Set-CollabEnvironment $agentConfig.launch.environment');
     const launch = source.indexOf('& $filePath @arguments');
 
     expect(commandDirAssignment).toBeGreaterThanOrEqual(0);
-    expect(pathAssignment).toBeGreaterThan(commandDirAssignment);
-    expect(cliAssignment).toBeGreaterThan(pathAssignment);
+    expect(cliAssignment).toBeGreaterThan(commandDirAssignment);
+    expect(pathAssignment).toBeGreaterThan(launchEnvironment);
     expect(launch).toBeGreaterThan(cliAssignment);
+    expect(launch).toBeGreaterThan(pathAssignment);
+    expect(source).toContain("'LARK_CHANNEL_ANTIGRAVITY_BIN'");
+    expect(source).toContain("'LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY'");
+  });
+
+  it('keeps agent adapters off legacy external bridge bin directories', () => {
+    for (const name of ['deepseek-harness/adapter.ts', 'antigravity/adapter.ts']) {
+      const source = readFileSync(join(process.cwd(), 'src', 'agent', name), 'utf8');
+      expect(source).not.toContain("dirname(context.rootDir), 'bin'");
+    }
   });
 });

@@ -1,6 +1,6 @@
 import type { Readable, Writable } from 'node:stream';
 import { createInterface } from 'node:readline';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter } from 'node:path';
 import { mergeProcessEnv, spawnProcess, type SpawnedProcessByStdio } from '../../platform/spawn';
 import { SpawnFailed } from '../../runtime/errors';
 import { prefixBridgeSystemPrompt } from '../bridge-system-prompt';
@@ -113,7 +113,7 @@ export class AntigravityAdapter implements AgentAdapter {
         LARK_CHANNEL_ANTIGRAVITY_BRIDGE: '1',
         LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: undefined,
         DSH_CWD: undefined,
-        PATH: antigravityPath(this.larkChannel, process.env.PATH),
+        PATH: antigravityPath(process.env.PATH),
         HERMES_HOME: undefined,
         HERMES_GIT_BASH_PATH: undefined,
       }),
@@ -171,13 +171,9 @@ export class AntigravityAdapter implements AgentAdapter {
   }
 }
 
-function antigravityPath(
-  context: LarkChannelEnvContext | undefined,
-  basePath: string | undefined,
-): string | undefined {
+function antigravityPath(basePath: string | undefined): string | undefined {
   const proxy = process.env.LARK_COLLAB_COMMAND_DIR;
-  if (!context?.rootDir) return [proxy, basePath].filter(Boolean).join(delimiter);
-  return [proxy, join(dirname(context.rootDir), 'bin'), basePath].filter(Boolean).join(delimiter);
+  return [proxy, basePath].filter(Boolean).join(delimiter);
 }
 
 async function* createEventStream(

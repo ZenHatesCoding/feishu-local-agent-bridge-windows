@@ -55,6 +55,7 @@ export function buildCollaborationContext(input: {
         'For an ask, the target records its answer with hub return, then really @ mentions the current owner.',
         'Complete only the assigned objective and return structured results and artifact paths.',
         `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>" --reply-in-thread. Do not use raw lark-cli --file in a collaboration task.`,
+        'Do not use an Agent-native .artifacts directory as delivery. Do not claim the delivery channel is unbound unless collab-artifact.cmd publish was actually run in this dispatch and still failed after its automatic repair and retry.',
         'Artifacts use locator as the portable source. localPath, when present, is only this node\'s cache. Verify sha256 when integrity matters.',
       ],
     },

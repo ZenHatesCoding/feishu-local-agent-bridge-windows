@@ -28,6 +28,7 @@ describe('collaboration context projection', () => {
     expect(context).toContain('"id":"justice"');
     expect(context).toContain('"displayName":"Chariot"');
     expect(context).not.toContain('ou_private');
+    expect(context).toContain('Do not claim the delivery channel is unbound');
   });
 
   it('keeps only the original and recent semantic history and drops mechanical events', () => {

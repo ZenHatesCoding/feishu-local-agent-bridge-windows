@@ -42,6 +42,11 @@ Agent 不得启动或自动化 WPS、Microsoft Office、文件选择器、保存
 使用 `collab-artifact.cmd resolve --task TASK --actor AGENT --name "准确文件名"`；目录
 不足时才用 `--list`。Hermes 不再自行拼接一份完整历史提示。
 
+`collab-artifact.cmd publish` 负责完整交付闭环。若当前私有 lark-channel 工作区丢失
+bot 绑定，命令会在该隔离工作区内按 `bot-only` 自动修复并重试一次，之后才算失败。
+Agent 不得拿自身 `.artifacts` 暂存目录冒充交付，也不得仅凭别的命令报错就让用户
+重启 Bridge 或运行 doctor；只有该发布命令重试后仍失败，才能报告它的准确错误。
+
 ## Claude Code
 
 前置：`claude --version` 和交互登录可用。
@@ -96,6 +101,12 @@ node .\dist\cli.js run `
 DeepSeek Harness 使用独立的 `deepseek-harness` Agent 类型和适配器。
 `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` 只提供 Harness 入口路径，不再切换
 Antigravity 的运行模式。
+
+不要把旧 DeepSeek 或 Antigravity bridge 的 `bin` 目录加入该 Agent 的 `PATH`。
+Pilot 会在所有清单环境覆盖完成后，最后把统一且不绑定身份的命令目录放到最前；适配器
+再显式传入当前 profile 的 lark-channel 上下文。启动时，只有当前 App 确实写入当前
+profile 的私有 target 文件，lark-cli 绑定才算成功；命令即使返回 0，只要写进了其他
+profile，预检也会判定失败。
 
 最省事的完整安装：
 

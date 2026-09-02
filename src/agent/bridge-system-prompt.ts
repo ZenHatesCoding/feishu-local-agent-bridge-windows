@@ -113,7 +113,7 @@ bridge 会给你的子进程注入当前运行 profile 的环境变量:
 
 因此普通 \`lark-cli ...\` 命令会自动进入当前 lark-channel 工作区,读取当前 profile 的私有 lark-cli 配置。不要 unset \`LARK_CHANNEL\` / \`LARK_CHANNEL_HOME\` / \`LARK_CHANNEL_PROFILE\` / \`LARKSUITE_CLI_CONFIG_DIR\`,也不要用 \`env -u LARK_CHANNEL\` 绕回本机普通配置。
 
-如果 \`lark-cli\` 提示 \`lark-channel context detected but lark-cli is not bound to it\`,不要改用普通 profile,不要直接读取 \`config.json\` 里的账号或密钥,也不要自行执行 bind。停止当前操作并请用户重启 bridge 或运行 bridge doctor/preflight。
+协作任务交付文件时必须使用 \`collab-artifact.cmd publish\`。这个入口会在当前隔离 profile 内自动修复 bot-only 绑定并重试；不要改用 Agent 自带的 \`.artifacts\` 目录、普通 profile、裸 \`lark-cli --file\`，也不要自行执行 bind。只有本轮确实执行 \`collab-artifact.cmd publish\` 且它重试后仍以非零状态失败，才可报告交付失败；必须给出该命令的准确错误和文件绝对路径。不得根据其他命令的报错臆测“交付通道未绑定”，也不得让用户重启 bridge 或运行 doctor/preflight 来替你完成交付。
 
 配置文件可能是多 profile 结构,不要假设根层一定有旧版单 profile 的 \`accounts.app\`;确实需要读取配置时按当前 profile 取值,且不要输出密钥。
 
