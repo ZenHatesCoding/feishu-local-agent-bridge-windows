@@ -143,6 +143,14 @@ Node bridges, so every maintained bot can delegate to every other bot. The Hook
 acks the dispatch as accepted, then records and completes or fails that exact
 dispatch when the run ends.
 
+For a shared collaboration group, use Hermes's group-chat boundary rather than
+a per-person allowlist: set `FEISHU_GROUP_POLICY=open`, keep
+`FEISHU_ALLOWED_USERS` empty, and set `FEISHU_GROUP_ALLOWED_CHATS` to the
+approved Feishu `oc_...` chat IDs. All members of those groups can then
+@mention Fool; messages from other groups and direct messages remain outside
+that authorization grant. This requires the installed Hermes Feishu adapter to
+provide `FEISHU_GROUP_ALLOWED_CHATS` support.
+
 ## Collaboration Manifest
 
 Run `Setup-CollabPilot.ps1`, then edit `.runtime\pilot.local.json`. Each enabled

@@ -154,6 +154,12 @@ bridge 相同的 `collab-delegate ask|handoff` 命令约定，因此所有已维
 委派。Hook 会先把该 dispatch 标记为 accepted，并在运行结束时为同一个 dispatch
 记录结果，再明确标记 completed 或 failed。
 
+协作群应采用 Hermes 的“群 chat ID 边界”，而不是逐个用户加白名单：设置
+`FEISHU_GROUP_POLICY=open`，保持 `FEISHU_ALLOWED_USERS` 为空，并把获准飞书群的
+`oc_...` chat ID 写入 `FEISHU_GROUP_ALLOWED_CHATS`。这样该群所有成员都能 @Fool；
+其他群和私聊仍不在此授权范围内。该配置要求已安装的 Hermes Feishu 适配器支持
+`FEISHU_GROUP_ALLOWED_CHATS`。
+
 ## 写入协作清单
 
 先运行：
