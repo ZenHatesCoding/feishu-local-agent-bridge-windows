@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.runtime/
+__pycache__/
+*.pyc
+coverage/
+.corepack/
+*.log
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+.npmrc
+
+.DS_Store
+.idea/
+.vscode/
+
+# Local maintenance scripts and unreleased changelog are not part of the package
+CHANGELOG.md
+tests-smoke/
+
+# Local bridge runtime state and secrets
+.lark-channel/
+.lark-cli/
+.gemini/
+AppData/
+workspace/
+vendor/

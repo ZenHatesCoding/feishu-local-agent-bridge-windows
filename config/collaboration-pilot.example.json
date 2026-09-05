@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "role": "all",
+  "nodeId": "main-pc",
+  "hub": { "bindHost": "127.0.0.1", "publicUrl": "http://127.0.0.1:17321", "port": 17321, "leaseMinutes": 30, "maxCausalDepth": 8, "tenantKey": "replace-with-a-private-shared-key" },
+  "larkCliJs": "",
+  "commonEnvironment": { "LARK_CHANNEL_DISABLE_PROXY": "1" },
+  "unsetEnvironment": ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"],
+  "agents": [
+    {
+      "id": "planner", "displayName": "Planner", "aliases": ["codex"], "enabled": false,
+      "launch": {
+        "filePath": "node.exe",
+        "arguments": ["C:\\path\\to\\bridge\\dist\\cli.js", "run", "--profile", "planner"],
+        "workingDirectory": "C:\\agent-workspace",
+        "environment": { "LARK_CHANNEL_HOME": "C:\\path\\to\\planner-profile", "LARK_CHANNEL_CODEX_BIN": "C:\\path\\to\\codex.cmd" }
+      },
+      "original": {
+        "stop": { "filePath": "powershell.exe", "arguments": ["-NoProfile", "-File", "C:\\path\\to\\stop-original.ps1"], "ignoreExitCode": true },
+        "start": { "filePath": "powershell.exe", "arguments": ["-NoProfile", "-File", "C:\\path\\to\\start-original.ps1"] }
+      }
+    },
+    {
+      "id": "reviewer", "displayName": "Reviewer", "aliases": ["custom-agent"], "enabled": false,
+      "launch": { "filePath": "C:\\path\\to\\bridge.exe", "arguments": ["--profile", "reviewer"], "workingDirectory": "${REPO_ROOT}", "environment": {} }
+    }
+  ]
+}

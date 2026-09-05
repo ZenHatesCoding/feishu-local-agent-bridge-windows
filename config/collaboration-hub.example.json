@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 17321
+  },
+  "ledgerPath": "../data/collaboration.jsonl",
+  "tokenEnv": "LARK_COLLAB_HUB_TOKEN",
+  "auth": {
+    "agentTokenEnvs": {
+      "world": "LARK_COLLAB_AGENT_TOKEN_WORLD",
+      "justice": "LARK_COLLAB_AGENT_TOKEN_JUSTICE",
+      "chariot": "LARK_COLLAB_AGENT_TOKEN_CHARIOT",
+      "fool": "LARK_COLLAB_AGENT_TOKEN_FOOL"
+    }
+  },
+  "leaseMinutes": 30,
+  "maxCausalDepth": 8,
+  "coordinator": {
+    "enabled": false,
+    "tenant": "feishu",
+    "appId": "cli_replace_with_coordinator_app_id",
+    "appSecretEnv": "LARK_COLLAB_COORDINATOR_SECRET",
+    "tenantKey": "replace-with-one-shared-tenant-key"
+  },
+  "agents": [
+    { "id": "world", "displayName": "World", "aliases": ["codex"] },
+    { "id": "justice", "displayName": "Justice", "aliases": ["antigravity"] },
+    { "id": "chariot", "displayName": "Chariot", "aliases": ["deepseek"] },
+    { "id": "fool", "displayName": "Fool", "aliases": ["hermes"] }
+  ]
+}

@@ -1,0 +1,11 @@
+@echo off
+set "HERMES_HOME="
+set "HERMES_GIT_BASH_PATH="
+set "HOME=C:\antigravity-bridge"
+set "USERPROFILE=C:\antigravity-bridge"
+set "LARK_CHANNEL=1"
+set "LARK_CHANNEL_HOME=C:\antigravity-bridge\.lark-channel"
+set "LARK_CHANNEL_PROFILE=antigravity"
+set "LARK_CHANNEL_CONFIG=C:\antigravity-bridge\.lark-channel\profiles\antigravity\lark-cli-source\config.json"
+set "LARKSUITE_CLI_CONFIG_DIR=C:\antigravity-bridge\.lark-channel\profiles\antigravity\lark-cli"
+"C:\Users\ZhenpingXing\.trae-cn\binaries\node\versions\24.14.0\lark-cli.cmd" %*
