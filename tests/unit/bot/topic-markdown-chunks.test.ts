@@ -4,7 +4,6 @@ import { splitMarkdownForTopic } from '../../../src/bot/channel.js';
 describe('topic markdown chunks', () => {
   it('keeps a long topic reply within the Feishu message limit', () => {
     const body = `${'第一段内容 '.repeat(800)}\n\n${'第二段内容 '.repeat(800)}`;
-
     const chunks = splitMarkdownForTopic(body);
 
     expect(chunks.length).toBeGreaterThan(1);
