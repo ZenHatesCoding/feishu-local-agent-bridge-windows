@@ -139,10 +139,10 @@ export async function runCollaborationDelegate(
       { tag: 'text', text: ` ${content}` },
     ]] },
   });
-  // Do not invoke the pilot's lark-cli.cmd shim here.  A Harness tool can
-  // execute this command but still be denied permission to spawn cmd.exe for
-  // the shim's second hop.  Running the configured JS entry directly also
-  // keeps the current bridge profile and its bot-only identity.
+// Do not invoke the pilot's lark-cli.cmd shim here.  A Harness tool can
+// execute this command but still be denied permission to spawn cmd.exe for
+// the shim's second hop.  Running the configured JS entry directly also
+// keeps the current bridge profile and its bot-only identity.
   const send = runLarkCli(larkCliJs, [
     'im', '+messages-reply', '--message-id', replyTo, '--content', post,
     '--msg-type', 'post', '--reply-in-thread', '--idempotency-key', `delegate-${digest}`, '--json',
