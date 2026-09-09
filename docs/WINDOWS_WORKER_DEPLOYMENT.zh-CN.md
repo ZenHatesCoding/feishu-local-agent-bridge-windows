@@ -134,6 +134,11 @@ Get-Content C:\Users\<you>\.lark-channel\active-profile                 # <profi
 - `hub.publicUrl` / `hub.tenantKey`：Hub 那边给你的。
 - `agents[].credentialEnv`：必须以 agent id 结尾，跟下面的
   `LARK_COLLAB_<AGENT_ID>_TOKEN` 对齐。
+- `larkCliJs`：留 `""` 即可，除非要固定某个具体安装。worker 启动器会自动解析真实
+  `@larksuite/cli` 的 JavaScript 入口（优先 npm 全局根目录，其次启动器
+  `node.exe` 旁的 `node_modules`），并导出为 `LARK_COLLAB_REAL_LARK_CLI_JS`；
+  这样 pilot `bin` 里的 `lark-cli` shim 才能工作，bridge preflight 也不会再误报
+  “lark-cli is not installed”，从而不会阻塞飞书投递（协作交棒、artifacts 发布）。
 
 校验：
 

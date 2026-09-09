@@ -135,6 +135,13 @@ Things to change:
 - `hub.publicUrl` / `hub.tenantKey` — given to you by whoever runs the Hub.
 - `agents[].credentialEnv` — must end with your agent id; pick a name that
   matches `LARK_COLLAB_<AGENT_ID>_TOKEN`.
+- `larkCliJs` — leave `""` unless you need to pin a specific install. The
+  worker launcher auto-resolves the real `@larksuite/cli` JavaScript entry
+  (npm global root, or `node_modules` next to the launcher's `node.exe`) and
+  exports it as `LARK_COLLAB_REAL_LARK_CLI_JS`. That keeps the pilot `bin`
+  `lark-cli` shims working and prevents a false "lark-cli is not installed"
+  result from the bridge pre-flight, which otherwise blocks Feishu delivery
+  (collaboration handoffs, artifact publish).
 
 Validate:
 

@@ -40,4 +40,14 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(stop).toContain('Stop-CollabRegisteredBridge $agentConfig');
     expect(stop).not.toContain('Stop-OriginalAgent $agentConfig');
   });
+
+  it('resolves the real lark-cli entry so pilot shims never shadow global lark-cli', () => {
+    const common = readPilotScript('Pilot.Common.ps1');
+    const run = readPilotScript('run-agent.ps1');
+
+    expect(common).toContain('function Export-CollabRealLarkCliJs');
+    expect(common).toContain('function Find-CollabRealLarkCliJs');
+    expect(common).toContain("'LARK_COLLAB_REAL_LARK_CLI_JS'");
+    expect(run).toContain('Export-CollabRealLarkCliJs -Pilot $pilot');
+  });
 });

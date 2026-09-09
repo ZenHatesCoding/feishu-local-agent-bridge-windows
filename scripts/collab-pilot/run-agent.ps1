@@ -16,7 +16,7 @@ $env:LARK_COLLAB_INSTANCE_ID = "$($env:LARK_COLLAB_NODE_ID):$Agent"
 $env:LARK_COLLAB_EVENT_SOURCE = 'distributed'
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir
-if ($pilot.larkCliJs) { $env:LARK_COLLAB_REAL_LARK_CLI_JS = Expand-CollabValue $pilot.larkCliJs }
+Export-CollabRealLarkCliJs -Pilot $pilot -LaunchFilePath $agentConfig.launch.filePath
 
 foreach ($name in @(
   'LARK_CHANNEL',

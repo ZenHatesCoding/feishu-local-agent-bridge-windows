@@ -72,6 +72,54 @@ function Set-CollabEnvironment([object]$Values) {
   }
 }
 
+# Locate the real @larksuite/cli JavaScript entry used by Feishu delivery
+# commands. The pilot `bin` directory is prepended to PATH and its lark-cli
+# shims delegate to this entry via LARK_COLLAB_REAL_LARK_CLI_JS; when that
+# variable is unset the shims exit with status 1, which makes a bridge
+# pre-flight check report "lark-cli is not installed" even though the real CLI
+# is present, and blocks collaboration handoffs. Prefer the launcher node.exe
+# directory (npm prefix for standard Windows Node installs), then `npm root -g`
+# (custom prefixes), then the %APPDATA%\npm default prefix.
+function Find-CollabRealLarkCliJs([string]$LaunchFilePath) {
+  $candidates = @()
+  if ($LaunchFilePath) {
+    $launcherDir = Split-Path -Parent (Expand-CollabValue $LaunchFilePath)
+    $candidates += Join-Path $launcherDir 'node_modules\@larksuite\cli\scripts\run.js'
+  }
+  try {
+    $npmRoot = (& npm.cmd root -g 2>$null | Select-Object -Last 1)
+    if ($npmRoot) { $candidates += Join-Path $npmRoot '@larksuite\cli\scripts\run.js' }
+  } catch {
+    # npm is not on PATH in this process; fall through to the other candidates.
+  }
+  $candidates += Join-Path $env:APPDATA 'npm\node_modules\@larksuite\cli\scripts\run.js'
+  foreach ($candidate in $candidates) {
+    if ($candidate -and (Test-Path -LiteralPath $candidate)) { return $candidate }
+  }
+  return $null
+}
+
+# Export LARK_COLLAB_REAL_LARK_CLI_JS for the current agent process. An
+# explicit pilot.larkCliJs wins; otherwise auto-resolve the installed
+# @larksuite/cli entry so a worker works out of the box after a global npm
+# install and never falls into the pilot-shim "lark-cli is not installed"
+# false negative.
+function Export-CollabRealLarkCliJs([object]$Pilot, [string]$LaunchFilePath) {
+  $explicit = ''
+  if ($Pilot -and $Pilot.larkCliJs) { $explicit = (Expand-CollabValue ([string]$Pilot.larkCliJs)).Trim() }
+  if ($explicit) {
+    [Environment]::SetEnvironmentVariable('LARK_COLLAB_REAL_LARK_CLI_JS', $explicit, 'Process')
+    return
+  }
+  $resolved = Find-CollabRealLarkCliJs -LaunchFilePath $LaunchFilePath
+  if ($resolved) {
+    [Environment]::SetEnvironmentVariable('LARK_COLLAB_REAL_LARK_CLI_JS', $resolved, 'Process')
+    Write-Warning "pilot.larkCliJs is empty; auto-resolved the real lark-cli entry at '$resolved'. Set larkCliJs in the pilot config to pin this explicitly."
+    return
+  }
+  Write-Warning 'pilot.larkCliJs is empty and no @larksuite/cli install was found (npm global root or node_modules next to the launcher). Feishu delivery commands (collaboration handoffs, artifact publish) will fail; run "npm install -g @larksuite/cli" or set larkCliJs in the pilot config.'
+}
+
 function Invoke-CollabCommand([object]$Command, [string]$Description) {
   if (!$Command -or !$Command.filePath) { return }
   $filePath = Expand-CollabValue $Command.filePath

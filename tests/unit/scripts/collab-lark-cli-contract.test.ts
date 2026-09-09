@@ -22,12 +22,17 @@ describe('collaboration pilot lark-cli identity contract', () => {
 
   it('places the identity-neutral command directory first for every agent', () => {
     const source = readPilotFile('run-agent.ps1');
+    const common = readPilotFile('Pilot.Common.ps1');
     const commandDirAssignment = source.indexOf("$commandDir = Join-Path $script:CollabRepoRoot 'scripts\\collab-pilot\\bin'");
     const pathAssignment = source.indexOf('$env:PATH = "$commandDir;$env:PATH"');
-    const cliAssignment = source.indexOf('$env:LARK_COLLAB_REAL_LARK_CLI_JS =');
+    // The real CLI entry is now exported through the shared helper; the literal
+    // assignment lives in Pilot.Common.ps1. The call site must still sit after
+    // the command dir is known and before the agent launcher runs.
+    const cliAssignment = source.indexOf('Export-CollabRealLarkCliJs -Pilot $pilot');
     const launchEnvironment = source.indexOf('Set-CollabEnvironment $agentConfig.launch.environment');
     const launch = source.indexOf('& $filePath @arguments');
 
+    expect(common).toContain("'LARK_COLLAB_REAL_LARK_CLI_JS'");
     expect(commandDirAssignment).toBeGreaterThanOrEqual(0);
     expect(cliAssignment).toBeGreaterThan(commandDirAssignment);
     expect(pathAssignment).toBeGreaterThan(launchEnvironment);
