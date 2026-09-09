@@ -1202,22 +1202,47 @@ async function sendFinalReply(input: {
         log.warn('outbound', 'markdown-stream-fallback', {
           err: err instanceof Error ? err.message : String(err),
         });
-        const result = await input.channel.send(
-          input.chatId,
-          { markdown: body },
-          input.sendOpts,
-        );
+        const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
         log.info('outbound', 'sent', outboundLogFields(input, 'markdown', body, result));
       }
     }
   } else if (body.trim()) {
-    const result = await input.channel.send(
-      input.chatId,
-      { markdown: body },
-      input.sendOpts,
-    );
+    const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
     log.info('outbound', 'sent', outboundLogFields(input, 'text', body, result));
   }
+}
+
+const TOPIC_MARKDOWN_CHUNK_LIMIT = 3500;
+
+/** Keep every long response segment inside the original Feishu topic. */
+async function sendMarkdownReply(
+  channel: LarkChannel,
+  chatId: string,
+  body: string,
+  sendOpts: { replyTo: string; replyInThread?: boolean },
+): Promise<{ messageId: string; chunkIds?: string[] }> {
+  const chunks = sendOpts.replyInThread ? splitMarkdownForTopic(body) : [body];
+  const ids: string[] = [];
+  for (const chunk of chunks) {
+    const result = await channel.send(chatId, { markdown: chunk }, sendOpts);
+    ids.push(...(result.chunkIds ?? [result.messageId]));
+  }
+  return { messageId: ids[0] ?? '', ...(ids.length > 1 ? { chunkIds: ids } : {}) };
+}
+
+export function splitMarkdownForTopic(body: string): string[] {
+  if (body.length <= TOPIC_MARKDOWN_CHUNK_LIMIT) return [body];
+  const chunks: string[] = [];
+  let remaining = body;
+  while (remaining.length > TOPIC_MARKDOWN_CHUNK_LIMIT) {
+    const window = remaining.slice(0, TOPIC_MARKDOWN_CHUNK_LIMIT + 1);
+    const boundary = Math.max(window.lastIndexOf('\n\n'), window.lastIndexOf('\n'), window.lastIndexOf(' '));
+    const end = boundary > 0 ? boundary : TOPIC_MARKDOWN_CHUNK_LIMIT;
+    chunks.push(remaining.slice(0, end).trimEnd());
+    remaining = remaining.slice(end).trimStart();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
 }
 
 async function sendCotDegradedNotice(input: {
