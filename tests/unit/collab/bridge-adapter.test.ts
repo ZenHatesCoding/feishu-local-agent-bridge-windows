@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { NormalizedMessage } from '@larksuite/channel';
 import { afterEach, describe, expect, it } from 'vitest';
-import { BridgeCollaborationAdapter } from '../../../src/collab/bridge-adapter';
+import { BridgeCollaborationAdapter, extractCollaborationHandoff } from '../../../src/collab/bridge-adapter';
 import { CollaborationClient } from '../../../src/collab/client';
 import { CollaborationHub } from '../../../src/collab/hub';
 import { JsonlLedger } from '../../../src/collab/ledger';
@@ -52,6 +52,10 @@ function message(input: {
 }
 
 describe('BridgeCollaborationAdapter', () => {
+  it('extracts a bridge-owned handoff without exposing its control marker', () => {
+    expect(extractCollaborationHandoff('Finding\n<collaboration_handoff target="chariot">Please rebut point 2</collaboration_handoff>'))
+      .toEqual({ visibleContent: 'Finding', handoff: { targetAgentId: 'chariot', content: 'Please rebut point 2' } });
+  });
   it('injects shared context for a human assignment', async () => {
     const { hub, client } = await fixture();
     const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');
