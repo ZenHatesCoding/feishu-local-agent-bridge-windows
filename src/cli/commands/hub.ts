@@ -109,6 +109,7 @@ export async function runCollaborationDelegate(
 ): Promise<void> {
   const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');
   const token = requiredEnv('LARK_COLLAB_HUB_TOKEN');
+  const larkCliJs = requiredEnv('LARK_COLLAB_REAL_LARK_CLI_JS');
   const taskId = options.task ?? requiredEnv('LARK_COLLAB_TASK_ID');
   const actor = options.actor ?? requiredEnv('LARK_COLLAB_AGENT_ID');
   const replyTo = options.replyTo ?? requiredEnv('LARK_COLLAB_REPLY_TO');
@@ -137,12 +138,15 @@ export async function runCollaborationDelegate(
       { tag: 'text', text: ` ${content}` },
     ]] },
   });
-  const send = spawnProcessSync('lark-cli', [
+  // Do not invoke the pilot's lark-cli.cmd shim here.  A Harness tool can
+  // execute this command but still be denied permission to spawn cmd.exe for
+  // the shim's second hop.  Running the configured JS entry directly also
+  // keeps the current bridge profile and its bot-only identity.
+  const send = runLarkCli(larkCliJs, [
     'im', '+messages-reply', '--message-id', replyTo, '--content', post,
     '--msg-type', 'post', '--reply-in-thread', '--idempotency-key', `delegate-${digest}`, '--json',
-  ], { env: process.env, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
-  if (send.stdout) process.stdout.write(String(send.stdout));
-  if (send.stderr) process.stderr.write(String(send.stderr));
+  ]);
+  emitProcessOutput(send);
   if (send.error) throw send.error;
   if (send.status !== 0) throw new Error(`Feishu delegation mention failed with exit code ${send.status}`);
   process.stdout.write(`${JSON.stringify({ task: result.task, dispatches: result.dispatches, mentioned: target }, null, 2)}\n`);
@@ -173,7 +177,6 @@ export async function runArtifactPublish(options: {
   const sendIdempotencyKey = `collab-${options.task.slice(-8)}-${options.actor}-${artifact.sha256.slice(0, 16)}`.slice(0, 50);
   const args = options.replyTo
     ? [
-        larkCliJs,
         'im',
         '+messages-reply',
         '--message-id',
@@ -186,7 +189,6 @@ export async function runArtifactPublish(options: {
         '--json',
       ]
     : [
-        larkCliJs,
         'im',
         '+messages-send',
         '--chat-id',

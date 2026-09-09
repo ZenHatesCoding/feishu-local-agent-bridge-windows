@@ -308,7 +308,15 @@ export class CollaborationHub {
       records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'handoff', input.content, action.sequence, nextHop, parent.id));
     } else if (input.type === 'ask') {
       records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'ask', input.content, action.sequence, nextHop, parent.id));
-    } else if (input.type === 'return' && activeOwner && activeOwner !== input.actorAgentId) {
+    } else if (
+      input.type === 'return'
+      && activeOwner
+      && activeOwner !== input.actorAgentId
+      // A bridge finalizes every run after the agent has had a chance to call
+      // handoff.  That finalization is a durable transcript entry, not a
+      // second request for the new owner to do the same work.
+      && !this.hasHandoffFromParent(task.id, input.actorAgentId, parent.id)
+    ) {
       records.push(this.dispatchRecord(
         input.idempotencyKey,
         task.id,
@@ -325,6 +333,16 @@ export class CollaborationHub {
       }));
     }
     return records;
+  }
+
+  private hasHandoffFromParent(taskId: string, actorAgentId: string, parentDispatchId: string): boolean {
+    return this.records.some((record) =>
+      record.taskId === taskId
+      && record.event.kind === 'action'
+      && record.event.action === 'handoff'
+      && record.event.actorAgentId === actorAgentId
+      && record.event.causedByDispatchId === parentDispatchId,
+    );
   }
 
   private recordsForArtifact(task: TaskProjection, input: ArtifactInput): LedgerRecord[] {

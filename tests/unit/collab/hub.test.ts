@@ -150,6 +150,23 @@ describe('CollaborationHub', () => {
     })).rejects.toThrow('only the current owner');
   });
 
+  it('records a handed-off run final answer without dispatching it back to the new owner', async () => {
+    const { hub } = await fixture();
+    const assigned = await hub.submit(humanMessage());
+    const root = assigned.dispatches[0]!;
+    await hub.acknowledge(root.id, 'world', 'accepted', 'accept-root');
+    await hub.submit({
+      type: 'handoff', idempotencyKey: 'handoff-root', taskId: assigned.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.id, targetAgentId: 'chariot', content: 'Take over',
+    });
+    const finalized = await hub.submit({
+      type: 'return', idempotencyKey: 'finalize-root', taskId: assigned.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.id, content: 'Here is the final answer too',
+    });
+    expect(finalized.dispatches).toEqual([]);
+    expect(JSON.stringify(hub.getContext(assigned.task.id, 'chariot'))).toContain('Here is the final answer too');
+  });
+
   it('enforces context visibility and rejects secrets', async () => {
     const { hub } = await fixture();
     const fanout = await hub.submit(humanMessage({ targetAgentIds: ['world', 'chariot'] }));
