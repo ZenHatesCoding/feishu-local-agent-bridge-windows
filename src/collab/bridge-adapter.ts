@@ -1,6 +1,6 @@
 import type { NormalizedMessage } from '@larksuite/channel';
 import { CollaborationClient } from './client';
-import type { Dispatch } from './types';
+import type { AgentIdentity, Dispatch } from './types';
 import type { NormalizedAttachment } from '../media/attachment';
 import { snapshotArtifact } from './artifact-store';
 import { taskIdFor } from './task-id';
@@ -12,6 +12,25 @@ export interface BridgeCollaborationDecision {
   taskId?: string;
   dispatchId?: string;
   reason?: string;
+}
+
+export interface CollaborationHandoffIntent {
+  targetAgentId: string;
+  content: string;
+}
+
+export function extractCollaborationHandoff(content: string): {
+  visibleContent: string;
+  handoff?: CollaborationHandoffIntent;
+} {
+  const match = /<collaboration_handoff\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_handoff>/i.exec(content);
+  if (!match) return { visibleContent: content };
+  const targetAgentId = match[1]!.trim();
+  const handoffContent = match[2]!.trim();
+  return {
+    visibleContent: `${content.slice(0, match.index)}${content.slice(match.index + match[0].length)}`.trim(),
+    ...(targetAgentId && handoffContent ? { handoff: { targetAgentId, content: handoffContent } } : {}),
+  };
 }
 
 export class BridgeCollaborationAdapter {
@@ -106,6 +125,28 @@ export class BridgeCollaborationAdapter {
       }
       throw err;
     }
+  }
+
+  async createHandoff(input: {
+    taskId: string;
+    dispatchId: string;
+    targetAgentId: string;
+    content: string;
+    runId: string;
+  }): Promise<AgentIdentity> {
+    const identity = (await this.client.identities()).agents
+      .find((agent) => agent.id === input.targetAgentId);
+    if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
+    await this.client.submit({
+      type: 'handoff',
+      idempotencyKey: `bridge-handoff:${this.agentId}:${input.runId}:${input.targetAgentId}`,
+      taskId: input.taskId,
+      actorAgentId: this.agentId,
+      causedByDispatchId: input.dispatchId,
+      targetAgentId: input.targetAgentId,
+      content: input.content,
+    });
+    return identity;
   }
 
   async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {

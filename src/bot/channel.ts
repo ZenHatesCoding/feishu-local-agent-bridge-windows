@@ -71,6 +71,7 @@ import {
 } from './cot';
 import {
   bridgeCollaborationFromEnv,
+  extractCollaborationHandoff,
   type BridgeCollaborationAdapter,
 } from '../collab/bridge-adapter';
 
@@ -967,10 +968,27 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
 
   const recordCollaborationResult = async (state: RunState): Promise<void> => {
     if (!collaboration || !collaborationRun?.dispatchId) return;
-    const body = renderText(finalAnswerOnlyState(state));
+    const extracted = extractCollaborationHandoff(renderText(finalAnswerOnlyState(state)));
+    if (extracted.handoff) {
+      try {
+        const target = await collaboration.createHandoff({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          targetAgentId: extracted.handoff.targetAgentId,
+          content: extracted.handoff.content,
+          runId: execution.runId,
+        });
+        await channel.send(chatId, { markdown: extracted.handoff.content }, {
+          ...sendOpts,
+          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+        });
+      } catch (err) {
+        log.fail('collab-handoff', err);
+      }
+    }
     await collaboration.finishRun(
       collaborationRun.taskId,
-      body,
+      extracted.visibleContent,
       execution.runId,
       collaborationRun.dispatchId,
       state.terminal === 'done',
@@ -980,7 +998,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       taskId: collaborationRun.taskId,
       dispatchId: collaborationRun.dispatchId,
       status: state.terminal === 'done' ? 'completed' : 'failed',
-      chars: body.length,
+      chars: extracted.visibleContent.length,
     });
   };
 
@@ -1176,7 +1194,7 @@ async function sendFinalReply(input: {
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
 }): Promise<void> {
-  const body = renderText(input.state);
+  const body = extractCollaborationHandoff(renderText(input.state)).visibleContent;
 
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
