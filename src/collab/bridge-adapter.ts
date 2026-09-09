@@ -181,7 +181,6 @@ export class BridgeCollaborationAdapter {
     });
     return identity;
   }
-
   async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {
     if (!this.artifactRoot) return;
     for (const attachment of attachments) {
