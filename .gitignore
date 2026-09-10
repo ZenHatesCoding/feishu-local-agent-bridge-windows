@@ -26,5 +26,9 @@ tests-smoke/
 .lark-cli/
 .gemini/
 AppData/
-workspace/
+# Anchored to the repository root on purpose: a bare `workspace/` pattern also
+# matches src/workspace/, which holds tracked sources (src/workspace/store.ts is
+# imported by src/cli/commands/start.ts). While that file was untracked, a
+# branch switch silently deleted it and the bundle stopped building.
+/workspace/
 vendor/
