@@ -1,5 +1,6 @@
 import type { NormalizedMessage } from '@larksuite/channel';
 import { CollaborationClient } from './client';
+import { stripTargetMentionPrefix } from './mentions';
 import type { AgentIdentity, Dispatch } from './types';
 import type { NormalizedAttachment } from '../media/attachment';
 import { snapshotArtifact } from './artifact-store';
@@ -144,10 +145,14 @@ export class BridgeCollaborationAdapter {
     targetAgentId: string;
     content: string;
     runId: string;
-  }): Promise<AgentIdentity> {
+  }): Promise<AgentIdentity & { content: string }> {
     const identity = (await this.client.identities()).agents
       .find((agent) => agent.id === input.targetAgentId);
     if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
+    // The bridge adds the one real structured mention when it sends the
+    // message; a hand-written "@open_id Name" prefix would render as a second,
+    // unreadable mention. Keep the ledger and the visible message identical.
+    const content = stripTargetMentionPrefix(input.content, identity);
     await this.client.submit({
       type: 'handoff',
       idempotencyKey: `bridge-handoff:${this.agentId}:${input.runId}:${input.targetAgentId}`,
@@ -155,9 +160,9 @@ export class BridgeCollaborationAdapter {
       actorAgentId: this.agentId,
       causedByDispatchId: input.dispatchId,
       targetAgentId: input.targetAgentId,
-      content: input.content,
+      content,
     });
-    return identity;
+    return { ...identity, content };
   }
 
   async createReply(input: {
@@ -166,10 +171,11 @@ export class BridgeCollaborationAdapter {
     targetAgentId: string;
     content: string;
     runId: string;
-  }): Promise<AgentIdentity> {
+  }): Promise<AgentIdentity & { content: string }> {
     const identity = (await this.client.identities()).agents
       .find((agent) => agent.id === input.targetAgentId);
     if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
+    const content = stripTargetMentionPrefix(input.content, identity);
     await this.client.submit({
       type: 'reply',
       idempotencyKey: `bridge-reply:${this.agentId}:${input.runId}:${input.targetAgentId}`,
@@ -177,9 +183,9 @@ export class BridgeCollaborationAdapter {
       actorAgentId: this.agentId,
       causedByDispatchId: input.dispatchId,
       targetAgentId: input.targetAgentId,
-      content: input.content,
+      content,
     });
-    return identity;
+    return { ...identity, content };
   }
 
   async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {

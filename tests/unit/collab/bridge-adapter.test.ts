@@ -60,6 +60,29 @@ describe('BridgeCollaborationAdapter', () => {
     expect(extractCollaborationHandoff('Finding\n<collaboration_reply target="chariot">What is your rebuttal?</collaboration_reply>'))
       .toEqual({ visibleContent: 'Finding', reply: { targetAgentId: 'chariot', content: 'What is your rebuttal?' } });
   });
+
+  it('drops a hand-written @open_id address before the bridge emits its real mention', async () => {
+    const { hub, client } = await fixture();
+    const chariotOpenId = 'ou_ae9b3ab812ab5380a4a58b888b2e9985';
+    hub.registerAgentIdentity('chariot', chariotOpenId, {});
+    const world = new BridgeCollaborationAdapter(client, 'world', 'tenant');
+    const assigned = await world.intake(message({
+      id: 'human-address', senderType: 'user', senderId: 'user', content: 'Keep going',
+    }));
+
+    const target = await world.createHandoff({
+      taskId: assigned.taskId!,
+      dispatchId: assigned.dispatchId!,
+      targetAgentId: 'chariot',
+      content: `@${chariotOpenId} Chariot，第 2 页交付完成，请继续第 3 页。`,
+      runId: 'run-address',
+    });
+
+    expect(target.content).toBe('第 2 页交付完成，请继续第 3 页。');
+    const context = JSON.stringify(hub.getContext(assigned.taskId!, 'world'));
+    expect(context).toContain('第 2 页交付完成，请继续第 3 页。');
+    expect(context).not.toContain(chariotOpenId);
+  });
   it('injects shared context for a human assignment', async () => {
     const { hub, client } = await fixture();
     const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');

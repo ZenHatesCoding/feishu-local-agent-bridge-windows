@@ -2,6 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnProcessSync } from '../../platform/spawn';
 import { CollaborationClient } from '../../collab/client';
+import { stripTargetMentionPrefix } from '../../collab/mentions';
 import type { ActionInput, SharedArtifact } from '../../collab/types';
 import { snapshotArtifact } from '../../collab/artifact-store';
 import { startFeishuCoordinator } from '../../collab/coordinator';
@@ -157,23 +158,11 @@ export async function runCollaborationDelegate(
 }
 
 /**
- * The actual mention is bridge-owned. Remove only an address prefix aimed at
- * that same recipient, never ordinary @ references in the body of the work.
+ * Re-exported for callers that address the delegation renderer through this
+ * command module; the implementation is shared with the bridge marker path
+ * (src/collab/mentions.ts) so both stay in sync.
  */
-export function stripTargetMentionPrefix(content: string, identity: { openId: string; displayName: string }): string {
-  const escapedOpenId = escapeRegExp(identity.openId);
-  const escapedDisplayName = escapeRegExp(identity.displayName);
-  const prefix = new RegExp(
-    `^\\s*(?:(?:@${escapedOpenId}|@${escapedDisplayName})\\s*)+(?:${escapedDisplayName}\\s*[，,：:]?\\s*)?`,
-    'i',
-  );
-  const stripped = content.replace(prefix, '').trim();
-  return stripped || content;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+export { stripTargetMentionPrefix };
 
 export async function runArtifactPublish(options: {
   task: string;

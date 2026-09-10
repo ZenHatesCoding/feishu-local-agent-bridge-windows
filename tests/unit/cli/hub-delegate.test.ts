@@ -18,6 +18,13 @@ describe('worker collaboration delegation rendering', () => {
     )).toBe('请检查第 3 页；正文中保留 @Justice 的审查结论。');
   });
 
+  it('removes a leading raw id token even when it is not the recipient open_id', () => {
+    expect(stripTargetMentionPrefix(
+      '@ou_ffffffffffffffffffffffffffffffff Justice，请接手。',
+      justice,
+    )).toBe('请接手。');
+  });
+
   it('does not erase content that is only an address', () => {
     expect(stripTargetMentionPrefix('@Justice', justice)).toBe('@Justice');
   });
