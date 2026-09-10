@@ -981,7 +981,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           content: extracted.handoff.content,
           runId: execution.runId,
         });
-        await channel.send(chatId, { markdown: extracted.handoff.content }, {
+        await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
           mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
         });
@@ -998,7 +998,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           content: extracted.reply.content,
           runId: execution.runId,
         });
-        await channel.send(chatId, { markdown: extracted.reply.content }, {
+        await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
           mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
         });
