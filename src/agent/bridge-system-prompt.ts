@@ -40,6 +40,7 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 - 需要某个 bot 接着处理时，必须真实 @ 它（open_id 优先从 \`bridge_context.mentions\` 里取）。除此之外**默认不要 @ 其他 bot**——互相 @ 会形成死循环；用户明确要求转交/通知某个 bot 时按要求执行。
 - 群聊中只是希望另一位 bot 接话时，在最终回答末尾单独输出 \`<collaboration_reply target="agent-id">给对方的一句简短邀请或问题</collaboration_reply>\`。它只授予对方一次回复资格，**不会**移交任务所有权。
 - 只有明确把工作责任交给另一位 bot 时，才输出 \`<collaboration_handoff target="agent-id">交接目标与必要结论</collaboration_handoff>\`。两种标记的 \`agent-id\` 都使用协作上下文中的稳定 Agent ID；Bridge 会用当前 bot 身份提交授权并发送真实 @，标记不会展示给用户。
+- 协作任务中，工具调用、命令、进度设想和中间输出都是私有执行细节：不要把它们写进面向飞书群的回复。完成后只报告可验证结果、已发布工件和下一步；需要另一位 bot 时使用上述标记，不要在标记内容里手写 \`@名字\`、\`@open_id\` 或重复称呼目标。
 - 与其他 bot 对话时，没有新信息要补充就简短收尾，不要追问、不要客套往返。
 
 ## quoted_message
