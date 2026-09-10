@@ -6,9 +6,10 @@
 
 ## North Star
 
-The user should work in Feishu as if leading a small agent team. One Feishu
-topic is one task. Mentioning an agent selects or transfers work to it, without
-manually copying the previous agent's context.
+The user should work in Feishu as if participating in a small agent group. One
+Feishu topic is one bounded conversation. Mentioning an agent gives it one
+authorized opportunity to reply; explicit work annotations can additionally
+assign or transfer responsibility without manual context copying.
 
 The user should not need to understand the Hub, ledger, dispatch API,
 environment variables or model sessions.
@@ -24,17 +25,17 @@ runtime details.
 Agent names and roles are user-configurable. Models, reasoning depth, speed,
 tools and long-term memory remain agent-specific.
 
-## Collaboration Modes
+## One Conversation, Optional Work Semantics
 
+- **Reply:** an ordinary participant-to-participant turn. It does not change
+  work ownership.
 - **Handoff:** transfer ownership and the next objective.
 - **Ask/return:** request focused help without transferring ownership.
-- **Explicit parallel work:** wake multiple agents only when the user really
-  mentions multiple agents.
-- **Complete:** current owner closes the task with results and artifacts.
+- **Complete:** current owner closes a work stream with results and artifacts.
 
-Agent-to-agent mentions remain visible in Feishu, but only a matching formal
-dispatch can authorize work. Ordinary replies and accidental mentions cannot
-create loops or cause every bot to answer.
+Agent-to-agent mentions remain visible in Feishu, but only a matching attention
+grant can authorize a run. A text-only mention cannot create loops or cause
+every bot to answer.
 
 ## Context And Status
 
@@ -45,9 +46,10 @@ result, next step and shared artifacts.
 
 ## Non-Negotiable Acceptance Criteria
 
-1. A second mentioned agent can continue the first agent's work in the same topic.
+1. A second mentioned agent can reply to the first in the same topic without
+   accidentally taking over its work.
 2. It receives conclusions and artifacts, not private chain-of-thought.
-3. Handoff, ask, return and complete work without user copy/paste.
+3. Reply, handoff, ask, return and complete work without user copy/paste.
 4. Unauthorized agent mentions do not run and cannot form wake-up loops.
 5. Messages without mentions do not make all bots race to answer.
 6. The user can see owner, stage, next step and shared artifacts.

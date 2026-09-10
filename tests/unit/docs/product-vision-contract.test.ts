@@ -19,9 +19,10 @@ describe('multi-agent product vision contract', () => {
       'utf8',
     );
     for (const phrase of [
-      '一个飞书话题就是一个任务',
+      '一个飞书话题就是一段',
       '不需要手工复制上一位 Agent 的上下文',
       'handoff',
+      '普通的 Agent-to-Agent 接话不会改变负责人',
       'ask',
       'return',
       'complete',

@@ -19,6 +19,7 @@ export async function runCollaborationHub(options: { config: string }): Promise<
     agents: config.agents,
     leaseMs: config.leaseMinutes * 60_000,
     maxCausalDepth: config.maxCausalDepth,
+    maxConversationTurns: config.maxConversationTurns,
   });
   await hub.initialize();
   const agentTokens = Object.fromEntries(
@@ -84,7 +85,7 @@ export async function runCollaborationAction(
   if (!baseUrl || !token) {
     throw new Error('LARK_COLLAB_HUB_URL and LARK_COLLAB_HUB_TOKEN are required');
   }
-  if ((type === 'handoff' || type === 'ask') && !options.target) {
+  if ((type === 'reply' || type === 'handoff' || type === 'ask') && !options.target) {
     throw new Error(`${type} requires --target`);
   }
   const client = new CollaborationClient({ baseUrl, token });
@@ -104,7 +105,7 @@ export async function runCollaborationAction(
 
 /** Authorize a delegation and visibly wake the target bot in the current topic. */
 export async function runCollaborationDelegate(
-  type: 'handoff' | 'ask',
+  type: 'reply' | 'handoff' | 'ask',
   options: { target: string; content: string; task?: string; actor?: string; replyTo?: string; causedByDispatch?: string },
 ): Promise<void> {
   const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');

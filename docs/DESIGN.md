@@ -8,18 +8,20 @@
 ## One-Sentence Architecture
 
 Feishu carries visible human/agent conversation and real notifications. The
-local Hub carries machine-verifiable task state, context visibility and work
-authorization. One Feishu topic is one task; mentioning an agent selects who
-works next.
+local Hub carries machine-verifiable conversation state, context visibility and
+attention authorization. One Feishu topic is one conversation; mentioning an
+agent grants it one authorized response turn. Work ownership is an explicit
+annotation, not a side effect of every message.
 
-## The Soul: Share Task State, Not Model Mind-State
+## The Soul: Share Conversation State, Not Model Mind-State
 
 Putting four independent bots in a group is not collaboration. Each bridge has
 its own events and model session, so the next agent cannot reliably know what
 the previous one completed. Broadcasting every message causes races and loops;
 merging all model sessions leaks private runtime data and pollutes context.
 
-The Hub therefore shares a filtered, auditable task projection:
+The Hub therefore shares a filtered, auditable conversation projection, with an
+optional work projection when participants explicitly assign work:
 
 - original requirements and later user constraints;
 - accepted conclusions, decisions, evidence and risks;

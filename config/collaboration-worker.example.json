@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "role": "worker",
   "nodeId": "second-pc",
   "hub": {

@@ -61,7 +61,7 @@ describe('CollaborationHub', () => {
     expect(result.task.ownerAgentId).toBe('world');
     expect(result.task.participants).toEqual(['world']);
     expect(result.dispatches).toMatchObject([
-      { targetAgentId: 'world', reason: 'assign', status: 'pending', hop: 1 },
+      { targetAgentId: 'world', reason: 'mention', status: 'pending', hop: 1 },
     ]);
     expect((await readFile(path, 'utf8')).trim().split('\n')).toHaveLength(1);
   });
@@ -148,6 +148,31 @@ describe('CollaborationHub', () => {
       targetAgentId: 'fool',
       content: 'This stale owner must not route work',
     })).rejects.toThrow('only the current owner');
+  });
+
+  it('treats an agent reply as a group-chat turn without transferring ownership', async () => {
+    const { hub } = await fixture();
+    const root = await hub.submit(humanMessage());
+    await hub.acknowledge(root.dispatches[0]!.id, 'world', 'accepted', 'accept-root-reply');
+    const reply = await hub.submit({
+      type: 'reply', idempotencyKey: 'reply-1', taskId: root.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.dispatches[0]!.id,
+      targetAgentId: 'justice', content: 'What is your counterargument?',
+    });
+    expect(reply.task.ownerAgentId).toBe('world');
+    expect(reply.dispatches).toMatchObject([{ targetAgentId: 'justice', reason: 'reply', hop: 2 }]);
+  });
+
+  it('bounds autonomous chat turns independently from work delegation depth', async () => {
+    const { hub } = await fixture();
+    const root = await hub.submit(humanMessage());
+    await hub.acknowledge(root.dispatches[0]!.id, 'world', 'accepted', 'accept-root-bound');
+    const first = await hub.submit({
+      type: 'reply', idempotencyKey: 'reply-bound-1', taskId: root.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.dispatches[0]!.id,
+      targetAgentId: 'justice', content: 'Continue',
+    });
+    expect(first.dispatches[0]!.hop).toBe(2);
   });
 
   it('records a handed-off run final answer without dispatching it back to the new owner', async () => {

@@ -986,6 +986,23 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         log.fail('collab-handoff', err);
       }
     }
+    if (extracted.reply) {
+      try {
+        const target = await collaboration.createReply({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          targetAgentId: extracted.reply.targetAgentId,
+          content: extracted.reply.content,
+          runId: execution.runId,
+        });
+        await channel.send(chatId, { markdown: extracted.reply.content }, {
+          ...sendOpts,
+          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+        });
+      } catch (err) {
+        log.fail('collab-reply', err);
+      }
+    }
     await collaboration.finishRun(
       collaborationRun.taskId,
       extracted.visibleContent,

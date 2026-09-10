@@ -19,17 +19,28 @@ export interface CollaborationHandoffIntent {
   content: string;
 }
 
+export interface CollaborationReplyIntent {
+  targetAgentId: string;
+  content: string;
+}
+
 export function extractCollaborationHandoff(content: string): {
   visibleContent: string;
   handoff?: CollaborationHandoffIntent;
+  reply?: CollaborationReplyIntent;
 } {
-  const match = /<collaboration_handoff\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_handoff>/i.exec(content);
+  const match = /<collaboration_(handoff|reply)\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_\1>/i.exec(content);
   if (!match) return { visibleContent: content };
-  const targetAgentId = match[1]!.trim();
-  const handoffContent = match[2]!.trim();
+  const kind = match[1]!.toLocaleLowerCase();
+  const targetAgentId = match[2]!.trim();
+  const intentContent = match[3]!.trim();
   return {
     visibleContent: `${content.slice(0, match.index)}${content.slice(match.index + match[0].length)}`.trim(),
-    ...(targetAgentId && handoffContent ? { handoff: { targetAgentId, content: handoffContent } } : {}),
+    ...(targetAgentId && intentContent
+      ? kind === 'handoff'
+        ? { handoff: { targetAgentId, content: intentContent } }
+        : { reply: { targetAgentId, content: intentContent } }
+      : {}),
   };
 }
 
@@ -140,6 +151,28 @@ export class BridgeCollaborationAdapter {
     await this.client.submit({
       type: 'handoff',
       idempotencyKey: `bridge-handoff:${this.agentId}:${input.runId}:${input.targetAgentId}`,
+      taskId: input.taskId,
+      actorAgentId: this.agentId,
+      causedByDispatchId: input.dispatchId,
+      targetAgentId: input.targetAgentId,
+      content: input.content,
+    });
+    return identity;
+  }
+
+  async createReply(input: {
+    taskId: string;
+    dispatchId: string;
+    targetAgentId: string;
+    content: string;
+    runId: string;
+  }): Promise<AgentIdentity> {
+    const identity = (await this.client.identities()).agents
+      .find((agent) => agent.id === input.targetAgentId);
+    if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
+    await this.client.submit({
+      type: 'reply',
+      idempotencyKey: `bridge-reply:${this.agentId}:${input.runId}:${input.targetAgentId}`,
       taskId: input.taskId,
       actorAgentId: this.agentId,
       causedByDispatchId: input.dispatchId,

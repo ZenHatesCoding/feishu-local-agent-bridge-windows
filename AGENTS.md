@@ -7,7 +7,8 @@ agents. The human-oriented entry points are [README.md](./README.md) and
 ## Product Invariants
 
 - Share task state, not private model sessions or chain-of-thought.
-- One Feishu topic is one task boundary.
+- One Feishu topic is one conversation boundary; work ownership is an explicit
+  annotation inside that conversation, not a property of every message.
 - Agent-to-Agent work requires both a real Feishu mention and a Hub dispatch.
 - The Hub is deterministic coordination code, not an LLM.
 - Preserve the default one-PC experience: `role: all` runs the Hub and all
