@@ -123,7 +123,12 @@ export async function runCollaborationDelegate(
   if (!identity) {
     throw new Error(`target agent is connected but has not registered its Feishu identity: ${target}`);
   }
-  const digest = createHash('sha256').update(`${type}\0${taskId}\0${causedByDispatchId}\0${actor}\0${target}\0${content}`).digest('hex').slice(0, 24);
+  // The bridge adds the one real, structured Feishu mention below. Models
+  // sometimes also prefix delegated content with "@open_id DisplayName", which
+  // Feishu renders as a second, unreadable mention. Keep the objective clean
+  // in both the ledger and the visible message.
+  const delegatedContent = stripTargetMentionPrefix(content, identity);
+  const digest = createHash('sha256').update(`${type}\0${taskId}\0${causedByDispatchId}\0${actor}\0${target}\0${delegatedContent}`).digest('hex').slice(0, 24);
   const result = await client.submit({
     type,
     idempotencyKey: `delegate:${digest}`,
@@ -131,12 +136,12 @@ export async function runCollaborationDelegate(
     actorAgentId: actor,
     causedByDispatchId,
     targetAgentId: target,
-    content,
+    content: delegatedContent,
   });
   const post = JSON.stringify({
     zh_cn: { content: [[
       { tag: 'at', user_id: identity.openId, user_name: identity.displayName },
-      { tag: 'text', text: ` ${content}` },
+      { tag: 'text', text: ` ${delegatedContent}` },
     ]] },
   });
 // Do not invoke the pilot's lark-cli.cmd shim here.  A Harness tool can
@@ -151,6 +156,25 @@ export async function runCollaborationDelegate(
   if (send.error) throw send.error;
   if (send.status !== 0) throw new Error(`Feishu delegation mention failed with exit code ${send.status}`);
   process.stdout.write(`${JSON.stringify({ task: result.task, dispatches: result.dispatches, mentioned: target }, null, 2)}\n`);
+}
+
+/**
+ * The actual mention is bridge-owned. Remove only an address prefix aimed at
+ * that same recipient, never ordinary @ references in the body of the work.
+ */
+export function stripTargetMentionPrefix(content: string, identity: { openId: string; displayName: string }): string {
+  const escapedOpenId = escapeRegExp(identity.openId);
+  const escapedDisplayName = escapeRegExp(identity.displayName);
+  const prefix = new RegExp(
+    `^\\s*(?:(?:@${escapedOpenId}|@${escapedDisplayName})\\s*)+(?:${escapedDisplayName}\\s*[，,：:]?\\s*)?`,
+    'i',
+  );
+  const stripped = content.replace(prefix, '').trim();
+  return stripped || content;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function runArtifactPublish(options: {

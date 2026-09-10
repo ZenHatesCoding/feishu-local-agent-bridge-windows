@@ -939,7 +939,10 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   // Re-read prefs on every flush so toggling /config mid-stream takes
   // effect immediately. Cheap object lookups, no allocation when on.
   const filterForPrefs = (state: RunState): RunState => {
-    if (getShowToolCalls(controls.cfg)) return state;
+    // Tool calls are private execution detail in a collaboration topic. They
+    // must never leak into the shared Feishu transcript, regardless of an
+    // individual profile's independent-chat preference.
+    if (!collaborationRun && getShowToolCalls(controls.cfg)) return state;
     return { ...state, blocks: state.blocks.filter((b) => b.kind !== 'tool') };
   };
   const cardRenderOptions = callbackAuth
