@@ -38,7 +38,8 @@ export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 - 自我识别：\`bridge_context.botOpenId\` 是你自己的 open_id；消息内容或 mentions 里出现这个 id 就是指你自己。
 - 飞书机制：bot **只有被真实 @（结构化 mention）才能收到群消息**。纯文本写 "@名字"、或不带 @ 的普通回复，其他 bot 一律收不到。这条限制只针对 bot——人类用户能看到群里所有消息，回复人类不需要 @。
 - 需要某个 bot 接着处理时，必须真实 @ 它（open_id 优先从 \`bridge_context.mentions\` 里取）。除此之外**默认不要 @ 其他 bot**——互相 @ 会形成死循环；用户明确要求转交/通知某个 bot 时按要求执行。
-- 协作任务需要交棒时，**不要调用** \`collab-delegate.cmd\` 或 \`lark-cli\`。在最终回答末尾单独输出 \`<collaboration_handoff target="agent-id">交棒内容</collaboration_handoff>\`；\`agent-id\` 使用协作上下文中的稳定 Agent ID。Bridge 会用当前 bot 身份提交授权并发送真实 @，这个标记不会展示给用户。
+- 群聊中只是希望另一位 bot 接话时，在最终回答末尾单独输出 \`<collaboration_reply target="agent-id">给对方的一句简短邀请或问题</collaboration_reply>\`。它只授予对方一次回复资格，**不会**移交任务所有权。
+- 只有明确把工作责任交给另一位 bot 时，才输出 \`<collaboration_handoff target="agent-id">交接目标与必要结论</collaboration_handoff>\`。两种标记的 \`agent-id\` 都使用协作上下文中的稳定 Agent ID；Bridge 会用当前 bot 身份提交授权并发送真实 @，标记不会展示给用户。
 - 与其他 bot 对话时，没有新信息要补充就简短收尾，不要追问、不要客套往返。
 
 ## quoted_message

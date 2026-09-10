@@ -23,6 +23,8 @@ export interface CollaborationHubOptions {
   agents: AgentRegistration[];
   leaseMs?: number;
   maxCausalDepth?: number;
+  /** Bound autonomous conversation, separately from work delegation depth. */
+  maxConversationTurns?: number;
   now?: () => Date;
   idFactory?: () => string;
 }
@@ -36,6 +38,7 @@ export class CollaborationHub {
   private readonly agentIdentities = new Map<string, AgentIdentity>();
   private readonly leaseMs: number;
   private readonly maxCausalDepth: number;
+  private readonly maxConversationTurns: number;
   private readonly now: () => Date;
   private readonly idFactory: () => string;
   private sequence = 0;
@@ -45,6 +48,7 @@ export class CollaborationHub {
     this.agents = new Map(options.agents.map((agent) => [agent.id, agent]));
     this.leaseMs = options.leaseMs ?? 30 * 60_000;
     this.maxCausalDepth = options.maxCausalDepth ?? 8;
+    this.maxConversationTurns = options.maxConversationTurns ?? 32;
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? randomUUID;
     if (this.agents.size !== options.agents.length) throw new Error('agent ids must be unique');
@@ -188,7 +192,7 @@ export class CollaborationHub {
               input.idempotencyKey,
               previousTaskId,
               target,
-              fanout ? 'fanout' : 'assign',
+              fanout ? 'fanout' : 'mention',
               input.content,
               sourceRecord.sequence,
               1,
@@ -249,7 +253,7 @@ export class CollaborationHub {
       records.push(this.record(`${input.idempotencyKey}:lease`, taskId, {
         kind: 'lease', ownerAgentId: target, reason: 'mention', expiresAt: this.leaseExpiry(),
       }));
-      records.push(this.dispatchRecord(input.idempotencyKey, taskId, target, 'assign', input.content, message.sequence, 1));
+      records.push(this.dispatchRecord(input.idempotencyKey, taskId, target, 'mention', input.content, message.sequence, 1));
     } else {
       for (const target of targets) {
         records.push(this.dispatchRecord(input.idempotencyKey, taskId, target, 'fanout', input.content, message.sequence, 1));
@@ -266,19 +270,24 @@ export class CollaborationHub {
     const activeOwner = task.leaseExpiresAt && Date.parse(task.leaseExpiresAt) > this.now().getTime()
       ? task.ownerAgentId
       : undefined;
-    if (input.type === 'handoff' || input.type === 'ask') {
-      if (activeOwner !== input.actorAgentId) {
-        throw new Error(`only the current owner (${activeOwner ?? 'none'}) may ${input.type}`);
-      }
+    if (input.type === 'reply' || input.type === 'handoff' || input.type === 'ask') {
       if (!input.targetAgentId) throw new Error(`${input.type} requires targetAgentId`);
       this.requireAgent(input.targetAgentId);
       if (input.targetAgentId === input.actorAgentId) throw new Error('an agent cannot target itself');
     }
+    if (input.type === 'handoff' || input.type === 'ask') {
+      if (activeOwner !== input.actorAgentId) {
+        throw new Error(`only the current owner (${activeOwner ?? 'none'}) may ${input.type}`);
+      }
+    }
 
     const parent = this.requireActiveParentDispatch(task.id, input.actorAgentId, input.causedByDispatchId);
     const nextHop = parent.hop + 1;
-    if ((input.type === 'handoff' || input.type === 'ask' || input.type === 'return') && nextHop > this.maxCausalDepth) {
+    if ((input.type === 'handoff' || input.type === 'ask') && nextHop > this.maxCausalDepth) {
       throw new Error(`maximum causal delegation depth exceeded (${this.maxCausalDepth})`);
+    }
+    if (input.type === 'reply' && nextHop > this.maxConversationTurns) {
+      throw new Error(`maximum autonomous conversation turns exceeded (${this.maxConversationTurns})`);
     }
     if (input.type === 'complete' && activeOwner !== input.actorAgentId) {
       throw new Error(`only the current owner (${activeOwner ?? 'none'}) may complete the task`);
@@ -301,14 +310,16 @@ export class CollaborationHub {
       causedByDispatchId: input.causedByDispatchId,
     });
     const records = [action];
-    if (input.type === 'handoff') {
+    if (input.type === 'reply') {
+      records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'reply', input.content, action.sequence, nextHop, parent.id));
+    } else if (input.type === 'handoff') {
       records.push(this.record(`${input.idempotencyKey}:lease`, task.id, {
         kind: 'lease', ownerAgentId: input.targetAgentId!, reason: 'handoff', expiresAt: this.leaseExpiry(),
       }));
       records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'handoff', input.content, action.sequence, nextHop, parent.id));
     } else if (input.type === 'ask') {
       records.push(this.dispatchRecord(input.idempotencyKey, task.id, input.targetAgentId!, 'ask', input.content, action.sequence, nextHop, parent.id));
-    } else if (input.type === 'return' && activeOwner && activeOwner !== input.actorAgentId) {
+    } else if (input.type === 'return' && parent.reason === 'ask' && activeOwner && activeOwner !== input.actorAgentId) {
       records.push(this.dispatchRecord(
         input.idempotencyKey,
         task.id,

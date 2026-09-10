@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "listen": {
     "host": "127.0.0.1",
     "port": 17321
@@ -16,6 +16,7 @@
   },
   "leaseMinutes": 30,
   "maxCausalDepth": 8,
+  "maxConversationTurns": 32,
   "coordinator": {
     "enabled": false,
     "tenant": "feishu",

@@ -3,13 +3,14 @@ import { dirname, resolve } from 'node:path';
 import type { AgentRegistration } from './types';
 
 export interface HubConfig {
-  schemaVersion: 1;
+  schemaVersion: 2;
   listen: { host: string; port: number };
   ledgerPath: string;
   tokenEnv: string;
   auth?: { agentTokenEnvs: Record<string, string> };
   leaseMinutes: number;
   maxCausalDepth: number;
+  maxConversationTurns: number;
   agents: AgentRegistration[];
   coordinator?: {
     enabled: boolean;
@@ -22,7 +23,7 @@ export interface HubConfig {
 
 export async function loadHubConfig(path: string): Promise<HubConfig> {
   const parsed = JSON.parse(await readFile(path, 'utf8')) as Partial<HubConfig>;
-  if (parsed.schemaVersion !== 1) throw new Error('hub config schemaVersion must be 1');
+  if (parsed.schemaVersion !== 2) throw new Error('hub config schemaVersion must be 2');
   if (!parsed.listen || !parsed.ledgerPath || !parsed.tokenEnv || !parsed.agents?.length) {
     throw new Error('hub config requires listen, ledgerPath, tokenEnv, and agents');
   }
@@ -47,7 +48,7 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
   }
   const base = dirname(resolve(path));
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     listen: {
       host: parsed.listen.host ?? '127.0.0.1',
       port: parsed.listen.port ?? 17321,
@@ -57,6 +58,7 @@ export async function loadHubConfig(path: string): Promise<HubConfig> {
     ...(parsed.auth ? { auth: parsed.auth } : {}),
     leaseMinutes: parsed.leaseMinutes ?? 30,
     maxCausalDepth: parsed.maxCausalDepth ?? (parsed as Partial<HubConfig> & { maxHops?: number }).maxHops ?? 8,
+    maxConversationTurns: parsed.maxConversationTurns ?? 32,
     agents: parsed.agents,
     ...(parsed.coordinator ? { coordinator: parsed.coordinator } : {}),
   };

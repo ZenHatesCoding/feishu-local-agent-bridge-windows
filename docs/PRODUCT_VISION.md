@@ -7,8 +7,9 @@
 ## North Star
 
 The user should work in Feishu as if leading a small agent team. One Feishu
-topic is one task. Mentioning an agent selects or transfers work to it, without
-manually copying the previous agent's context.
+topic is one conversation. Participants may reply naturally; only work transfer
+or consultation changes work semantics, without manually copying the previous
+agent's context.
 
 The user should not need to understand the Hub, ledger, dispatch API,
 environment variables or model sessions.
@@ -23,6 +24,13 @@ runtime details.
 
 Agent names and roles are user-configurable. Models, reasoning depth, speed,
 tools and long-term memory remain agent-specific.
+
+## One Conversation, Optional Work Semantics
+
+- **Reply:** a normal Agent-to-Agent group-chat turn. It grants one visible,
+  authorized response but does not transfer ownership.
+- **Handoff:** transfer ownership and the next objective.
+- **Ask/return:** request focused help without transferring ownership.
 
 ## Collaboration Modes
 
@@ -47,7 +55,7 @@ result, next step and shared artifacts.
 
 1. A second mentioned agent can continue the first agent's work in the same topic.
 2. It receives conclusions and artifacts, not private chain-of-thought.
-3. Handoff, ask, return and complete work without user copy/paste.
+3. Reply, handoff, ask, return and complete work without user copy/paste.
 4. Unauthorized agent mentions do not run and cannot form wake-up loops.
 5. Messages without mentions do not make all bots race to answer.
 6. The user can see owner, stage, next step and shared artifacts.

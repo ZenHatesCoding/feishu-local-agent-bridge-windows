@@ -50,7 +50,8 @@ export interface MessageInput {
 }
 
 export interface ActionInput {
-  type: 'handoff' | 'ask' | 'return' | 'complete';
+  /** `reply` is a normal group-chat turn; it never transfers work ownership. */
+  type: 'reply' | 'handoff' | 'ask' | 'return' | 'complete';
   idempotencyKey: string;
   taskId: string;
   actorAgentId: AgentId;
@@ -137,7 +138,7 @@ export type LedgerEvent =
       kind: 'dispatch';
       dispatchId: string;
       targetAgentId: AgentId;
-      reason: 'assign' | 'fanout' | 'handoff' | 'ask' | 'return';
+      reason: 'mention' | 'fanout' | 'reply' | 'handoff' | 'ask' | 'return';
       objective: string;
       sourceSequence: number;
       parentDispatchId?: string;
@@ -166,7 +167,7 @@ export interface Dispatch {
   sequence: number;
   taskId: string;
   targetAgentId: AgentId;
-  reason: 'assign' | 'fanout' | 'handoff' | 'ask' | 'return';
+  reason: 'mention' | 'fanout' | 'reply' | 'handoff' | 'ask' | 'return';
   objective: string;
   sourceSequence: number;
   parentDispatchId?: string;

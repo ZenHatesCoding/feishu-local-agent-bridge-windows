@@ -56,6 +56,10 @@ describe('BridgeCollaborationAdapter', () => {
     expect(extractCollaborationHandoff('Finding\n<collaboration_handoff target="chariot">Please rebut point 2</collaboration_handoff>'))
       .toEqual({ visibleContent: 'Finding', handoff: { targetAgentId: 'chariot', content: 'Please rebut point 2' } });
   });
+  it('extracts a bridge-owned group-chat reply without exposing its control marker', () => {
+    expect(extractCollaborationHandoff('Finding\n<collaboration_reply target="chariot">What is your rebuttal?</collaboration_reply>'))
+      .toEqual({ visibleContent: 'Finding', reply: { targetAgentId: 'chariot', content: 'What is your rebuttal?' } });
+  });
   it('injects shared context for a human assignment', async () => {
     const { hub, client } = await fixture();
     const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');

@@ -52,13 +52,13 @@ hub
     await runCollaborationHub(opts);
   });
 
-for (const action of ['handoff', 'ask', 'return', 'complete'] as const) {
+for (const action of ['reply', 'handoff', 'ask', 'return', 'complete'] as const) {
   hub
     .command(action)
     .description(`Submit a structured collaboration ${action} action`)
     .requiredOption('--task <id>', 'collaboration task id')
     .requiredOption('--actor <agent>', 'calling agent id')
-    .option('--target <agent>', 'target agent id (required for handoff and ask)')
+    .option('--target <agent>', 'target agent id (required for reply, handoff and ask)')
     .requiredOption('--content <text>', 'objective, question, result, or summary')
     .option('--caused-by-dispatch <id>', 'active dispatch that caused this action; defaults to bridge environment')
     .option('--idempotency-key <key>', 'stable retry key; generated when omitted')
@@ -74,7 +74,7 @@ for (const action of ['handoff', 'ask', 'return', 'complete'] as const) {
     });
 }
 
-for (const action of ['handoff', 'ask'] as const) {
+for (const action of ['reply', 'handoff', 'ask'] as const) {
   hub
     .command(`delegate-${action}`)
     .description(`Authorize and visibly @ an agent for a collaboration ${action}`)

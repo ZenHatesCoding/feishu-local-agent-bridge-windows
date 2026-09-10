@@ -28,7 +28,7 @@ function Get-CollabPilotConfig {
     throw "Pilot config not found: $script:CollabManifestFile`nRun .\scripts\collab-pilot\Setup-CollabPilot.ps1, then edit the generated file."
   }
   $config = Get-Content -LiteralPath $script:CollabManifestFile -Raw | ConvertFrom-Json
-  if ([int]$config.schemaVersion -ne 1) { throw 'Unsupported pilot config schemaVersion.' }
+  if ([int]$config.schemaVersion -ne 2) { throw 'Unsupported pilot config schemaVersion.' }
   return $config
 }
 
@@ -167,13 +167,14 @@ function Initialize-CollabRuntimeState {
     $tokenEnvs[$agent.id] = "LARK_COLLAB_AGENT_TOKEN_$safeId"
   }
   $config = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     listen = [ordered]@{ host = $listenHost; port = $listenPort }
     ledgerPath = 'collaboration.jsonl'
     tokenEnv = 'LARK_COLLAB_HUB_TOKEN'
     auth = [ordered]@{ agentTokenEnvs = $tokenEnvs }
     leaseMinutes = if ($pilot.hub.leaseMinutes) { [int]$pilot.hub.leaseMinutes } else { 30 }
     maxCausalDepth = if ($pilot.hub.maxCausalDepth) { [int]$pilot.hub.maxCausalDepth } elseif ($pilot.hub.maxHops) { [int]$pilot.hub.maxHops } else { 8 }
+    maxConversationTurns = if ($pilot.hub.maxConversationTurns) { [int]$pilot.hub.maxConversationTurns } else { 32 }
     agents = $hubAgents
   }
   [IO.File]::WriteAllText($script:CollabConfigFile, ($config | ConvertTo-Json -Depth 8))
@@ -253,7 +254,11 @@ function Test-CollabPid([object]$ProcessId) {
 
 function Start-CollabBackground([string]$Name, [string]$ScriptPath, [string[]]$ScriptArguments = @()) {
   $table = Read-CollabPidTable
-  if (Test-CollabPid $table[$Name]) { Write-Output "$Name is already running (PID $($table[$Name]))."; return [int]$table[$Name] }
+  if (Test-CollabPid $table[$Name]) {
+    # Keep this function's success stream to its PID return value only.
+    Write-Verbose "$Name is already running (PID $($table[$Name]))."
+    return [int]$table[$Name]
+  }
   $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArguments
   $process = Start-Process -WindowStyle Hidden -PassThru -FilePath powershell.exe -ArgumentList $arguments `
     -RedirectStandardOutput (Join-Path $script:CollabLogDir "$Name.out.log") `

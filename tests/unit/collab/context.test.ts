@@ -8,7 +8,7 @@ const task: TaskProjection = {
 };
 
 const dispatch: Dispatch = {
-  id: 'dispatch-1', taskId: 'task-1', targetAgentId: 'world', reason: 'assign',
+  id: 'dispatch-1', taskId: 'task-1', targetAgentId: 'world', reason: 'mention',
   objective: 'Coordinate the work', sourceSequence: 30, sequence: 31, hop: 1, status: 'accepted',
 };
 
@@ -24,6 +24,7 @@ describe('collaboration context projection', () => {
       ],
     });
 
+    expect(context).toContain('collab-delegate.cmd reply');
     expect(context).toContain('collab-delegate.cmd handoff|ask');
     expect(context).toContain('"id":"justice"');
     expect(context).toContain('"displayName":"Chariot"');

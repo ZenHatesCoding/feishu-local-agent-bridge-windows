@@ -5,13 +5,13 @@ import { describe, expect, it } from 'vitest';
 import { loadHubConfig } from '../../../src/collab/config';
 
 describe('collaboration Hub config', () => {
-  it('keeps schema v1 shared-token configs compatible', async () => {
+  it('loads schema v2 shared-token configs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'collab-config-'));
     const path = join(dir, 'hub.json');
     await writeFile(path, JSON.stringify({
-      schemaVersion: 1, listen: { host: '127.0.0.1', port: 17321 },
+      schemaVersion: 2, listen: { host: '127.0.0.1', port: 17321 },
       ledgerPath: 'ledger.jsonl', tokenEnv: 'HUB_TOKEN', leaseMinutes: 30,
-      maxCausalDepth: 8, agents: [{ id: 'world', displayName: 'World' }],
+      maxCausalDepth: 8, maxConversationTurns: 32, agents: [{ id: 'world', displayName: 'World' }],
     }));
     const loaded = await loadHubConfig(path);
     expect(loaded.agents).toMatchObject([{ id: 'world' }]);
@@ -22,7 +22,7 @@ describe('collaboration Hub config', () => {
     const dir = await mkdtemp(join(tmpdir(), 'collab-config-auth-'));
     const path = join(dir, 'hub.json');
     await writeFile(path, JSON.stringify({
-      schemaVersion: 1, listen: { host: '127.0.0.1', port: 17321 },
+      schemaVersion: 2, listen: { host: '127.0.0.1', port: 17321 },
       ledgerPath: 'ledger.jsonl', tokenEnv: 'HUB_TOKEN',
       agents: [{ id: 'world', displayName: 'World' }],
       auth: { agentTokenEnvs: { world: 'WORLD_TOKEN' } },

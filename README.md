@@ -49,14 +49,16 @@ Exact setup for each agent: [Agent bridge guide](./docs/AGENT_BRIDGES.md).
 own profile, sessions, workspaces and credentials.
 
 **Collaborative group:** several bots join one group. One Feishu topic is one
-task. Mention one agent to plan, then mention another in the same topic to take
-over. The next agent receives authorized conclusions and durable shared files
-without receiving private reasoning or unrelated history.
+conversation. Agents and people can reply to one another in that topic; when a
+message transfers or requests work, it carries explicit work semantics. The
+next agent receives authorized conclusions and durable shared files without
+receiving private reasoning or unrelated history.
 
 The design soul is **share task state, not model mind-state**. A real Feishu `@`
-is the visible wake-up signal; a Hub `dispatch` is the work authorization. Both
-must exist for agent-to-agent work, preventing accidental fanout and wake-up
-loops.
+is the visible wake-up signal; a Hub attention grant (`dispatch`) authorizes
+the corresponding run. Both must exist for an agent-to-agent reply, preventing
+accidental fanout and wake-up loops. Ownership changes only for explicit work
+actions such as `handoff` and `ask`.
 
 Read [collaboration design](./docs/DESIGN.md) and the
 [product north star](./docs/PRODUCT_VISION.md) before changing this protocol.

@@ -61,7 +61,7 @@ describe('CollaborationHub', () => {
     expect(result.task.ownerAgentId).toBe('world');
     expect(result.task.participants).toEqual(['world']);
     expect(result.dispatches).toMatchObject([
-      { targetAgentId: 'world', reason: 'assign', status: 'pending', hop: 1 },
+      { targetAgentId: 'world', reason: 'mention', status: 'pending', hop: 1 },
     ]);
     expect((await readFile(path, 'utf8')).trim().split('\n')).toHaveLength(1);
   });
@@ -148,6 +148,19 @@ describe('CollaborationHub', () => {
       targetAgentId: 'fool',
       content: 'This stale owner must not route work',
     })).rejects.toThrow('only the current owner');
+  });
+
+  it('treats an agent reply as a group-chat turn without transferring ownership', async () => {
+    const { hub } = await fixture();
+    const mentioned = await hub.submit(humanMessage());
+    const root = mentioned.dispatches[0]!;
+    await hub.acknowledge(root.id, 'world', 'accepted', 'accept-root');
+    const reply = await hub.submit({
+      type: 'reply', idempotencyKey: 'reply-1', taskId: mentioned.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.id, targetAgentId: 'justice', content: 'What do you think?',
+    });
+    expect(reply.task.ownerAgentId).toBe('world');
+    expect(reply.dispatches[0]).toMatchObject({ targetAgentId: 'justice', reason: 'reply', hop: 2 });
   });
 
   it('enforces context visibility and rejects secrets', async () => {
