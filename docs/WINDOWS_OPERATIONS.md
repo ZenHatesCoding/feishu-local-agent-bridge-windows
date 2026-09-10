@@ -51,9 +51,10 @@ commands switch between collaboration and an existing independent bridge.
 `ignoreExitCode` is useful only for an idempotent stop command. Only Hermes
 uses `hermesHook`.
 
-`hub.maxCausalDepth` limits one Agent-to-Agent causal chain, not the lifetime
-number of turns in a topic. Legacy `maxHops` is read only for manifest
-migration; new manifests should use `maxCausalDepth`.
+`hub.maxCausalDepth` limits one explicit work (`ask` / `handoff`) causal chain,
+not the lifetime number of turns in a topic. `hub.maxConversationTurns` bounds
+autonomous Agent-to-Agent reply turns in one conversation. New manifests must
+set both values; the Pilot manifest schema is version 2.
 
 Paths support `%USERPROFILE%`, `%PATH%`, `${REPO_ROOT}`, `${STATE_DIR}` and
 `${LOCALAPPDATA}`. Escape Windows backslashes in JSON.
@@ -127,6 +128,24 @@ Do not assume one bot's `allowedChats` applies to another profile: write and
 verify each profile independently. Hermes uses its own native Feishu access
 policy and does not use the `allowedChats` field; preserve its existing
 configuration and validate its group-mention behavior separately.
+
+## Agent Conversation Turns
+
+An Agent must not create a bare textual `@` in a collaboration topic. Use the
+Pilot command injected into its environment:
+
+```powershell
+collab-delegate.cmd reply --target world --content "I disagree with that premise because ..."
+collab-delegate.cmd ask --target justice --content "Review the risk in this visual proposal"
+collab-delegate.cmd handoff --target chariot --content "Take responsibility for the evidence summary"
+```
+
+The command records an idempotent action with the Hub and sends a topic reply
+with a real Feishu mention. `reply` is a normal group-chat turn and leaves work
+ownership unchanged; `ask` and `handoff` carry explicit work semantics. Target
+bridges consume only their corresponding attention grants, so Agents use stable
+Hub IDs rather than guessing Feishu `open_id` values or invoking bare
+`lark-cli`.
 
 The pilot prepends `scripts\collab-pilot\bin` to every agent's `PATH`. Its
 `lark-cli.cmd` and `lark-cli.ps1` are identity-neutral entry points: they invoke

@@ -20,6 +20,13 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(source).toContain('Add-Type -AssemblyName System.Net.Http');
   });
 
+  it('keeps PID-returning background launches free of success-stream status text', () => {
+    const source = readPilotScript('Pilot.Common.ps1');
+    expect(source).toContain('function Start-CollabBackground');
+    expect(source).toContain('Write-Verbose "$Name is already running');
+    expect(source).not.toContain('Write-Output "$Name is already running');
+  });
+
   it('registers a current-user logon task with restart and unlimited runtime', () => {
     const source = readPilotScript('Install-CollabPilotStartup.ps1');
     expect(source).toContain('New-ScheduledTaskTrigger -AtLogOn');

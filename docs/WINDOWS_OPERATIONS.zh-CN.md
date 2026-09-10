@@ -83,7 +83,7 @@ notepad .\.runtime\pilot.local.json
 - `enabled: false` 可保留尚未准备好的 Agent，不会加入 Hub 或被启动。
 - `runOnThisNode: false` 表示 Agent 会登记到中央 Hub，但不在这台机器启动，适合预先
   登记另一台电脑上的 Bot；省略时保持原有行为，在本机启动。
-- `hub.maxCausalDepth` 限制单条 Agent 委派因果链的深度，不限制一个话题的累计工作轮数。旧 `maxHops` 仅用于读取旧清单；新配置应使用 `maxCausalDepth`。
+- `hub.maxCausalDepth` 限制单条显式工作（`ask` / `handoff`）因果链的深度，不限制一个话题的累计工作轮数。`hub.maxConversationTurns` 则限制同一段对话中 Agent 自主互回的轮数。新清单必须设置二者，Pilot 清单版本为 2。
 
 路径支持 `%USERPROFILE%`、`%PATH%`、`${REPO_ROOT}`、`${STATE_DIR}`、`${LOCALAPPDATA}`。JSON 中 Windows 反斜杠需要写成 `\\`。
 
@@ -177,10 +177,12 @@ bridge（例如 Codex、Antigravity、DeepSeek Harness）都必须分别允许�
 ```powershell
 collab-delegate.cmd ask --target justice --content "审查这份视觉方案的风险"
 collab-delegate.cmd handoff --target chariot --content "接手并完成证据整理"
+collab-delegate.cmd reply --target world --content "我不同意这个前提，理由是……"
 ```
 
-该命令从当前运行环境取得任务和话题回复目标，先向 Hub 写入幂等 `ask` 或 `handoff`，再
-以当前 bot 身份发送带真实飞书 mention 的话题回复。目标 bridge 只会消费对应 dispatch。
+该命令从当前运行环境取得任务和话题回复目标，先向 Hub 写入幂等动作，再
+以当前 bot 身份发送带真实飞书 mention 的话题回复。`reply` 是普通群聊回合，不改变
+工作责任；`ask` 和 `handoff` 才是显式协作语义。目标 bridge 只会消费对应 dispatch。
 各 bridge 连接后会自动把自己的飞书 `open_id` 注册到 Hub，因此 Agent 应只使用稳定的
 Hub Agent ID（如 `world`、`justice`、`chariot`），不应自行查询群成员、猜测 open_id，或用
 裸 `lark-cli` 发送委派。

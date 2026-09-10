@@ -198,7 +198,13 @@ function Test-CollabPid([object]$ProcessId) {
 
 function Start-CollabBackground([string]$Name, [string]$ScriptPath, [string[]]$ScriptArguments = @()) {
   $table = Read-CollabPidTable
-  if (Test-CollabPid $table[$Name]) { Write-Output "$Name is already running (PID $($table[$Name]))."; return [int]$table[$Name] }
+  if (Test-CollabPid $table[$Name]) {
+    # This function returns a PID to its callers.  Do not write status to the
+    # success stream: PowerShell would turn the status string and PID into an
+    # object array, which then breaks the caller's PID checks.
+    Write-Verbose "$Name is already running (PID $($table[$Name]))."
+    return [int]$table[$Name]
+  }
   $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath) + $ScriptArguments
   $process = Start-Process -WindowStyle Hidden -PassThru -FilePath powershell.exe -ArgumentList $arguments `
     -RedirectStandardOutput (Join-Path $script:CollabLogDir "$Name.out.log") `

@@ -138,8 +138,9 @@ Point the manifest launch command at the existing Hermes venv and
 The Hook accepts a human group message only when Hermes was actually mentioned.
 For bot-originated messages it additionally requires a pending Hub dispatch for
 the same topic. During an authorized run Hermes receives the current agent
-directory and the same `collab-delegate ask|handoff` command contract as the
-Node bridges, so every maintained bot can delegate to every other bot. The Hook
+directory and the same `collab-delegate reply|ask|handoff` command contract as
+the Node bridges: `reply` continues the group conversation without moving work
+ownership. The Hook
 acks the dispatch as accepted, then records and completes or fails that exact
 dispatch when the run ends.
 
