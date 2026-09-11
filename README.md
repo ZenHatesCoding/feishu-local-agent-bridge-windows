@@ -16,14 +16,20 @@ git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.gi
   C:\feishu-local-agent-bridge
 ```
 
-Older branches are historical snapshots, not supported deployment choices:
+## Branch Roles
 
-| Branch | Historical scope | New-install recommendation |
+New installations use `main`. The two active work lines start from `main` and
+are merged back only after their focused acceptance checks pass. Frozen lines
+remain available for rollback and historical standalone deployments.
+
+| Branch | Role | Policy |
 | --- | --- | --- |
-| `main` | Unified adapters and collaboration platform | **Use this branch** |
-| `antigravity` | Earlier Antigravity-only packaging | History only |
-| `deepseek-harness` | Earlier DeepSeek-only packaging | History only |
-| `feature/feishu-multi-agent-hub` | First unified Hub milestone | History only |
+| `main` | Stable unified product and release line | **Use for every new installation** |
+| `codex/conversation-first-hub` | Active Hub protocol and conversation-semantics line | Start from `main`; merge after protocol tests pass |
+| `feature/worker-windows-bootstrap` | Active real-Windows-worker deployment line | Start from `main`; merge after a real second-PC Feishu check |
+| `feature/feishu-multi-agent-hub` | First unified Hub milestone | Frozen; rollback/history only |
+| `antigravity` | Earlier Antigravity-only packaging | Frozen standalone rollback path |
+| `deepseek-harness` | Earlier DeepSeek-only packaging | Frozen standalone rollback path |
 
 The same checkout can build all bridge runtimes. Each bot still needs its own
 Feishu app/profile and local agent login. Hermes stays in its existing install

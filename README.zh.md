@@ -15,14 +15,19 @@ git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.gi
   C:\feishu-local-agent-bridge
 ```
 
-旧分支是历史快照，不是受支持的部署选择：
+## 分支职责
 
-| 分支 | 历史用途 | 新电脑建议 |
+新部署统一使用 `main`。两条活跃工作线都从 `main` 开始，只有通过各自的验收后才合回
+主线；冻结线保留用于回退和历史独立部署。
+
+| 分支 | 职责 | 管理策略 |
 | --- | --- | --- |
-| `main` | 统一适配器与协作平台 | **统一使用** |
-| `antigravity` | 较早的 Antigravity 专用封装 | 仅历史保留 |
-| `deepseek-harness` | 较早的 DeepSeek 专用封装 | 仅历史保留 |
-| `feature/feishu-multi-agent-hub` | 初代统一 Hub 里程碑 | 仅历史保留 |
+| `main` | 稳定的统一产品与发布线 | **所有新安装统一使用** |
+| `codex/conversation-first-hub` | 活跃的 Hub 协议与会话语义工作线 | 从 `main` 开始；协议测试通过后合回 |
+| `feature/worker-windows-bootstrap` | 活跃的真实 Windows Worker 部署工作线 | 从 `main` 开始；真实第二台电脑 Feishu 验收后合回 |
+| `feature/feishu-multi-agent-hub` | 初代统一 Hub 里程碑 | 冻结；仅回退/历史使用 |
+| `antigravity` | 较早的 Antigravity 专用封装 | 冻结的独立部署回退线 |
+| `deepseek-harness` | 较早的 DeepSeek 专用封装 | 冻结的独立部署回退线 |
 
 同一份 checkout 可以构建所有 bridge runtime。每个机器人仍需要独立的飞书应用/
 profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项目 Hook 接入。
