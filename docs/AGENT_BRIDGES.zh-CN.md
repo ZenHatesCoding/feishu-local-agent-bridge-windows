@@ -150,7 +150,7 @@ Hermes 的 venv、源码、配置、会话、记忆、技能和其他 Hook 都�
 
 Hook 只接受真实 `@Hermes` 的人类群消息；bot 发来的消息还必须在同一话题中存在
 待处理的 Hub dispatch。授权运行时，Hermes 会收到当前 Agent 目录，以及与 Node
-bridge 相同的 `collab-delegate reply|ask|handoff` 命令约定；`reply` 只延续群聊对话，
+bridge 相同的 Bridge 接管协作标记约定；`reply` 只延续群聊对话，
 不转移工作责任。Hook 会先把该 dispatch 标记为 accepted，并在运行结束时为同一个 dispatch
 记录结果，再明确标记 completed 或 failed。
 

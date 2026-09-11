@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { stripTargetMentionPrefix } from '../../../src/cli/commands/hub';
+import { stripTargetMentionPrefix } from '../../../src/collab/mentions';
 
-describe('worker collaboration delegation rendering', () => {
+describe('bridge collaboration mention rendering', () => {
   const justice = { openId: 'ou_ae9b3ab812ab5380a4a58b888b2e9985', displayName: 'Justice' };
 
   it('removes a model-generated target address before the bridge emits its real mention', () => {

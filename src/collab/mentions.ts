@@ -36,6 +36,11 @@ export function stripTargetMentionPrefix(
   return stripped.trim() || content;
 }
 
+/** Raw Feishu IDs have no user-facing meaning and must never render in a group reply. */
+export function stripRawFeishuMentionTokens(content: string): string {
+  return content.replace(/@o(?:u|c|n)_[A-Za-z0-9]+/g, '').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

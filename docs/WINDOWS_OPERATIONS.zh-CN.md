@@ -176,21 +176,20 @@ bridge（例如 Codex、Antigravity、DeepSeek Harness）都必须分别允许�
 
 ## Agent 自主委派
 
-协作任务中，Agent 不能只在回复里写一个文本 `@`。要让当前负责人请求专家协助或正式
-交接，使用 pilot 注入的命令：
+协作任务中，Agent 不能只在回复里写一个文本 `@`。需要邀请另一位 bot 或正式交接时，
+只在最终回答中输出一个标记，由 Bridge 完成整个投递：
 
-```powershell
-collab-delegate.cmd ask --target justice --content "审查这份视觉方案的风险"
-collab-delegate.cmd handoff --target chariot --content "接手并完成证据整理"
-collab-delegate.cmd reply --target world --content "我不同意这个前提，理由是……"
+```text
+<collaboration_reply target="world">我不同意这个前提，理由是……</collaboration_reply>
+<collaboration_ask target="justice">审查这份视觉方案的风险</collaboration_ask>
+<collaboration_handoff target="chariot">接手并完成证据整理</collaboration_handoff>
 ```
 
-该命令从当前运行环境取得任务和话题回复目标，先向 Hub 写入幂等动作，再
-以当前 bot 身份发送带真实飞书 mention 的话题回复。`reply` 是普通群聊回合，不改变
-工作责任；`ask` 和 `handoff` 才是显式协作语义。目标 bridge 只会消费对应 dispatch。
-各 bridge 连接后会自动把自己的飞书 `open_id` 注册到 Hub，因此 Agent 应只使用稳定的
-Hub Agent ID（如 `world`、`justice`、`chariot`），不应自行查询群成员、猜测 open_id，或用
-裸 `lark-cli` 发送委派。
+Bridge 从当前运行环境取得任务和话题回复目标，写入幂等动作，再以当前 bot 身份发送
+带真实飞书 mention 的话题回复。`reply` 是普通群聊回合，不改变工作责任；`ask` 是咨询，
+`handoff` 才移交工作责任。目标 bridge 只会消费对应 dispatch。Agent 只使用当前群
+`mentionTargets` roster 里的稳定 Hub Agent ID（如 `world`、`justice`、`chariot`），不应
+自行查询群成员、猜测 open_id，或用裸 `lark-cli` 发送委派。
 
 Pilot 还会把 `scripts\collab-pilot\bin` 放在每个 Agent 的 `PATH` 最前面。目录内的
 `lark-cli.cmd` / `lark-cli.ps1` 是不绑定身份的统一入口：它们只调用清单中配置的真实

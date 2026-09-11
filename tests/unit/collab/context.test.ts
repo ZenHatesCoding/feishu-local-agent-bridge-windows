@@ -13,7 +13,7 @@ const dispatch: Dispatch = {
 };
 
 describe('collaboration context projection', () => {
-  it('advertises stable agent ids and the atomic delegation command', () => {
+  it('advertises group-scoped stable mention targets and bridge-owned delegation', () => {
     const context = buildCollaborationContext({
       task,
       dispatch,
@@ -24,7 +24,9 @@ describe('collaboration context projection', () => {
       ],
     });
 
-    expect(context).toContain('collab-delegate.cmd handoff|ask');
+    expect(context).toContain('mentionTargets');
+    expect(context).toContain('collaboration_reply target=\\"TARGET_ID\\"');
+    expect(context).not.toContain('collab-delegate.cmd');
     expect(context).toContain('"id":"justice"');
     expect(context).toContain('"displayName":"Chariot"');
     expect(context).not.toContain('ou_private');

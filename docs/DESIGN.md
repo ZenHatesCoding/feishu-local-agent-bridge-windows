@@ -101,12 +101,15 @@ Dispatches have an explicit lifecycle: `pending -> accepted -> completed` or
 dispatch for the same task and actor. This prevents stale work from spawning
 new work and makes failed runs auditable instead of leaving them accepted.
 
-Agent-originated delegation uses one entry point for both keys. It accepts a
-stable Hub agent ID, records the causal `ask` or `handoff`, resolves the target
-bot's current Feishu `open_id` from the runtime identity registry, and sends a
-real mention. Agents never guess identity from group membership. Hub actions
-and Feishu delivery use stable idempotency keys, so a retry does not create a
-second unit of work.
+An Agent delegates by placing one `collaboration_reply` or
+`collaboration_handoff` marker in its final answer. The Bridge, rather than the
+model, consumes that marker, records the causal action, resolves the target's
+current identity, and sends the one real mention in the same topic. The prompt
+contains only the Hub roster observed for that Feishu group; it never exposes
+an `open_id`, a shell command, or a global bot list. Absence from that roster
+means unknown, not absent from the group. Raw Feishu IDs are removed from
+visible collaboration text, and a delivery failure is reported in the topic
+instead of being silently logged.
 
 The identity registry contains routing metadata, never credentials. Each bot's
 credentials remain in its profile. The pilot prepends an identity-neutral

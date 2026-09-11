@@ -74,6 +74,7 @@ import {
   extractCollaborationHandoff,
   type BridgeCollaborationAdapter,
 } from '../collab/bridge-adapter';
+import { stripRawFeishuMentionTokens } from '../collab/mentions';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -987,6 +988,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         });
       } catch (err) {
         log.fail('collab-handoff', err);
+        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.handoff.targetAgentId, err);
       }
     }
     if (extracted.reply) {
@@ -1004,11 +1006,30 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         });
       } catch (err) {
         log.fail('collab-reply', err);
+        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.reply.targetAgentId, err);
+      }
+    }
+    if (extracted.ask) {
+      try {
+        const target = await collaboration.createAsk({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          targetAgentId: extracted.ask.targetAgentId,
+          content: extracted.ask.content,
+          runId: execution.runId,
+        });
+        await channel.send(chatId, { markdown: target.content }, {
+          ...sendOpts,
+          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+        });
+      } catch (err) {
+        log.fail('collab-ask', err);
+        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.ask.targetAgentId, err);
       }
     }
     await collaboration.finishRun(
       collaborationRun.taskId,
-      extracted.visibleContent,
+      stripRawFeishuMentionTokens(extracted.visibleContent),
       execution.runId,
       collaborationRun.dispatchId,
       state.terminal === 'done',
@@ -1018,7 +1039,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       taskId: collaborationRun.taskId,
       dispatchId: collaborationRun.dispatchId,
       status: state.terminal === 'done' ? 'completed' : 'failed',
-      chars: extracted.visibleContent.length,
+      chars: stripRawFeishuMentionTokens(extracted.visibleContent).length,
     });
   };
 
@@ -1214,7 +1235,7 @@ async function sendFinalReply(input: {
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
 }): Promise<void> {
-  const body = extractCollaborationHandoff(renderText(input.state)).visibleContent;
+  const body = stripRawFeishuMentionTokens(extractCollaborationHandoff(renderText(input.state)).visibleContent);
 
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
@@ -1248,6 +1269,19 @@ async function sendFinalReply(input: {
     const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
     log.info('outbound', 'sent', outboundLogFields(input, 'text', body, result));
   }
+}
+
+async function sendCollaborationDeliveryFailure(
+  channel: LarkChannel,
+  chatId: string,
+  sendOpts: { replyTo: string; replyInThread?: boolean },
+  targetAgentId: string,
+  err: unknown,
+): Promise<void> {
+  const detail = err instanceof Error ? err.message : String(err);
+  await channel.send(chatId, {
+    markdown: `未能向协作目标 \`${targetAgentId}\` 发送真实 @：${stripRawFeishuMentionTokens(detail)}`,
+  }, sendOpts).catch((sendErr) => log.fail('collab-delivery-failure-notice', sendErr));
 }
 
 const TOPIC_MARKDOWN_CHUNK_LIMIT = 3500;

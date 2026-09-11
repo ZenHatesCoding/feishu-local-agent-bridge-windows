@@ -25,12 +25,18 @@ export interface CollaborationReplyIntent {
   content: string;
 }
 
+export interface CollaborationAskIntent {
+  targetAgentId: string;
+  content: string;
+}
+
 export function extractCollaborationHandoff(content: string): {
   visibleContent: string;
   handoff?: CollaborationHandoffIntent;
   reply?: CollaborationReplyIntent;
+  ask?: CollaborationAskIntent;
 } {
-  const match = /<collaboration_(handoff|reply)\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_\1>/i.exec(content);
+  const match = /<collaboration_(handoff|reply|ask)\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_\1>/i.exec(content);
   if (!match) return { visibleContent: content };
   const kind = match[1]!.toLocaleLowerCase();
   const targetAgentId = match[2]!.trim();
@@ -40,7 +46,9 @@ export function extractCollaborationHandoff(content: string): {
     ...(targetAgentId && intentContent
       ? kind === 'handoff'
         ? { handoff: { targetAgentId, content: intentContent } }
-        : { reply: { targetAgentId, content: intentContent } }
+        : kind === 'ask'
+          ? { ask: { targetAgentId, content: intentContent } }
+          : { reply: { targetAgentId, content: intentContent } }
       : {}),
   };
 }
@@ -146,23 +154,7 @@ export class BridgeCollaborationAdapter {
     content: string;
     runId: string;
   }): Promise<AgentIdentity & { content: string }> {
-    const identity = (await this.client.identities()).agents
-      .find((agent) => agent.id === input.targetAgentId);
-    if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
-    // The bridge adds the one real structured mention when it sends the
-    // message; a hand-written "@open_id Name" prefix would render as a second,
-    // unreadable mention. Keep the ledger and the visible message identical.
-    const content = stripTargetMentionPrefix(input.content, identity);
-    await this.client.submit({
-      type: 'handoff',
-      idempotencyKey: `bridge-handoff:${this.agentId}:${input.runId}:${input.targetAgentId}`,
-      taskId: input.taskId,
-      actorAgentId: this.agentId,
-      causedByDispatchId: input.dispatchId,
-      targetAgentId: input.targetAgentId,
-      content,
-    });
-    return { ...identity, content };
+    return this.createDelegation('handoff', input);
   }
 
   async createReply(input: {
@@ -172,13 +164,30 @@ export class BridgeCollaborationAdapter {
     content: string;
     runId: string;
   }): Promise<AgentIdentity & { content: string }> {
+    return this.createDelegation('reply', input);
+  }
+
+  async createAsk(input: {
+    taskId: string;
+    dispatchId: string;
+    targetAgentId: string;
+    content: string;
+    runId: string;
+  }): Promise<AgentIdentity & { content: string }> {
+    return this.createDelegation('ask', input);
+  }
+
+  private async createDelegation(
+    type: 'reply' | 'handoff' | 'ask',
+    input: { taskId: string; dispatchId: string; targetAgentId: string; content: string; runId: string },
+  ): Promise<AgentIdentity & { content: string }> {
     const identity = (await this.client.identities()).agents
       .find((agent) => agent.id === input.targetAgentId);
     if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
     const content = stripTargetMentionPrefix(input.content, identity);
     await this.client.submit({
-      type: 'reply',
-      idempotencyKey: `bridge-reply:${this.agentId}:${input.runId}:${input.targetAgentId}`,
+      type,
+      idempotencyKey: `bridge-${type}:${this.agentId}:${input.runId}:${input.targetAgentId}`,
       taskId: input.taskId,
       actorAgentId: this.agentId,
       causedByDispatchId: input.dispatchId,

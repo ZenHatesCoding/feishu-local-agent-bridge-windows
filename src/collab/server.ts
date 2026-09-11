@@ -106,7 +106,7 @@ export class CollaborationHubServer {
             dispatch,
             entries: this.hub.getContext(taskId, agentId),
             artifacts: this.hub.getArtifacts(taskId, agentId),
-            agents: this.hub.listAgentIdentities(),
+            agents: this.hub.listChatAgentIdentities(task.address.chatId),
           }),
         });
       }

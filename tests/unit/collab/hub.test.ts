@@ -54,6 +54,22 @@ describe('CollaborationHub', () => {
     ]);
   });
 
+  it('scopes mention targets to bots observed in the current group', async () => {
+    const { hub } = await fixture();
+    hub.registerAgentIdentity('world', 'ou_world');
+    hub.registerAgentIdentity('chariot', 'ou_chariot');
+    hub.registerAgentIdentity('justice', 'ou_justice');
+    await hub.submit(humanMessage({ targetAgentIds: ['world', 'chariot'] }));
+    await hub.submit(humanMessage({
+      idempotencyKey: 'other-group', messageId: 'om_other',
+      address: { tenantKey: 'tenant', chatId: 'other-chat', threadId: 'topic-2' },
+      targetAgentIds: ['justice'],
+    }));
+
+    expect(hub.listChatAgentIdentities('chat').map((agent) => agent.id)).toEqual(['chariot', 'world']);
+    expect(hub.listChatAgentIdentities('other-chat').map((agent) => agent.id)).toEqual(['justice']);
+  });
+
   it('assigns one mentioned agent and creates a durable dispatch', async () => {
     const { hub, path } = await fixture();
     const result = await hub.submit(humanMessage());

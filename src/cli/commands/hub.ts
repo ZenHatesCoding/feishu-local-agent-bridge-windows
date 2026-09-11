@@ -1,8 +1,7 @@
 import { dirname, resolve } from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { spawnProcessSync } from '../../platform/spawn';
 import { CollaborationClient } from '../../collab/client';
-import { stripTargetMentionPrefix } from '../../collab/mentions';
 import type { ActionInput, SharedArtifact } from '../../collab/types';
 import { snapshotArtifact } from '../../collab/artifact-store';
 import { startFeishuCoordinator } from '../../collab/coordinator';
@@ -103,68 +102,6 @@ export async function runCollaborationAction(
   });
   console.log(JSON.stringify({ task: result.task, dispatches: result.dispatches }, null, 2));
 }
-
-/** Authorize a delegation and visibly wake the target bot in the current topic. */
-export async function runCollaborationDelegate(
-  type: 'reply' | 'handoff' | 'ask',
-  options: { target: string; content: string; task?: string; actor?: string; replyTo?: string; causedByDispatch?: string },
-): Promise<void> {
-  const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');
-  const token = requiredEnv('LARK_COLLAB_HUB_TOKEN');
-  const larkCliJs = requiredEnv('LARK_COLLAB_REAL_LARK_CLI_JS');
-  const taskId = options.task ?? requiredEnv('LARK_COLLAB_TASK_ID');
-  const actor = options.actor ?? requiredEnv('LARK_COLLAB_AGENT_ID');
-  const replyTo = options.replyTo ?? requiredEnv('LARK_COLLAB_REPLY_TO');
-  const causedByDispatchId = options.causedByDispatch ?? requiredEnv('LARK_COLLAB_DISPATCH_ID');
-  const client = new CollaborationClient({ baseUrl, token });
-  const target = options.target.trim();
-  const content = options.content.trim();
-  if (!target || !content) throw new Error('target and content are required');
-  const identity = (await client.identities()).agents.find((agent) => agent.id === target);
-  if (!identity) {
-    throw new Error(`target agent is connected but has not registered its Feishu identity: ${target}`);
-  }
-  // The bridge adds the one real, structured Feishu mention below. Models
-  // sometimes also prefix delegated content with "@open_id DisplayName", which
-  // Feishu renders as a second, unreadable mention. Keep the objective clean
-  // in both the ledger and the visible message.
-  const delegatedContent = stripTargetMentionPrefix(content, identity);
-  const digest = createHash('sha256').update(`${type}\0${taskId}\0${causedByDispatchId}\0${actor}\0${target}\0${delegatedContent}`).digest('hex').slice(0, 24);
-  const result = await client.submit({
-    type,
-    idempotencyKey: `delegate:${digest}`,
-    taskId,
-    actorAgentId: actor,
-    causedByDispatchId,
-    targetAgentId: target,
-    content: delegatedContent,
-  });
-  const post = JSON.stringify({
-    zh_cn: { content: [[
-      { tag: 'at', user_id: identity.openId, user_name: identity.displayName },
-      { tag: 'text', text: ` ${delegatedContent}` },
-    ]] },
-  });
-// Do not invoke the pilot's lark-cli.cmd shim here.  A Harness tool can
-// execute this command but still be denied permission to spawn cmd.exe for
-// the shim's second hop.  Running the configured JS entry directly also
-// keeps the current bridge profile and its bot-only identity.
-  const send = runLarkCli(larkCliJs, [
-    'im', '+messages-reply', '--message-id', replyTo, '--content', post,
-    '--msg-type', 'post', '--reply-in-thread', '--idempotency-key', `delegate-${digest}`, '--json',
-  ]);
-  emitProcessOutput(send);
-  if (send.error) throw send.error;
-  if (send.status !== 0) throw new Error(`Feishu delegation mention failed with exit code ${send.status}`);
-  process.stdout.write(`${JSON.stringify({ task: result.task, dispatches: result.dispatches, mentioned: target }, null, 2)}\n`);
-}
-
-/**
- * Re-exported for callers that address the delegation renderer through this
- * command module; the implementation is shared with the bridge marker path
- * (src/collab/mentions.ts) so both stay in sync.
- */
-export { stripTargetMentionPrefix };
 
 export async function runArtifactPublish(options: {
   task: string;

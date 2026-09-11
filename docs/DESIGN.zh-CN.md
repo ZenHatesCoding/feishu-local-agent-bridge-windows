@@ -144,11 +144,12 @@ tenantKey + chatId + threadId -> taskId
 dispatch；一旦目标数超过一个，就清除单负责人状态并按 fanout 处理。因此事件到达
 顺序不会再导致只有第一个 bot 响应，Hermes 即使晚于 Node bridge 到达也不例外。
 
-Agent 自主委派使用一个原子化入口完成这两个步骤。它接收稳定的 Hub Agent ID，
-先写入带父 dispatch 的 `ask` 或 `handoff`，再从 Hub 的运行时身份注册表取得目标
-bot 的飞书 `open_id` 并发送真实 mention。Agent 不需要、也不允许从群成员列表猜测
-目标身份。Hub 动作和飞书发送分别使用稳定幂等键；发送失败时授权仍可审计，重试
-不会创建第二份工作。
+Agent 需要委派时，只在最终回答中输出一个 `collaboration_reply` 或
+`collaboration_handoff` 标记。Bridge 而不是模型负责消费标记、写入带父 dispatch 的
+动作、解析目标当前身份，并在同一话题发送唯一的真实 mention。提示词只提供 Hub 已在
+当前飞书群观察到的 roster；其中没有 `open_id`、shell 命令或全局 bot 名单。roster 未
+出现某个名字只表示未知，不能据此判断该 bot 不在群里。面向群聊的协作文本会移除裸
+飞书 ID；投递失败会在话题中明确报告，不再只写日志。
 
 身份注册表只描述“哪个已连接 bridge 当前代表哪个飞书 bot”，不承载凭据。凭据
 始终留在各自 profile。Pilot 把身份无关的 `lark-cli` 入口放到所有 Agent 的 `PATH`

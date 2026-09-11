@@ -17,7 +17,7 @@ describe('Hermes collaboration Hook contract', () => {
   it('exposes formal ask and handoff delegation to Hermes', () => {
     expect(handler).toContain('/prompt-context');
     expect(handler).not.toContain('/context?agentId=');
-    expect(sharedContext).toContain('collab-delegate.cmd handoff|ask');
+    expect(sharedContext).toContain('<collaboration_handoff target="TARGET_ID">');
     expect(sharedContext).toContain('yourDispatch');
   });
 

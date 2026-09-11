@@ -136,21 +136,21 @@ configuration and validate its group-mention behavior separately.
 
 ## Agent Conversation Turns
 
-An Agent must not create a bare textual `@` in a collaboration topic. Use the
-Pilot command injected into its environment:
+An Agent must not create a bare textual `@` in a collaboration topic. It puts
+one marker in its final answer and the Bridge performs the entire delivery:
 
-```powershell
-collab-delegate.cmd reply --target world --content "I disagree with that premise because ..."
-collab-delegate.cmd ask --target justice --content "Review the risk in this visual proposal"
-collab-delegate.cmd handoff --target chariot --content "Take responsibility for the evidence summary"
+```text
+<collaboration_reply target="world">I disagree with that premise because ...</collaboration_reply>
+<collaboration_ask target="justice">Review the risk in this visual proposal</collaboration_ask>
+<collaboration_handoff target="chariot">Take responsibility for the evidence summary</collaboration_handoff>
 ```
 
-The command records an idempotent action with the Hub and sends a topic reply
-with a real Feishu mention. `reply` is a normal group-chat turn and leaves work
-ownership unchanged; `ask` and `handoff` carry explicit work semantics. Target
-bridges consume only their corresponding attention grants, so Agents use stable
-Hub IDs rather than guessing Feishu `open_id` values or invoking bare
-`lark-cli`.
+The Bridge records the idempotent action and sends a topic reply with a real
+Feishu mention. `reply` is a normal group-chat turn and leaves work ownership
+unchanged; `ask` is consultation and `handoff` carries explicit work semantics. Target bridges consume
+only their corresponding attention grants. Agents use only the stable IDs in
+their current-group `mentionTargets` roster; they never guess Feishu `open_id`
+values or invoke `lark-cli` for delegation.
 
 The pilot prepends `scripts\collab-pilot\bin` to every agent's `PATH`. Its
 `lark-cli.cmd` and `lark-cli.ps1` are identity-neutral entry points: they invoke

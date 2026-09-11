@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { NormalizedMessage } from '@larksuite/channel';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BridgeCollaborationAdapter, extractCollaborationHandoff } from '../../../src/collab/bridge-adapter';
+import { stripRawFeishuMentionTokens } from '../../../src/collab/mentions';
 import { CollaborationClient } from '../../../src/collab/client';
 import { CollaborationHub } from '../../../src/collab/hub';
 import { JsonlLedger } from '../../../src/collab/ledger';
@@ -59,6 +60,15 @@ describe('BridgeCollaborationAdapter', () => {
   it('extracts a normal reply invitation without turning it into a handoff', () => {
     expect(extractCollaborationHandoff('Argument\n<collaboration_reply target="chariot">Please rebut point 2</collaboration_reply>'))
       .toEqual({ visibleContent: 'Argument', reply: { targetAgentId: 'chariot', content: 'Please rebut point 2' } });
+  });
+
+  it('extracts a consultation without transferring ownership', () => {
+    expect(extractCollaborationHandoff('Finding\n<collaboration_ask target="chariot">Review the risk</collaboration_ask>'))
+      .toEqual({ visibleContent: 'Finding', ask: { targetAgentId: 'chariot', content: 'Review the risk' } });
+  });
+
+  it('never lets raw Feishu IDs leak into visible collaboration text', () => {
+    expect(stripRawFeishuMentionTokens('请 @ou_abc123 Star 接手')).toBe('请 Star 接手');
   });
 
   it('drops a hand-written @open_id address before the bridge emits its real mention', async () => {

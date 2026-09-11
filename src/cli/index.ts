@@ -29,7 +29,6 @@ import {
   runArtifactRegisterGit,
   runArtifactResolve,
   runCollaborationAction,
-  runCollaborationDelegate,
   runCollaborationHub,
 } from './commands/hub';
 
@@ -71,21 +70,6 @@ for (const action of ['reply', 'handoff', 'ask', 'return', 'complete'] as const)
       causedByDispatchId?: string;
     }) => {
       await runCollaborationAction(action, opts);
-    });
-}
-
-for (const action of ['reply', 'handoff', 'ask'] as const) {
-  hub
-    .command(`delegate-${action}`)
-    .description(`Authorize and visibly @ an agent for a collaboration ${action}`)
-    .requiredOption('--target <agent>', 'target agent id')
-    .requiredOption('--content <text>', 'objective or question')
-    .option('--task <id>', 'collaboration task id; defaults to bridge environment')
-    .option('--actor <agent>', 'calling agent id; defaults to bridge environment')
-    .option('--reply-to <id>', 'Feishu message to reply to; defaults to bridge environment')
-    .option('--caused-by-dispatch <id>', 'active dispatch; defaults to bridge environment')
-    .action(async (opts: { target: string; content: string; task?: string; actor?: string; replyTo?: string; causedByDispatch?: string }) => {
-      await runCollaborationDelegate(action, opts);
     });
 }
 

@@ -129,6 +129,16 @@ export class CollaborationHub {
     return [...this.agentIdentities.values()].sort((a, b) => a.id.localeCompare(b.id)).map((item) => ({ ...item }));
   }
 
+  /** Bots the Hub has actually observed participating in this Feishu group. */
+  listChatAgentIdentities(chatId: string): AgentIdentity[] {
+    const participantIds = new Set<string>();
+    for (const task of this.tasks.values()) {
+      if (task.address.chatId !== chatId) continue;
+      for (const agentId of task.participants) participantIds.add(agentId);
+    }
+    return this.listAgentIdentities().filter((identity) => participantIds.has(identity.id));
+  }
+
   getContext(taskId: string, agentId: string, afterSequence = 0): ContextEntry[] {
     this.requireAgent(agentId);
     const task = this.tasks.get(taskId);
