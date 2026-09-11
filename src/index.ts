@@ -19,3 +19,31 @@ export type {
   TelemetryEvent,
 } from './core/telemetry';
 export { reportMetric, reportError } from './core/logger';
+
+export { CollaborationHub } from './collab/hub';
+export { JsonlLedger } from './collab/ledger';
+export { CollaborationHubServer } from './collab/server';
+export { CollaborationClient } from './collab/client';
+export { BridgeCollaborationAdapter, bridgeCollaborationFromEnv } from './collab/bridge-adapter';
+export {
+  coordinatorInputForMessage,
+  resolveMentionedAgents,
+  startFeishuCoordinator,
+} from './collab/coordinator';
+export { buildCollaborationContext } from './collab/context';
+export { taskIdFor, validateTaskAddress } from './collab/task-id';
+export { snapshotArtifact } from './collab/artifact-store';
+export type {
+  ActionInput,
+  ArtifactInput,
+  AgentRegistration,
+  ContextEntry,
+  ContextVisibility,
+  Dispatch,
+  HubInput,
+  HubResult,
+  MessageInput,
+  SharedArtifact,
+  TaskAddress,
+  TaskProjection,
+} from './collab/types';

@@ -57,6 +57,7 @@ type StoredProfileConfig = Pick<
   | 'permissions'
   | 'codex'
   | 'antigravity'
+  | 'deepseekHarness'
   | 'attachments'
   | 'comments'
   | 'larkCli'
@@ -95,6 +96,7 @@ function serializeProfileConfig(profile: ProfileConfig): StoredProfileConfig {
     permissions: profile.permissions,
     ...(profile.codex ? { codex: profile.codex } : {}),
     ...(profile.antigravity ? { antigravity: profile.antigravity } : {}),
+    ...(profile.deepseekHarness ? { deepseekHarness: profile.deepseekHarness } : {}),
     attachments: profile.attachments,
     comments: {},
     larkCli: profile.larkCli,
@@ -294,7 +296,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 export function agentKindFromString(value: string | undefined): AgentKind | undefined {
-  if (value === 'claude' || value === 'codex' || value === 'antigravity') return value;
+  if (value === 'claude' || value === 'codex' || value === 'antigravity' || value === 'deepseek-harness') return value;
   if (value === undefined) return undefined;
   throw new Error(`unsupported agent: ${value}`);
 }

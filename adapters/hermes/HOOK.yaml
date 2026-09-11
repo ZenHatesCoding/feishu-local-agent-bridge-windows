@@ -1,0 +1,5 @@
+name: feishu-collaboration-hub
+description: Gates Hermes on authorized Feishu mentions, injects shared task context, enables formal bot delegation, and records final results.
+events:
+  - agent:start
+  - agent:end

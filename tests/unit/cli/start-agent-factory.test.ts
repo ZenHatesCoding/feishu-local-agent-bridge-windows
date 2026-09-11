@@ -87,6 +87,23 @@ describe('start runtime agent factory', () => {
     expect(agent.displayName).toBe('Antigravity CLI');
   });
 
+  it('creates an independent DeepSeek Harness runtime agent', () => {
+    const agent = createRuntimeAgent(
+      createDefaultProfileConfig({
+        agentKind: 'deepseek-harness',
+        accounts: appAccount(),
+        deepseekHarness: {
+          binaryPath: 'node',
+          entryPath: 'C:\\deepseek-harness\\apps\\cli\\lib\\bin.js',
+        },
+      }),
+      { profileDir: '/tmp/lark-channel-bridge/profiles/deepseek-e2e' },
+    );
+
+    expect(agent.id).toBe('deepseek-harness');
+    expect(agent.displayName).toBe('DeepSeek Harness');
+  });
+
   it('seeds a default Antigravity binary when bootstrapping a new Antigravity profile', () => {
     const profile = createRuntimeProfileConfig({
       agentKind: 'antigravity',
@@ -94,7 +111,7 @@ describe('start runtime agent factory', () => {
     });
 
     expect(profile.antigravity?.binaryPath).toContain('agy');
-    expect(profile.antigravity?.printTimeout).toBe('10m');
+    expect(profile.antigravity?.printTimeout).toBe('60m');
     expect(profile.antigravity?.dangerouslySkipPermissions).toBe(true);
   });
 

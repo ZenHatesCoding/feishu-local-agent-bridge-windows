@@ -24,6 +24,14 @@ import {
   runServiceUnregister,
 } from './commands/service';
 import { runStart } from './commands/start';
+import {
+  runArtifactPublish,
+  runArtifactRegisterGit,
+  runArtifactResolve,
+  runCollaborationAction,
+  runCollaborationDelegate,
+  runCollaborationHub,
+} from './commands/hub';
 
 const program = new Command();
 
@@ -32,6 +40,93 @@ program
   .description('Bridge Feishu/Lark messenger with local CLI coding agents')
   .version(pkg.version, '-v, --version');
 
+const hub = program
+  .command('hub')
+  .description('Run the experimental Feishu multi-agent collaboration control plane');
+
+hub
+  .command('run')
+  .description('Run the collaboration hub in the foreground')
+  .requiredOption('-c, --config <path>', 'path to collaboration hub config')
+  .action(async (opts: { config: string }) => {
+    await runCollaborationHub(opts);
+  });
+
+for (const action of ['reply', 'handoff', 'ask', 'return', 'complete'] as const) {
+  hub
+    .command(action)
+    .description(`Submit a structured collaboration ${action} action`)
+    .requiredOption('--task <id>', 'collaboration task id')
+    .requiredOption('--actor <agent>', 'calling agent id')
+    .option('--target <agent>', 'target agent id (required for reply, handoff and ask)')
+    .requiredOption('--content <text>', 'objective, question, result, or summary')
+    .option('--caused-by-dispatch <id>', 'active dispatch that caused this action; defaults to bridge environment')
+    .option('--idempotency-key <key>', 'stable retry key; generated when omitted')
+    .action(async (opts: {
+      task: string;
+      actor: string;
+      target?: string;
+      content: string;
+      idempotencyKey?: string;
+      causedByDispatchId?: string;
+    }) => {
+      await runCollaborationAction(action, opts);
+    });
+}
+
+for (const action of ['reply', 'handoff', 'ask'] as const) {
+  hub
+    .command(`delegate-${action}`)
+    .description(`Authorize and visibly @ an agent for a collaboration ${action}`)
+    .requiredOption('--target <agent>', 'target agent id')
+    .requiredOption('--content <text>', 'objective or question')
+    .option('--task <id>', 'collaboration task id; defaults to bridge environment')
+    .option('--actor <agent>', 'calling agent id; defaults to bridge environment')
+    .option('--reply-to <id>', 'Feishu message to reply to; defaults to bridge environment')
+    .option('--caused-by-dispatch <id>', 'active dispatch; defaults to bridge environment')
+    .action(async (opts: { target: string; content: string; task?: string; actor?: string; replyTo?: string; causedByDispatch?: string }) => {
+      await runCollaborationDelegate(action, opts);
+    });
+}
+
+const artifact = hub
+  .command('artifact')
+  .description('Publish and register shared task artifacts');
+
+artifact
+  .command('publish')
+  .description('Snapshot a local file, send it to Feishu, and register it with the task')
+  .requiredOption('--task <id>', 'collaboration task id')
+  .requiredOption('--actor <agent>', 'publishing agent id')
+  .requiredOption('--path <path>', 'local file path')
+  .option('--name <name>', 'shared file name')
+  .option('--chat-id <id>', 'target Feishu chat id')
+  .option('--reply-to <id>', 'message id to reply to')
+  .option('--reply-in-thread', 'send the reply inside the Feishu topic')
+  .action(runArtifactPublish);
+
+artifact
+  .command('register-git')
+  .description('Register a committed Git file as a portable task artifact')
+  .requiredOption('--task <id>', 'collaboration task id')
+  .requiredOption('--actor <agent>', 'publishing agent id')
+  .requiredOption('--path <path>', 'local path used to hash and cache the file')
+  .requiredOption('--repository <url>', 'Git repository clone URL')
+  .requiredOption('--commit <sha>', 'immutable Git commit SHA')
+  .option('--repo-path <path>', 'path to the file inside the repository')
+  .option('--name <name>', 'shared file name')
+  .action(runArtifactRegisterGit);
+
+artifact
+  .command('resolve')
+  .description('Resolve one visible task artifact on demand, or list compact metadata')
+  .requiredOption('--task <id>', 'collaboration task id')
+  .requiredOption('--actor <agent>', 'requesting agent id')
+  .option('--id <artifact-id>', 'exact artifact id')
+  .option('--name <name>', 'exact artifact name')
+  .option('--list', 'list visible artifact metadata without paths or locators')
+  .action(runArtifactResolve);
+
 // === process-level commands (work directly on bridge processes) ===
 
 program
@@ -39,7 +134,7 @@ program
   .description('Run the bridge in the foreground (was `start` in older versions)')
   .option('-c, --config <path>', 'path to config file')
   .option('--profile <name>', 'profile name to run')
-  .option('--agent <kind>', 'agent kind for a new profile (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind for a new profile (claude, codex, antigravity, or deepseek-harness)')
   .option('--workspace <path>', 'initial working directory for first-run profile bootstrap')
   .option('--app-id <id>', 'use an existing Lark/Feishu app instead of QR app creation')
   .option('--app-secret <secret>', 'App Secret for --app-id; prefer interactive input on shared machines')
@@ -63,7 +158,7 @@ program
   .description('Migrate legacy bridge config/state into the current profile layout')
   .option('-c, --config <path>', 'path to config file')
   .option('--profile <name>', 'target profile name for legacy v1 config migration')
-  .option('--agent <kind>', 'agent kind for legacy v1 profile migration (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind for legacy v1 profile migration (claude, codex, antigravity, or deepseek-harness)')
   .action(async (opts: { config?: string; profile?: string; agent?: string }) => {
     await runMigrate(opts);
   });
@@ -82,7 +177,7 @@ profile
 profile
   .command('create <name>')
   .description('Create a profile from QR registration or existing app credentials')
-  .option('--agent <kind>', 'agent kind (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind (claude, codex, antigravity, or deepseek-harness)')
   .option('--workspace <path>', 'initial working directory for this profile')
   .option('--app-id <id>', 'use an existing Lark/Feishu app instead of QR app creation')
   .option('--app-secret <secret>', 'App Secret for --app-id; prefer interactive input on shared machines')
@@ -154,7 +249,7 @@ program
   .command('start')
   .description('Install (if needed) and start the bridge as an OS-managed daemon')
   .option('--profile <name>', 'profile name (defaults to active profile)')
-  .option('--agent <kind>', 'agent kind for first-run profile bootstrap (claude, codex, or antigravity)')
+  .option('--agent <kind>', 'agent kind for first-run profile bootstrap (claude, codex, antigravity, or deepseek-harness)')
   .option('--workspace <path>', 'initial working directory for first-run profile bootstrap')
   .option('--app-id <id>', 'use an existing Lark/Feishu app instead of QR app creation')
   .option('--app-secret <secret>', 'App Secret for --app-id; prefer interactive input on shared machines')

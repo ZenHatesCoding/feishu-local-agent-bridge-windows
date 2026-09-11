@@ -5,7 +5,7 @@ import type {
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
-import { antigravityCapability, claudeCapability, codexCapability } from '../agent/capability';
+import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode } from '../agent/capability';
 import {
   buildAgentPrompt,
   type BridgePromptInteractiveCard,
@@ -69,6 +69,11 @@ import {
   CotPublisher,
   finalAnswerOnlyState,
 } from './cot';
+import {
+  bridgeCollaborationFromEnv,
+  extractCollaborationHandoff,
+  type BridgeCollaborationAdapter,
+} from '../collab/bridge-adapter';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -186,6 +191,12 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
   // so /config bumps take effect for the next run.
   const pool = new ProcessPool(() => getMaxConcurrentRuns(controls.cfg));
   const executor = new RunExecutor({ agent, pool, activeRuns });
+  const collaboration = bridgeCollaborationFromEnv();
+  const collaborationRuns = new Map<string, {
+    promptContext: string;
+    taskId: string;
+    dispatchId?: string;
+  }>();
 
   // Resolve the App Secret to plaintext. The config field can be a literal
   // string, a "${VAR}" template, or a {source, id} SecretRef referencing
@@ -309,6 +320,8 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           activePolicyFingerprints,
           scope,
           mode,
+          collaboration,
+          collaborationRuns,
         });
       } catch (err) {
         log.fail('flush', err);
@@ -339,6 +352,8 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           logThreadModeOverride,
           executor,
           pool,
+          collaboration,
+          collaborationRuns,
         }),
       ).catch((err) => log.fail('intake', err));
     },
@@ -433,6 +448,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       openId: identity.openId,
       ...(identity.name ? { name: identity.name } : {}),
     });
+    await collaboration?.registerIdentity(identity.openId);
   }
   log.info('ws', 'connected', {
     bot: identity?.name ?? 'unknown',
@@ -536,6 +552,12 @@ interface IntakeDeps {
   logThreadModeOverride: LogThreadModeOverride;
   executor: RunExecutor;
   pool: ProcessPool;
+  collaboration?: BridgeCollaborationAdapter;
+  collaborationRuns: Map<string, {
+    promptContext: string;
+    taskId: string;
+    dispatchId?: string;
+  }>;
 }
 
 type LogThreadModeOverride = (input: {
@@ -559,6 +581,8 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     logThreadModeOverride,
     executor,
     pool,
+    collaboration,
+    collaborationRuns,
   } = deps;
   const preview = msg.content.length > 80 ? `${msg.content.slice(0, 80)}…` : msg.content;
   // Resolve scope (and underlying chat mode) once at intake — every
@@ -652,6 +676,24 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     return;
   }
 
+  if (collaboration) {
+    const decision = await collaboration.intake(msg);
+    log.info('collab', decision.respond ? 'routed' : 'recorded-only', {
+      scope,
+      taskId: decision.taskId,
+      dispatchId: decision.dispatchId,
+      reason: decision.reason,
+    });
+    if (!decision.respond) return;
+    if (decision.promptContext && decision.taskId) {
+      collaborationRuns.set(msg.messageId, {
+        promptContext: decision.promptContext,
+        taskId: decision.taskId,
+        ...(decision.dispatchId ? { dispatchId: decision.dispatchId } : {}),
+      });
+    }
+  }
+
   const size = pending.push(scope, msg);
   log.info('intake', 'queued', { scope, queueSize: size, debounceMs: DEBOUNCE_MS });
 }
@@ -670,6 +712,12 @@ interface RunBatchDeps {
   activePolicyFingerprints: Map<string, string>;
   scope: string;
   mode: ChatMode;
+  collaboration?: BridgeCollaborationAdapter;
+  collaborationRuns?: Map<string, {
+    promptContext: string;
+    taskId: string;
+    dispatchId?: string;
+  }>;
 }
 
 async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
@@ -687,6 +735,8 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     activePolicyFingerprints,
     scope,
     mode,
+    collaboration,
+    collaborationRuns,
   } = deps;
   if (batch.length === 0) return;
   const firstMsg = batch[0];
@@ -738,7 +788,21 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     }
   }
 
-  const prompt = buildPrompt(batch, attachments, quotes, channel.botIdentity);
+  const collaborationRun = [...batch]
+    .reverse()
+    .map((message) => collaborationRuns?.get(message.messageId))
+    .find((value): value is NonNullable<typeof value> => Boolean(value));
+  for (const message of batch) collaborationRuns?.delete(message.messageId);
+  if (collaboration && collaborationRun && attachments.length > 0) {
+    await collaboration.recordAttachments(collaborationRun.taskId, attachments);
+  }
+  const prompt = buildPrompt(
+    batch,
+    attachments,
+    quotes,
+    channel.botIdentity,
+    collaborationRun?.promptContext,
+  );
   log.info('prompt', 'built', { promptChars: prompt.length, quotes: quotes.length });
 
   // For topic groups: thread the reply so it lands in the same topic as the
@@ -772,8 +836,12 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       ? codexCapability(controls.profileConfig)
       : controls.profileConfig.agentKind === 'antigravity'
         ? antigravityCapability(controls.profileConfig)
-      : claudeCapability(controls.profileConfig);
-  const flow = await startRunFlow({
+        : controls.profileConfig.agentKind === 'deepseek-harness'
+          ? deepSeekHarnessCapability(controls.profileConfig)
+        : claudeCapability(controls.profileConfig);
+  let flow: Awaited<ReturnType<typeof startRunFlow>>;
+  try {
+    flow = await startRunFlow({
     scopeId: scope,
     scope: scopeContext,
     prompt,
@@ -787,13 +855,32 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     executor,
     now: Date.now(),
     stopGraceMs: getAgentStopGraceMs(controls.cfg),
+    env: collaborationRun ? {
+      LARK_COLLAB_TASK_ID: collaborationRun.taskId,
+      ...(collaborationRun.dispatchId ? { LARK_COLLAB_DISPATCH_ID: collaborationRun.dispatchId } : {}),
+      LARK_COLLAB_CHAT_ID: chatId,
+      ...(threadId ? { LARK_COLLAB_THREAD_ID: threadId } : {}),
+      LARK_COLLAB_REPLY_TO: lastMsg.messageId,
+    } : undefined,
     observability: {
       profile: controls.profile,
       agent: capability.agentId,
       source: 'im',
       stage: 'submit',
     },
-  });
+    });
+  } catch (err) {
+    if (collaboration && collaborationRun?.dispatchId) {
+      await collaboration.finishRun(
+        collaborationRun.taskId,
+        '',
+        `spawn-failed:${lastMsg.messageId}`,
+        collaborationRun.dispatchId,
+        false,
+      ).catch((ackErr) => log.fail('collab-finalize', ackErr));
+    }
+    throw err;
+  }
   if (!flow.ok) {
     log.info('run-flow', 'rejected', { scope, code: flow.rejectReason.code });
     log.warn('policy', 'denied', {
@@ -844,7 +931,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     log.info('flush', 'idle-watchdog', { idleTimeoutMs });
   }
 
-  const replyMode = getMessageReplyMode(controls.cfg);
+  const replyMode = effectiveReplyMode(capability, getMessageReplyMode(controls.cfg));
   log.info('flush', 'reply-mode', { mode: replyMode });
   const cotMessages = getCotMessages(controls.cfg);
   const cotEnabled = cotMessages !== 'off';
@@ -876,6 +963,61 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   // never let that outbound API call block agent event draining.
   const reactionPromise =
     cotEnabled || replyMode === 'card' ? undefined : addWorkingReaction(channel, lastMsg.messageId);
+  let collaborationFinalState: RunState | undefined;
+  let collaborationFinalized = false;
+
+  const recordCollaborationResult = async (state: RunState): Promise<void> => {
+    if (!collaboration || !collaborationRun?.dispatchId) return;
+    const extracted = extractCollaborationHandoff(renderText(finalAnswerOnlyState(state)));
+    if (extracted.handoff) {
+      try {
+        const target = await collaboration.createHandoff({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          targetAgentId: extracted.handoff.targetAgentId,
+          content: extracted.handoff.content,
+          runId: execution.runId,
+        });
+        await channel.send(chatId, { markdown: extracted.handoff.content }, {
+          ...sendOpts,
+          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+        });
+      } catch (err) {
+        log.fail('collab-handoff', err);
+      }
+    }
+    if (extracted.reply) {
+      try {
+        const target = await collaboration.createReply({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          targetAgentId: extracted.reply.targetAgentId,
+          content: extracted.reply.content,
+          runId: execution.runId,
+        });
+        await channel.send(chatId, { markdown: extracted.reply.content }, {
+          ...sendOpts,
+          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+        });
+      } catch (err) {
+        log.fail('collab-reply', err);
+      }
+    }
+    await collaboration.finishRun(
+      collaborationRun.taskId,
+      extracted.visibleContent,
+      execution.runId,
+      collaborationRun.dispatchId,
+      state.terminal === 'done',
+    );
+    collaborationFinalized = true;
+    log.info('collab', 'run-finalized', {
+      taskId: collaborationRun.taskId,
+      dispatchId: collaborationRun.dispatchId,
+      status: state.terminal === 'done' ? 'completed' : 'failed',
+      chars: extracted.visibleContent.length,
+    });
+  };
 
   try {
     if (cotEnabled) {
@@ -919,6 +1061,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           sendOpts,
           cardRenderOptions,
         });
+        await recordCollaborationResult(finalState);
         return;
       }
       log.warn('cot', 'fallback-existing-reply', { reason: 'create-disabled' });
@@ -942,7 +1085,10 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
             await cardCtrl.update(renderCard(filterForPrefs(state), cardRenderOptions));
           }
         },
-      );
+      ).then((state) => {
+        collaborationFinalState = state;
+        return state;
+      });
       const streamDone = channel.stream(
         chatId,
         {
@@ -987,7 +1133,10 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
             await markdownCtrl.setContent(renderText(filterForPrefs(state)));
           }
         },
-      );
+      ).then((state) => {
+        collaborationFinalState = state;
+        return state;
+      });
       const streamDone = channel.stream(
         chatId,
         {
@@ -1024,6 +1173,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         recordSession,
         async () => {},
       );
+      collaborationFinalState = finalState;
       await sendFinalReply({
         channel,
         chatId,
@@ -1034,8 +1184,18 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         cardRenderOptions,
       });
     }
+    if (collaborationFinalState) await recordCollaborationResult(collaborationFinalState);
   } catch (err) {
     log.fail('stream', err);
+    if (collaboration && collaborationRun?.dispatchId && !collaborationFinalized) {
+      await collaboration.finishRun(
+        collaborationRun.taskId,
+        '',
+        execution.runId,
+        collaborationRun.dispatchId,
+        false,
+      ).catch((ackErr) => log.fail('collab-finalize', ackErr));
+    }
   } finally {
     activePolicyFingerprints.delete(scope);
     scheduleWorkingReactionCleanup(channel, lastMsg.messageId, reactionPromise);
@@ -1051,7 +1211,7 @@ async function sendFinalReply(input: {
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
 }): Promise<void> {
-  const body = renderText(input.state);
+  const body = extractCollaborationHandoff(renderText(input.state)).visibleContent;
 
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
@@ -1077,22 +1237,51 @@ async function sendFinalReply(input: {
         log.warn('outbound', 'markdown-stream-fallback', {
           err: err instanceof Error ? err.message : String(err),
         });
-        const result = await input.channel.send(
-          input.chatId,
-          { markdown: body },
-          input.sendOpts,
-        );
+        const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
         log.info('outbound', 'sent', outboundLogFields(input, 'markdown', body, result));
       }
     }
   } else if (body.trim()) {
-    const result = await input.channel.send(
-      input.chatId,
-      { markdown: body },
-      input.sendOpts,
-    );
+    const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
     log.info('outbound', 'sent', outboundLogFields(input, 'text', body, result));
   }
+}
+
+const TOPIC_MARKDOWN_CHUNK_LIMIT = 3500;
+
+/**
+ * The channel SDK deliberately removes replyTo after its first long-message
+ * chunk.  That makes the remaining text a new group message.  For a Feishu
+ * topic, every chunk must explicitly remain a reply to the topic message.
+ */
+async function sendMarkdownReply(
+  channel: LarkChannel,
+  chatId: string,
+  body: string,
+  sendOpts: { replyTo: string; replyInThread?: boolean },
+): Promise<{ messageId: string; chunkIds?: string[] }> {
+  const chunks = sendOpts.replyInThread ? splitMarkdownForTopic(body) : [body];
+  const ids: string[] = [];
+  for (const chunk of chunks) {
+    const result = await channel.send(chatId, { markdown: chunk }, sendOpts);
+    ids.push(...(result.chunkIds ?? [result.messageId]));
+  }
+  return { messageId: ids[0] ?? '', ...(ids.length > 1 ? { chunkIds: ids } : {}) };
+}
+
+export function splitMarkdownForTopic(body: string): string[] {
+  if (body.length <= TOPIC_MARKDOWN_CHUNK_LIMIT) return [body];
+  const chunks: string[] = [];
+  let remaining = body;
+  while (remaining.length > TOPIC_MARKDOWN_CHUNK_LIMIT) {
+    const window = remaining.slice(0, TOPIC_MARKDOWN_CHUNK_LIMIT + 1);
+    const boundary = Math.max(window.lastIndexOf('\n\n'), window.lastIndexOf('\n'), window.lastIndexOf(' '));
+    const end = boundary > 0 ? boundary : TOPIC_MARKDOWN_CHUNK_LIMIT;
+    chunks.push(remaining.slice(0, end).trimEnd());
+    remaining = remaining.slice(end).trimStart();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
 }
 
 async function sendCotDegradedNotice(input: {
@@ -1380,6 +1569,7 @@ function buildPrompt(
   attachments: LocalAttachment[],
   quotes: QuotedContext[] = [],
   botIdentity?: { openId: string; name?: string },
+  collaborationContext?: string,
 ): string {
   const first = batch[0];
   if (!first) return '';
@@ -1406,7 +1596,7 @@ function buildPrompt(
   const senderType = senderTypeOf(first);
   const mentions = mergeMentions(batch);
 
-  return buildAgentPrompt({
+  const prompt = buildAgentPrompt({
     context: {
       chatId: first.chatId,
       chatType: first.chatType,
@@ -1425,6 +1615,7 @@ function buildPrompt(
     interactiveCards: batch.map(toPromptInteractiveCard).filter(isDefined),
     attachments: attachments.map(toPromptAttachment),
   });
+  return collaborationContext ? `${collaborationContext}\n\n${prompt}` : prompt;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   }>,
   exitCodes: [] as number[],
   outputs: [] as string[],
+  skipBindTargetProjection: false,
   onSpawn: undefined as undefined | ((callIndex: number, args: string[], env?: NodeJS.ProcessEnv) => void),
 }));
 
@@ -95,6 +96,7 @@ describe('lark-cli preflight', () => {
     mocks.atomicWriteFailures = [];
     mocks.exitCodes = [];
     mocks.outputs = [];
+    mocks.skipBindTargetProjection = false;
     mocks.onSpawn = undefined;
     mocks.spawnProcessSync.mockReturnValue({ status: 0 });
     mocks.spawnProcess.mockImplementation(
@@ -112,6 +114,27 @@ describe('lark-cli preflight', () => {
         const exitCode = mocks.exitCodes.shift() ?? 0;
         const output = mocks.outputs.shift() ?? '';
         queueMicrotask(() => {
+          if (
+            exitCode === 0 &&
+            !mocks.skipBindTargetProjection &&
+            args[0] === 'config' &&
+            args[1] === 'bind' &&
+            options.env?.LARKSUITE_CLI_CONFIG_DIR &&
+            options.env.LARK_CHANNEL_CONFIG
+          ) {
+            const projected = JSON.parse(readFileSync(options.env.LARK_CHANNEL_CONFIG, 'utf8')) as AppConfig;
+            const target = join(options.env.LARKSUITE_CLI_CONFIG_DIR, 'lark-channel', 'config.json');
+            mkdirSync(join(options.env.LARKSUITE_CLI_CONFIG_DIR, 'lark-channel'), { recursive: true });
+            writeFileSync(target, JSON.stringify({
+              apps: [{
+                appId: projected.accounts.app.id,
+                brand: projected.accounts.app.tenant,
+                defaultAs: 'bot',
+                strictMode: 'bot',
+                users: null,
+              }],
+            }));
+          }
           if (output) child.stderr.write(output);
           child.emit('exit', exitCode);
         });
@@ -156,6 +179,30 @@ describe('lark-cli preflight', () => {
       accounts: { app: { id: string } };
     };
     expect(source.accounts.app.id).toBe('cli_codex');
+  });
+
+  it('rejects a successful bind command that wrote no current-profile target', async () => {
+    const root = await tempRoot();
+    const appPaths = resolveAppPaths({ rootDir: root, profile: 'deepseek' });
+    mocks.exitCodes = [0];
+    mocks.skipBindTargetProjection = true;
+    const printed: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((value) => printed.push(String(value)));
+
+    await preFlightChecks({
+      larkChannel: {
+        profile: appPaths.profile,
+        rootDir: appPaths.rootDir,
+        configPath: appPaths.configFile,
+        larkCliConfigDir: appPaths.larkCliConfigDir,
+        larkCliSourceConfigFile: appPaths.larkCliSourceConfigFile,
+      },
+      bridgeConfig,
+      appPaths,
+    });
+
+    expect(printed.join('\n')).toContain('binding verification failed');
+    await expect(readFile(appPaths.larkCliTargetConfigFile, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('falls back through a locked root source overlay for lark-cli builds without LARK_CHANNEL_CONFIG support', async () => {

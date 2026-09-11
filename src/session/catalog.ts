@@ -214,7 +214,7 @@ function normalizeEntry(input: unknown): SessionCatalogEntry | undefined {
   if (
     typeof raw.key !== 'string' ||
     typeof raw.scopeId !== 'string' ||
-    (raw.agentId !== 'claude' && raw.agentId !== 'codex' && raw.agentId !== 'antigravity') ||
+    (raw.agentId !== 'claude' && raw.agentId !== 'codex' && raw.agentId !== 'antigravity' && raw.agentId !== 'deepseek-harness') ||
     typeof raw.cwdRealpath !== 'string' ||
     typeof raw.policyFingerprint !== 'string' ||
     (raw.status !== 'active' && raw.status !== 'archived') ||
@@ -248,7 +248,7 @@ function matchesIdentity(entry: SessionCatalogEntry, input: SessionCatalogIdenti
 
 function isValidAgentEntry(entry: SessionCatalogEntry): boolean {
   if (entry.agentId === 'claude') return Boolean(entry.sessionId) && !entry.threadId;
-  if (entry.agentId === 'antigravity') return !entry.sessionId && !entry.threadId;
+  if (entry.agentId === 'antigravity' || entry.agentId === 'deepseek-harness') return !entry.sessionId && !entry.threadId;
   return Boolean(entry.threadId) && !entry.sessionId;
 }
 
@@ -259,9 +259,9 @@ function assertAgentIdentity(input: UpsertSessionCatalogInput): void {
     }
     return;
   }
-  if (input.agentId === 'antigravity') {
+  if (input.agentId === 'antigravity' || input.agentId === 'deepseek-harness') {
     if (input.sessionId || input.threadId) {
-      throw new Error('Antigravity catalog entries must not include sessionId or threadId');
+      throw new Error('Stateless catalog entries must not include sessionId or threadId');
     }
     return;
   }

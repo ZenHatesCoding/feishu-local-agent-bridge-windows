@@ -175,11 +175,58 @@ describe('topic message quote handling', () => {
       expect.objectContaining({ cardContentType: 'user_card_content' }),
     );
   });
+
+  it.each(['claude', 'codex', 'antigravity', 'deepseek-harness'] as const)(
+    'does not send a synthetic intake acknowledgement for %s',
+    async (agentKind) => {
+      const h = await createHarness({ agentKind });
+      await startTestBridge(h);
+
+      await h.channel.handlers.message?.(
+        message({
+          messageId: 'om_harness',
+          rootId: 'om_topic_root',
+          parentId: 'om_topic_root',
+          threadId: 'omt_topic',
+          content: '@Bridge 做一个长任务',
+        }),
+      );
+
+      await waitFor(() => h.agent.runOptions.length === 1);
+      expect(h.channel.sent).not.toContainEqual(
+        expect.objectContaining({
+          content: { markdown: '已收到，正在处理。完成后会在本话题发送最终结果。' },
+        }),
+      );
+    },
+  );
+
+  it.each(['antigravity', 'deepseek-harness'] as const)(
+    'keeps final-output %s non-streaming without a synthetic reply',
+    async (agentKind) => {
+      const h = await createHarness({ agentKind });
+      await startTestBridge(h);
+
+      await h.channel.handlers.message?.(
+        message({
+          messageId: 'om_harness',
+          rootId: 'om_topic_root',
+          parentId: 'om_topic_root',
+          threadId: 'omt_topic',
+          content: '@Bridge 做一个长任务',
+        }),
+      );
+
+      await waitFor(() => h.agent.runOptions.length === 1);
+      expect(h.channel.streams).toHaveLength(0);
+    },
+  );
 });
 
 async function createHarness(options: {
   chatMode?: 'group' | 'topic';
   quotedMessages?: Record<string, string>;
+  agentKind?: 'claude' | 'codex' | 'antigravity' | 'deepseek-harness';
 } = {}): Promise<{
   tmp: TmpProfile;
   channel: FakeLarkChannel & { handlers: MessageHandlerMap };
@@ -192,7 +239,7 @@ async function createHarness(options: {
   const tmp = await createTmpProfile('topic-quote-');
   const workspace = await realpath(tmp.workspace);
   const baseProfileConfig = createDefaultProfileConfig({
-    agentKind: 'claude',
+    agentKind: options.agentKind ?? 'claude',
     accounts: {
       app: {
         id: 'cli_test',
@@ -204,6 +251,13 @@ async function createHarness(options: {
       allowedChats: ['oc_topic_chat'],
       allowedUsers: ['ou_user'],
     },
+    ...(options.agentKind === 'codex'
+      ? { codex: { binaryPath: 'codex' } }
+      : options.agentKind === 'deepseek-harness'
+      ? { deepseekHarness: { binaryPath: 'node', entryPath: '/harness/cli.js' } }
+      : options.agentKind === 'antigravity'
+        ? { antigravity: { binaryPath: 'agy', printTimeout: '60m' } }
+        : {}),
   });
   const profileConfig = {
     ...baseProfileConfig,

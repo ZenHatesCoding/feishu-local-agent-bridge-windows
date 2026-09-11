@@ -1,5 +1,8 @@
 node_modules/
 dist/
+.runtime/
+__pycache__/
+*.pyc
 coverage/
 .corepack/
 *.log
@@ -24,3 +27,4 @@ tests-smoke/
 .gemini/
 AppData/
 workspace/
+vendor/

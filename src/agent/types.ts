@@ -45,6 +45,8 @@ export interface AgentRunOptions {
    * are adapter-specific.
   */
   stopGraceMs?: number;
+  /** Internal per-run environment such as collaboration task identity. */
+  env?: NodeJS.ProcessEnv;
 }
 
 export interface AgentRun {

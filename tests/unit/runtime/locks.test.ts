@@ -1,9 +1,13 @@
-import { mkdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveAppPaths } from '../../../src/config/app-paths';
-import { withProfileAndAppLocks } from '../../../src/runtime/locks';
+import {
+  cleanupStoppedRuntimeLocks,
+  runtimeLockMetaFile,
+  withProfileAndAppLocks,
+} from '../../../src/runtime/locks';
 
 const roots: string[] = [];
 
@@ -99,5 +103,65 @@ describe('runtime locks', () => {
     await withProfileAndAppLocks(second, 'cli_new', 'codex', async () => {
       expect(true).toBe(true);
     });
+  });
+
+  it('cleans only dead runtime locks owned by the stopped process', async () => {
+    const root = await makeRoot();
+    const paths = resolveAppPaths({ rootDir: root, profile: 'codex' });
+    const appId = 'cli_test';
+    const deadPid = 2_147_483_647;
+    const targets = [
+      { kind: 'profile', target: paths.profileLockFile },
+      { kind: 'app', target: paths.appLockFile(appId), appId },
+    ] as const;
+
+    for (const target of targets) {
+      await mkdir(`${target.target}.lock`, { recursive: true });
+      await writeFile(target.target, '', 'utf8');
+      await writeFile(
+        runtimeLockMetaFile(target.target),
+        `${JSON.stringify({
+          ...target,
+          profile: 'codex',
+          agentKind: 'codex',
+          pid: deadPid,
+          startedAt: new Date().toISOString(),
+        })}\n`,
+        'utf8',
+      );
+    }
+
+    await expect(cleanupStoppedRuntimeLocks(paths, appId, deadPid)).resolves.toEqual(
+      targets.map(({ target }) => target),
+    );
+    for (const { target } of targets) {
+      await expect(stat(`${target}.lock`)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(runtimeLockMetaFile(target))).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(target)).resolves.toBeDefined();
+    }
+  });
+
+  it('preserves locks when ownership does not match the stopped process', async () => {
+    const root = await makeRoot();
+    const paths = resolveAppPaths({ rootDir: root, profile: 'codex' });
+    const target = paths.profileLockFile;
+    await mkdir(`${target}.lock`, { recursive: true });
+    await writeFile(target, '', 'utf8');
+    await writeFile(
+      runtimeLockMetaFile(target),
+      `${JSON.stringify({
+        kind: 'profile',
+        target,
+        profile: 'codex',
+        agentKind: 'codex',
+        pid: 2_147_483_646,
+        startedAt: new Date().toISOString(),
+      })}\n`,
+      'utf8',
+    );
+
+    await expect(cleanupStoppedRuntimeLocks(paths, 'cli_test', 2_147_483_647)).resolves.toEqual([]);
+    await expect(stat(`${target}.lock`)).resolves.toBeDefined();
+    await expect(stat(runtimeLockMetaFile(target))).resolves.toBeDefined();
   });
 });

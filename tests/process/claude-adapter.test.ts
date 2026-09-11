@@ -96,6 +96,7 @@ describe('ClaudeAdapter process contract', () => {
 
     expect(record.env).toMatchObject({
       LARK_CHANNEL: '1',
+      LARK_CHANNEL_UNATTENDED: '1',
       LARK_CHANNEL_PROFILE: 'codex-dev',
       LARK_CHANNEL_HOME: rootDir,
       LARK_CHANNEL_CONFIG: larkCliSourceConfigFile,
@@ -245,6 +246,7 @@ async function createFakeClaude(options: {
       '    cwd: process.cwd(),',
       '    env: {',
       '      LARK_CHANNEL: process.env.LARK_CHANNEL,',
+      '      LARK_CHANNEL_UNATTENDED: process.env.LARK_CHANNEL_UNATTENDED,',
       '      LARK_CHANNEL_PROFILE: process.env.LARK_CHANNEL_PROFILE,',
       '      LARK_CHANNEL_HOME: process.env.LARK_CHANNEL_HOME,',
       '      LARK_CHANNEL_CONFIG: process.env.LARK_CHANNEL_CONFIG,',
@@ -270,6 +272,7 @@ async function readRecord(path: string): Promise<{
   cwd: string;
   env: {
     LARK_CHANNEL?: string;
+    LARK_CHANNEL_UNATTENDED?: string;
     LARK_CHANNEL_PROFILE?: string;
     LARK_CHANNEL_HOME?: string;
     LARK_CHANNEL_CONFIG?: string;
@@ -283,6 +286,7 @@ async function readRecord(path: string): Promise<{
     cwd: string;
     env: {
       LARK_CHANNEL?: string;
+      LARK_CHANNEL_UNATTENDED?: string;
       LARK_CHANNEL_PROFILE?: string;
       LARK_CHANNEL_HOME?: string;
       LARK_CHANNEL_CONFIG?: string;

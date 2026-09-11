@@ -81,6 +81,7 @@ describe('CodexAdapter process contract', () => {
     expect(record.stdin).not.toBe('hello from lark');
     expect(record.env).toMatchObject({
       LARK_CHANNEL: '1',
+      LARK_CHANNEL_UNATTENDED: '1',
       CODEX_HOME: '/outer/codex-home',
     });
     expect(record.env.APP_SECRET).toBe('inherited-secret');
@@ -118,6 +119,7 @@ describe('CodexAdapter process contract', () => {
 
     expect(record.env).toMatchObject({
       LARK_CHANNEL: '1',
+      LARK_CHANNEL_UNATTENDED: '1',
       LARK_CHANNEL_PROFILE: 'codex-dev',
       LARK_CHANNEL_HOME: rootDir,
       LARK_CHANNEL_CONFIG: larkCliSourceConfigFile,
@@ -448,6 +450,7 @@ async function createFakeCodex(options: {
       '    stdin,',
       '    env: {',
       '      LARK_CHANNEL: process.env.LARK_CHANNEL,',
+      '      LARK_CHANNEL_UNATTENDED: process.env.LARK_CHANNEL_UNATTENDED,',
       '      LARK_CHANNEL_PROFILE: process.env.LARK_CHANNEL_PROFILE,',
       '      LARK_CHANNEL_HOME: process.env.LARK_CHANNEL_HOME,',
       '      LARK_CHANNEL_CONFIG: process.env.LARK_CHANNEL_CONFIG,',
@@ -475,6 +478,7 @@ async function readRecord(path: string): Promise<{
   stdin: string;
   env: {
     LARK_CHANNEL?: string;
+    LARK_CHANNEL_UNATTENDED?: string;
     LARK_CHANNEL_PROFILE?: string;
     LARK_CHANNEL_HOME?: string;
     LARK_CHANNEL_CONFIG?: string;
@@ -490,6 +494,7 @@ async function readRecord(path: string): Promise<{
     stdin: string;
     env: {
       LARK_CHANNEL?: string;
+      LARK_CHANNEL_UNATTENDED?: string;
       LARK_CHANNEL_PROFILE?: string;
       LARK_CHANNEL_HOME?: string;
       LARK_CHANNEL_CONFIG?: string;

@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { delimiter, extname, isAbsolute, join } from 'node:path';
 
-export type AgentKind = 'claude' | 'codex' | 'antigravity';
+export type AgentKind = 'claude' | 'codex' | 'antigravity' | 'deepseek-harness';
 
 export interface DetectedAgent {
   kind: AgentKind;
@@ -49,6 +49,9 @@ export async function detectInstalledAgents(): Promise<DetectedAgent[]> {
     { kind: 'claude', command: process.env.LARK_CHANNEL_CLAUDE_BIN ?? 'claude' },
     { kind: 'codex', command: process.env.LARK_CHANNEL_CODEX_BIN ?? 'codex' },
     { kind: 'antigravity', command: process.env.LARK_CHANNEL_ANTIGRAVITY_BIN ?? 'agy' },
+    ...(process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY
+      ? [{ kind: 'deepseek-harness' as const, command: process.env.LARK_CHANNEL_NODE_BIN ?? 'node' }]
+      : []),
   ];
   const detected: DetectedAgent[] = [];
   for (const candidate of candidates) {

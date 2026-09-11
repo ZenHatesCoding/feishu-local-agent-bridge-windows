@@ -204,13 +204,25 @@ async function checkLarkCli(opts: PreFlightOptions): Promise<void> {
       : { status: 'not-needed' as const, reason: 'not-private-binding' };
   const sBind = p.spinner();
   sBind.start('Initializing lark-cli configuration');
-  const bindResult = await bindLarkCliWithCompatibility(
+  let bindResult = await bindLarkCliWithCompatibility(
     profileArgs,
     larkChannelEnv,
     appPaths,
     privateBinding,
     'bot-only',
   );
+  if (bindResult.success && privateBinding) {
+    const verified = await readPrivateTarget(appPaths, bridgeConfig);
+    if (!verified.sameApp) {
+      bindResult = {
+        success: false,
+        output: [
+          bindResult.output,
+          `lark-cli binding verification failed: current App was not written to ${appPaths.larkCliTargetConfigFile}`,
+        ].filter(Boolean).join('\n'),
+      };
+    }
+  }
   if (!bindResult.success) {
     sBind.error('lark-cli configuration failed');
     if (privateBinding) {

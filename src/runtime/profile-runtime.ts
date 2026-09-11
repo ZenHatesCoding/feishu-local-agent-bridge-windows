@@ -2,6 +2,7 @@ import { mkdir, readFile, realpath } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import * as p from '@clack/prompts';
 import { runRegistrationWizard } from '../bot/wizard';
+import { DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT } from '../agent/antigravity/adapter';
 import { detectInstalledAgents, type DetectedAgent } from '../cli/agent-detection';
 import {
   createBootstrapAntigravityConfig,
@@ -95,8 +96,16 @@ export function createRuntimeProfileConfig(
       ? {
           antigravity: input.antigravity ?? {
             binaryPath: process.env.LARK_CHANNEL_ANTIGRAVITY_BIN ?? defaultAgyCommand(),
-            printTimeout: '10m',
+            printTimeout: DEFAULT_ANTIGRAVITY_PRINT_TIMEOUT,
             dangerouslySkipPermissions: true,
+          },
+        }
+      : {}),
+    ...(input.agentKind === 'deepseek-harness'
+      ? {
+          deepseekHarness: input.deepseekHarness ?? {
+            binaryPath: process.env.LARK_CHANNEL_NODE_BIN ?? 'node',
+            entryPath: process.env.LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY ?? '',
           },
         }
       : {}),
@@ -118,7 +127,7 @@ export async function resolveProfileRuntime(
   if (!profile && opts.allowBootstrap) {
     const detected = await detectInstalledAgents();
     if (detected.length === 0) {
-      throw new Error('no supported local agent found; install claude, codex, or antigravity first');
+      throw new Error('no supported local agent found; install claude, codex, antigravity, or DeepSeek Harness first');
     }
     if (detected.length > 1) {
       const selected = await selectDetectedAgent(detected, opts.selectAgent);
@@ -408,7 +417,7 @@ function resolveBootstrapAgent(
   requestedAgent: AgentKind | undefined,
   profile: string | undefined,
 ): AgentKind | undefined {
-  return requestedAgent ?? (profile === 'codex' ? 'codex' : profile === 'antigravity' ? 'antigravity' : undefined);
+  return requestedAgent ?? (profile === 'codex' ? 'codex' : profile === 'antigravity' ? 'antigravity' : profile === 'deepseek' ? 'deepseek-harness' : undefined);
 }
 
 async function hasLegacyConfig(configPath: string): Promise<boolean> {
@@ -581,7 +590,7 @@ function formatAmbiguousAgentSelectionError(
 ): string {
   const lines = detected.map((agent) => `  - ${agent.kind}: ${agent.binaryPath}`);
   return [
-    '检测到多个本地 agent，请使用 --agent <claude|codex|antigravity> 指定要初始化哪一个。',
+    '检测到多个本地 agent，请使用 --agent <claude|codex|antigravity|deepseek-harness> 指定要初始化哪一个。',
     '已检测到：',
     ...lines,
   ].join('\n');
