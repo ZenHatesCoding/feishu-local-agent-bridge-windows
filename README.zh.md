@@ -5,25 +5,24 @@
 
 [English README](./README.md)
 
-## 一个推荐分支
+## 唯一推荐安装方式
 
-新电脑统一拉 **`feature/feishu-multi-agent-hub`**。它现在同时包含所有维护中的
+新电脑统一拉 **`main`**。它现在同时包含所有维护中的
 Agent 适配器、DeepSeek Harness 部署脚本、协作 Hub、共享文件和 Windows 后台管理。
 
 ```powershell
-git clone --branch feature/feishu-multi-agent-hub --single-branch `
-  https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
+git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 ```
 
-旧分支保留历史和回退价值，但新部署不再需要分别拉取：
+旧分支是历史快照，不是受支持的部署选择：
 
 | 分支 | 历史用途 | 新电脑建议 |
 | --- | --- | --- |
-| `main` | Claude Code、Codex、Antigravity 独立桥 | 改用最新功能分支 |
+| `main` | 统一适配器与协作平台 | **统一使用** |
 | `antigravity` | 较早的 Antigravity 专用封装 | 仅历史保留 |
 | `deepseek-harness` | 较早的 DeepSeek 专用封装 | 仅历史保留 |
-| `feature/feishu-multi-agent-hub` | 统一适配器与多 Agent 协作 | **统一使用** |
+| `feature/feishu-multi-agent-hub` | 初代统一 Hub 里程碑 | 仅历史保留 |
 
 同一份 checkout 可以构建所有 bridge runtime。每个机器人仍需要独立的飞书应用/
 profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项目 Hook 接入。

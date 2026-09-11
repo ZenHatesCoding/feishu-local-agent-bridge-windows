@@ -5,27 +5,25 @@ Feishu/Lark, either as independent bots or as a team collaborating in one topic.
 
 [中文说明](./README.zh.md)
 
-## One Recommended Branch
+## One Recommended Install
 
-For a new installation, clone **`feature/feishu-multi-agent-hub`**. It now
+For a new installation, clone **`main`**. It now
 contains all maintained bridge adapters, DeepSeek Harness setup scripts, the
 collaboration Hub, shared-file support and Windows process management.
 
 ```powershell
-git clone --branch feature/feishu-multi-agent-hub --single-branch `
-  https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
+git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 ```
 
-Older branches remain useful as rollback/history, but are not required for a
-fresh deployment:
+Older branches are historical snapshots, not supported deployment choices:
 
 | Branch | Historical scope | New-install recommendation |
 | --- | --- | --- |
-| `main` | Claude Code, Codex and Antigravity independent bridges | Use the latest feature branch instead |
+| `main` | Unified adapters and collaboration platform | **Use this branch** |
 | `antigravity` | Earlier Antigravity-only packaging | History only |
 | `deepseek-harness` | Earlier DeepSeek-only packaging | History only |
-| `feature/feishu-multi-agent-hub` | Unified adapters plus collaboration | **Use this branch** |
+| `feature/feishu-multi-agent-hub` | First unified Hub milestone | History only |
 
 The same checkout can build all bridge runtimes. Each bot still needs its own
 Feishu app/profile and local agent login. Hermes stays in its existing install

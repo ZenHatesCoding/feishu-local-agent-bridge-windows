@@ -5,12 +5,12 @@
 
 ## 先回答分支问题
 
-新电脑只拉 `feature/feishu-multi-agent-hub`。当前分支已经统一包含 Claude Code、
+新电脑只拉 `main`。当前主线已经统一包含 Claude Code、
 Codex、Antigravity、DeepSeek Harness 的 bridge 能力，以及 Hermes Hook 和协作 Hub。
 不需要为了部署不同 Agent 再切换或克隆其他分支。
 
-`main`、`antigravity`、`deepseek-harness` 是旧部署形态的历史/回退分支。它们可以
-继续独立使用，但不再是新部署文档的主路径。
+`antigravity`、`deepseek-harness`、`feature/feishu-multi-agent-hub` 是旧部署形态或
+里程碑的历史/回退分支，不再是新部署文档的主路径。
 
 ## 共同前置条件
 

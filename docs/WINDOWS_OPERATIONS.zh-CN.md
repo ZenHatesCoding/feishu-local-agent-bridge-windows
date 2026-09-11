@@ -5,8 +5,8 @@
 [概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [多电脑联网](./NETWORKING.zh-CN.md) |
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
-本文面向从 GitHub 克隆项目的新电脑。新部署统一使用
-`feature/feishu-multi-agent-hub`，不再需要为不同 Agent 拉多份分支。
+本文面向从 GitHub 克隆项目的新电脑。新部署统一使用 `main`，不再需要为不同
+Agent 拉多份分支。
 
 Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台电脑连接同一个 Hub。
 推荐从 `role: "all"` 开始：主电脑既是中心，也是现有 Bot 的执行节点；以后再增加
@@ -35,7 +35,7 @@ Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台�
 ## 从 GitHub 部署
 
 ```powershell
-git clone -b feature/feishu-multi-agent-hub https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git C:\feishu-multi-agent-hub
+git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git C:\feishu-multi-agent-hub
 Set-Location C:\feishu-multi-agent-hub
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\collab-pilot\Setup-CollabPilot.ps1
@@ -51,6 +51,11 @@ notepad .\.runtime\pilot.local.json
 ```
 
 预检不连接飞书，不停止现有 bridge，也不安装 Hermes。
+
+远程 Worker 使用独立且不受 Git 跟踪的 worker 清单、唯一的 `nodeId`、每个 Agent
+各自的 token；如果 Node 不在 `PATH`，清单中写绝对 Node 路径。先在本机预检、手动
+启动一个 Agent，并确认它已在 Hub 注册，再启用登录后自动启动。Hub 地址、机器名、用户
+路径和 token 均不得写入受跟踪文件。
 
 ## 清单结构
 

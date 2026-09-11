@@ -15,10 +15,10 @@ const pairs: Array<readonly [string, string]> = [
 ];
 
 describe('documentation navigation', () => {
-  it('keeps one unified new-install branch and all supported agents in both READMEs', async () => {
+  it('keeps main as the unified new-install branch and all supported agents in both READMEs', async () => {
     const docs = await Promise.all(['README.md', 'README.zh.md'].map((file) => readFile(resolve(root, file), 'utf8')));
     for (const content of docs) {
-      expect(content).toContain('feature/feishu-multi-agent-hub');
+      expect(content).toContain('`main`');
       expect(content).toContain('Claude Code');
       expect(content).toContain('Codex');
       expect(content).toContain('Antigravity');

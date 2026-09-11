@@ -24,8 +24,7 @@ Feishu App Secrets in the pilot manifest.
 ## Clone And Build
 
 ```powershell
-git clone --branch feature/feishu-multi-agent-hub --single-branch `
-  https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
+git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 Set-Location C:\feishu-local-agent-bridge
 Set-ExecutionPolicy -Scope Process Bypass
@@ -42,6 +41,12 @@ notepad .\.runtime\pilot.local.json
 ```
 
 Validation does not connect Feishu, stop bridges or install Hermes.
+
+For a remote worker, use a separate Git-ignored worker manifest, a unique
+`nodeId`, one token per agent, and an absolute Node executable path when Node
+is not on `PATH`. Validate the manifest locally, start one agent manually, and
+confirm that it appears in the Hub before enabling logon startup. Keep hub URLs,
+machine names, user paths and tokens out of tracked files.
 
 ## Manifest
 
