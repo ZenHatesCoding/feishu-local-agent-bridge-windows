@@ -17,6 +17,11 @@ $env:LARK_COLLAB_INSTANCE_ID = "$($env:LARK_COLLAB_NODE_ID):$Agent"
 # canonical Hub dispatch.  No bot is allowed to infer a partial target set
 # from its own callback delivery.
 $env:LARK_COLLAB_EVENT_SOURCE = if ($pilot.hub.coordinator -and $pilot.hub.coordinator.enabled) { 'coordinator' } else { 'distributed' }
+$env:LARK_COLLAB_AGENT_ROSTER = @(
+  Get-CollabAgents | ForEach-Object {
+    [ordered]@{ id = [string]$_.id; displayName = [string]$_.displayName; aliases = @($_.aliases) }
+  }
+) | ConvertTo-Json -Compress
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir
 Export-CollabRealLarkCliJs -Pilot $pilot -LaunchFilePath $agentConfig.launch.filePath

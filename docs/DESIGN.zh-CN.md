@@ -138,9 +138,10 @@ tenantKey + chatId + threadId -> taskId
 - 机器人互相引用、回复或误 `@` 不会无限循环；
 - 用户直接选择 Agent 的操作仍然自然，只需要正常 `@`。
 
-一条人类消息同时 `@` 多个 bot 时，静默 Coordinator 只接收一次该消息、解析完整的
-结构化 `@` 列表，并原子创建所有目标的 dispatch。执行 bridge 只等待和消费属于自己的
-dispatch，因此回调到达顺序不会再导致只有第一个 bot 响应。
+一条人类消息同时 `@` 多个 bot 时，每个收到事件的 bridge 都保留该飞书事件中的完整
+结构化 `@` 列表。第一个通过认证且自身确实在目标列表中的 bridge 一次提交全部目标，Hub
+原子创建所有 dispatch；后到回调只会幂等重放。因此回调到达顺序不会再导致只有第一个
+bot 响应。
 
 Agent 需要委派时，只在最终回答中输出一个 `collaboration_reply` 或
 `collaboration_handoff` 标记。Bridge 而不是模型负责消费标记、写入带父 dispatch 的
@@ -349,17 +350,12 @@ Fool 使用同样的协议，但通过一个隔离 Hermes 源码副本和可移�
 注入、未经授权唤醒取消与结果记录。Hermes 原源码、venv、配置、会话、记忆和
 技能不被重装或覆盖。
 
-## 规范事件源：静默 Coordinator
+## 完整 mention 的规范路由
 
-多 Agent 协作使用一个**静默 coordinator 飞书应用**作为唯一的话题消息写入者。它
-不运行模型、不回复；只从一条原始飞书事件解析完整的结构化 `@` 列表，并以一次 Hub
-提交创建全部 dispatch。执行 Bot（包括 Hermes）只等待并消费属于自己的 dispatch，
-不再从“我自己是否被 @”推断目标集合。
-
-这条边界尤其重要：用户一条 `@World @Justice` 必须原子地产生 World 与 Justice 的
-两个 fan-out dispatch，不会因为两个 Bot 的回调到达顺序、某个 bridge 短暂重连，或
-其中一个先开始运行而退化成单目标任务。Coordinator 应用需要被加入协作群，并订阅群
-消息事件；其 App ID 和 App Secret 只写入 Git 忽略的 Pilot 清单或进程环境。
+默认 distributed 事件源会保留任一收到回调的 bridge 所见完整结构化 `@` 列表，因此
+`@World @Justice` 无需第五个飞书应用也会原子创建两个 fan-out dispatch。静默
+Coordinator 仍是已有此类应用的部署可选项：它提供单一有序事件源，但不运行模型、不回复，
+凭据始终保留在 Git 忽略的本机配置中。
 
 无论实现如何演进，以下原则不变：飞书是操作界面，Hub 是唯一任务真相，Agent
 保留各自能力，上下文按任务和权限投影，真实通知与正式授权必须对应。

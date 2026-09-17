@@ -6,6 +6,7 @@ import {
 } from '@larksuite/channel';
 import type { CollaborationHub } from './hub';
 import type { AgentRegistration, MessageInput } from './types';
+import { resolveMentionedAgents } from './agent-roster';
 
 export interface FeishuCoordinatorOptions {
   tenant: 'feishu' | 'lark';
@@ -74,22 +75,7 @@ export function coordinatorInputForMessage(
   };
 }
 
-export function resolveMentionedAgents(
-  msg: Pick<NormalizedMessage, 'mentions'>,
-  agents: AgentRegistration[],
-): string[] {
-  const targets = new Set<string>();
-  for (const mention of msg.mentions ?? []) {
-    const candidates = [mention.openId, mention.name].filter((value): value is string => Boolean(value));
-    for (const agent of agents) {
-      const identities = [agent.id, agent.displayName, ...(agent.aliases ?? [])];
-      if (candidates.some((candidate) => identities.some((identity) => equalIdentity(candidate, identity)))) {
-        targets.add(agent.id);
-      }
-    }
-  }
-  return [...targets];
-}
+export { resolveMentionedAgents } from './agent-roster';
 
 function rawSenderType(msg: NormalizedMessage): 'human' | 'agent' {
   const raw = msg.raw as { sender?: { sender_type?: unknown } } | undefined;

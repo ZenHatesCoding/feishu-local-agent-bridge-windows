@@ -2,9 +2,11 @@ import type { NormalizedMessage } from '@larksuite/channel';
 import { CollaborationClient } from './client';
 import { stripTargetMentionPrefix } from './mentions';
 import type { AgentIdentity, Dispatch } from './types';
+import type { AgentRegistration } from './types';
 import type { NormalizedAttachment } from '../media/attachment';
 import { snapshotArtifact } from './artifact-store';
 import { taskIdFor } from './task-id';
+import { parseAgentRoster, resolveMentionedAgents } from './agent-roster';
 
 export interface BridgeCollaborationDecision {
   managed: boolean;
@@ -60,6 +62,7 @@ export class BridgeCollaborationAdapter {
     private readonly tenantKey: string,
     private readonly eventSource: 'distributed' | 'coordinator' = 'distributed',
     private readonly artifactRoot?: string,
+    private readonly agentRoster: AgentRegistration[] = [],
   ) {}
 
   registerIdentity(openId: string): Promise<void> {
@@ -92,7 +95,7 @@ export class BridgeCollaborationAdapter {
         ...(msg.senderName ? { name: msg.senderName } : {}),
       },
       content: msg.content || '(empty message)',
-      targetAgentIds: msg.mentionedBot ? [this.agentId] : [],
+      targetAgentIds: actorType === 'human' ? this.observedHumanTargets(msg) : [],
     });
 
     let dispatch = result.dispatches.find((item) => item.targetAgentId === this.agentId);
@@ -237,6 +240,16 @@ export class BridgeCollaborationAdapter {
     return undefined;
   }
 
+  private observedHumanTargets(msg: NormalizedMessage): string[] {
+    // Every delivery of a Feishu rich-text message carries its entire
+    // structured mention list.  Preserve that source fact instead of reducing
+    // it to the receiving bridge.  The self fallback keeps older SDK payloads
+    // compatible while preventing an unmentioned bridge from inventing work.
+    const targets = new Set(resolveMentionedAgents(msg, this.agentRoster));
+    if (msg.mentionedBot) targets.add(this.agentId);
+    return [...targets];
+  }
+
   private async acceptDispatch(
     msg: NormalizedMessage,
     taskId: string,
@@ -281,6 +294,7 @@ export function bridgeCollaborationFromEnv(): BridgeCollaborationAdapter | undef
     tenantKey!,
     eventSource,
     process.env.LARK_COLLAB_ARTIFACT_ROOT,
+    parseAgentRoster(process.env.LARK_COLLAB_AGENT_ROSTER),
   );
 }
 

@@ -10,8 +10,8 @@
 The project deploys the local Hub, ledger, visibility/routing protocol,
 artifact store, maintained bridge adapters, Hermes Hook and background process
 management. The user supplies Windows/Git/Node/pnpm, installed and logged-in
-agents, one Feishu app/profile per bot, a silent Coordinator app that receives
-group messages, actual launch commands, workspaces and model settings.
+agents, one Feishu app/profile per bot, actual launch commands, workspaces and
+model settings.
 
 Pilot supports both one Windows computer running the Hub and all Bots, and
 multiple computers connected to one Hub. Start with `role: "all"`: the main PC
@@ -42,10 +42,11 @@ notepad .\.runtime\pilot.local.json
 
 Validation does not connect Feishu, stop bridges or install Hermes.
 
-### Canonical multi-mention routing
+### Optional silent Coordinator
 
-Enable the silent Coordinator in the Git-ignored Pilot manifest so a single
-Feishu event creates the complete fan-out set for every mentioned Bot:
+The default distributed route already creates the complete fan-out set from the
+structured mentions present in any receiving Bot callback. Installations with
+an existing silent Coordinator app can optionally enable one ordered writer:
 
 ```json
 {
@@ -63,8 +64,7 @@ Feishu event creates the complete fan-out set for every mentioned Bot:
 Set the named App Secret only in the environment that starts the Pilot, then
 restart the Hub and all Bots. The Coordinator app must be in the collaboration
 group and receive group-message events. In this mode every execution Bot,
-including Hermes, waits for its coordinator-created dispatch rather than
-writing a partial event from its own callback.
+including Hermes, waits for its coordinator-created dispatch.
 
 For a remote worker, use a separate Git-ignored worker manifest, a unique
 `nodeId`, one token per agent, and an absolute Node executable path when Node

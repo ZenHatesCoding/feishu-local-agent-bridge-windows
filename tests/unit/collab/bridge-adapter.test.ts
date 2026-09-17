@@ -38,6 +38,7 @@ function message(input: {
   senderId: string;
   content: string;
   threadId?: string;
+  mentions?: Array<{ openId?: string; name?: string }>;
 }): NormalizedMessage {
   return {
     chatId: 'chat',
@@ -47,6 +48,7 @@ function message(input: {
     senderId: input.senderId,
     content: input.content,
     mentionedBot: true,
+    mentions: input.mentions ?? [],
     resources: [],
     raw: { sender: { sender_type: input.senderType } },
   } as unknown as NormalizedMessage;
@@ -105,6 +107,23 @@ describe('BridgeCollaborationAdapter', () => {
     await adapter.finishRun(decision.taskId!, 'World accepted architecture A', 'run-1', decision.dispatchId!, true);
     expect(JSON.stringify(hub.getContext(decision.taskId!, 'world')))
       .toContain('World accepted architecture A');
+  });
+
+  it('preserves all structured human mentions when one bridge reports the event', async () => {
+    const { hub, client } = await fixture();
+    const roster = [
+      { id: 'world', displayName: 'World' },
+      { id: 'chariot', displayName: 'Chariot' },
+    ];
+    const world = new BridgeCollaborationAdapter(client, 'world', 'tenant', 'distributed', undefined, roster);
+    const decision = await world.intake(message({
+      id: 'human-fanout', senderType: 'user', senderId: 'user', content: 'Review independently',
+      mentions: [{ name: 'World' }, { name: 'Chariot' }],
+    }));
+
+    expect(decision.respond).toBe(true);
+    expect(hub.listDispatches('world')).toHaveLength(1);
+    expect(hub.listDispatches('chariot')).toHaveLength(1);
   });
 
   it('snapshots accepted inbound attachments into shared task context', async () => {

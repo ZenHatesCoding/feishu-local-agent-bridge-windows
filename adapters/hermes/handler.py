@@ -177,6 +177,30 @@ def _wait_for_dispatch(task_id: str, agent_id: str) -> dict[str, Any] | None:
         delay = min(delay * 1.5, 1.0)
 
 
+def _observed_human_targets(context: dict[str, Any], agent_id: str) -> list[str]:
+    """Resolve the complete structured mention list shipped with this event."""
+    try:
+        roster = json.loads(os.environ.get("LARK_COLLAB_AGENT_ROSTER", "[]"))
+    except json.JSONDecodeError:
+        roster = []
+    targets: list[str] = []
+    for mention in context.get("mentions") or []:
+        if not isinstance(mention, dict):
+            continue
+        candidates = {str(mention.get(key) or "").strip().lower() for key in ("openId", "open_id", "name")}
+        for agent in roster if isinstance(roster, list) else []:
+            if not isinstance(agent, dict):
+                continue
+            identities = [agent.get("id"), agent.get("displayName"), *(agent.get("aliases") or [])]
+            if any(str(identity or "").strip().lower() in candidates for identity in identities):
+                target = str(agent.get("id") or "").strip()
+                if target and target not in targets:
+                    targets.append(target)
+    if agent_id not in targets:
+        targets.append(agent_id)
+    return targets
+
+
 def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dict[str, Any] | None:
     message_id = str(context.get("message_id") or "")
     message = str(context.get("message_full") or context.get("message") or "(empty message)")
@@ -210,7 +234,7 @@ def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dic
             "id": str(context.get("user_id") or "unknown"),
         },
         "content": message[:100_000],
-        "targetAgentIds": [agent_id],
+        "targetAgentIds": _observed_human_targets(context, agent_id),
     })
     return next(
         (item for item in result.get("dispatches", []) if item.get("targetAgentId") == agent_id),

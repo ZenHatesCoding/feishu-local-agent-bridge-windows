@@ -8,6 +8,13 @@
 +                "message_id": getattr(source, "message_id", None) or getattr(event, "message_id", None) or "",
 +                "is_bot": bool(getattr(source, "is_bot", False)),
 +                "mentioned_bot": bool(getattr(source, "mentioned_bot", False)),
++                "mentions": [
++                    {
++                        "openId": getattr(item, "open_id", None) or getattr(item, "openId", None),
++                        "name": getattr(item, "name", None),
++                    }
++                    for item in (getattr(source, "mentions", None) or [])
++                ],
              }
              await self.hooks.emit("agent:start", hook_ctx)
 +            if hook_ctx.get("cancel"):

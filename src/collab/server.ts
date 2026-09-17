@@ -160,8 +160,8 @@ function authorizeAgent(principal: Principal, agentId: string): void {
 function authorizeEvent(principal: Principal, input: HubInput): void {
   if (principal.kind === 'admin') return;
   if (input.type === 'message') {
-    if (input.targetAgentIds.some((id) => id !== principal.agentId)) {
-      throw new AuthorizationError('agent credential can only route an observed message to itself');
+    if (input.targetAgentIds.length > 0 && !input.targetAgentIds.includes(principal.agentId)) {
+      throw new AuthorizationError('agent credential can only route a message that really mentioned itself');
     }
     return;
   }

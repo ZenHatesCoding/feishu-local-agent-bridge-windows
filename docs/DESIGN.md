@@ -88,10 +88,12 @@ assignment starts a new root at depth 1, so a long-lived topic never becomes
 unusable merely because it has accumulated legitimate work. The causal-depth
 ceiling only stops unbounded Agent-to-Agent recursion.
 
-When one human message mentions several bots, the silent coordinator receives
-the message once, resolves its complete structured mention list, and creates
-all target dispatches atomically. Execution bridges only wait for their own
-dispatches, so callback arrival order cannot make only the first bot respond.
+When one human message mentions several bots, every receiving bridge preserves
+the complete structured mention list contained in that one Feishu event. The
+first authenticated mentioned bridge submits the whole set and the Hub creates
+all target dispatches atomically; later deliveries are idempotent. A bridge may
+submit a set only when it is itself among the structured targets. Callback
+arrival order therefore cannot make only the first bot respond.
 
 Dispatches have an explicit lifecycle: `pending -> accepted -> completed` or
 `pending -> accepted -> failed`. A child action must name an accepted parent
@@ -267,14 +269,11 @@ processes still use distinct Feishu profiles and environments. The pilot
 manifest describes launch/rollback commands; it does not install or log into
 agents on the user's behalf.
 
-The silent coordinator Feishu app is the canonical event source. It parses the
-complete structured mention list from one raw Feishu event and writes every
-fan-out dispatch in one Hub submission. It never runs a model or replies;
-execution bots, including Hermes, only consume their authorized dispatches.
-Thus `@World @Justice` cannot collapse into a single-target task because of
-callback ordering or a brief bridge reconnect. The coordinator must join the
-collaboration group and subscribe to group-message events; its credentials
-stay in the Git-ignored Pilot manifest or process environment.
+The default distributed event source preserves the complete structured mention
+list from any one receiving bridge, so `@World @Justice` creates both fan-out
+dispatches without a fifth Feishu app. A silent coordinator remains an optional
+single ordered event source for installations that already operate one; it
+never runs a model or replies, and its credentials stay Git-ignored.
 
 Whatever implementation evolves, these invariants remain: Feishu is the user
 interface, the Hub is task truth, agents preserve their individual abilities,

@@ -66,11 +66,11 @@ describe('Collaboration Hub per-agent authentication', () => {
       address: { tenantKey: 'tenant', chatId: 'chat', threadId: 'topic' },
       messageId: 'om_bad', actor: { type: 'human', id: 'user' }, content: 'Wake other bot',
       targetAgentIds: ['chariot'],
-    })).rejects.toThrow('only route an observed message to itself');
+    })).rejects.toThrow('really mentioned itself');
     await expect(admin.registerIdentity('chariot', 'ou_real')).resolves.toMatchObject({ agent: { id: 'chariot' } });
   });
 
-  it('fans out one message when each authenticated bot reports its own real mention', async () => {
+  it('accepts one complete structured mention set from any mentioned bot', async () => {
     const { world, chariot } = await fixture();
     const input = {
       type: 'message' as const,
@@ -81,10 +81,9 @@ describe('Collaboration Hub per-agent authentication', () => {
       content: 'Answer independently',
     };
 
-    await world.submit({ ...input, targetAgentIds: ['world'] });
-    const merged = await chariot.submit({ ...input, targetAgentIds: ['chariot'] });
+    const routed = await world.submit({ ...input, targetAgentIds: ['world', 'chariot'] });
 
-    expect(merged.dispatches.map((item) => item.targetAgentId).sort()).toEqual(['chariot', 'world']);
+    expect(routed.dispatches.map((item) => item.targetAgentId).sort()).toEqual(['chariot', 'world']);
     expect((await world.dispatches('world')).dispatches).toHaveLength(1);
     expect((await chariot.dispatches('chariot')).dispatches).toHaveLength(1);
   });
