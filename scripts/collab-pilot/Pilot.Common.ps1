@@ -177,6 +177,22 @@ function Initialize-CollabRuntimeState {
     maxConversationTurns = if ($pilot.hub.maxConversationTurns) { [int]$pilot.hub.maxConversationTurns } else { 32 }
     agents = $hubAgents
   }
+  # A coordinator is the canonical Feishu event writer.  It is deliberately
+  # configured in the private Pilot manifest so its App Secret never reaches
+  # the generated runtime config or the repository.
+  if ($pilot.hub.coordinator -and $pilot.hub.coordinator.enabled) {
+    $coordinator = $pilot.hub.coordinator
+    if (!$coordinator.tenant -or !$coordinator.appId -or !$coordinator.appSecretEnv) {
+      throw 'Enabled hub.coordinator requires tenant, appId, and appSecretEnv in the Pilot manifest.'
+    }
+    $config['coordinator'] = [ordered]@{
+      enabled = $true
+      tenant = [string]$coordinator.tenant
+      appId = [string]$coordinator.appId
+      appSecretEnv = [string]$coordinator.appSecretEnv
+      tenantKey = if ($coordinator.tenantKey) { [string]$coordinator.tenantKey } else { Get-CollabTenantKey }
+    }
+  }
   [IO.File]::WriteAllText($script:CollabConfigFile, ($config | ConvertTo-Json -Depth 8))
 }
 

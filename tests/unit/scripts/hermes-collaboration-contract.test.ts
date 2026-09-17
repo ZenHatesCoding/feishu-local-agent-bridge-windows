@@ -10,7 +10,8 @@ describe('Hermes collaboration Hook contract', () => {
     expect(gatewayPatch).toContain('mentioned_bot');
     expect(gatewayPatch).toContain('self._mentions_self(message)');
     expect(handler).toContain('if not bool(context.get("mentioned_bot"))');
-    expect(handler).toContain('return _pending_dispatch(task_id, agent_id)');
+    expect(handler).toContain('def _wait_for_dispatch(task_id: str, agent_id: str)');
+    expect(handler).toContain('LARK_COLLAB_EVENT_SOURCE", "distributed") == "coordinator"');
     expect(handler).toContain('context["cancel"] = True');
   });
 

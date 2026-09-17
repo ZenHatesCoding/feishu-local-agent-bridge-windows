@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -159,14 +160,37 @@ def _pending_dispatch(task_id: str, agent_id: str) -> dict[str, Any] | None:
     return max(matches, key=lambda item: int(item.get("sequence", 0)), default=None)
 
 
+def _wait_for_dispatch(task_id: str, agent_id: str) -> dict[str, Any] | None:
+    """Wait for the canonical coordinator write to reach the Hub.
+
+    Hermes is an execution endpoint, never a second event writer, when the
+    Pilot enables the silent coordinator.  A short bounded wait tolerates the
+    normal race between the coordinator and this bot's Feishu callback.
+    """
+    deadline = time.monotonic() + 10
+    delay = 0.1
+    while True:
+        dispatch = _pending_dispatch(task_id, agent_id)
+        if dispatch is not None or time.monotonic() >= deadline:
+            return dispatch
+        time.sleep(delay)
+        delay = min(delay * 1.5, 1.0)
+
+
 def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dict[str, Any] | None:
     message_id = str(context.get("message_id") or "")
     message = str(context.get("message_full") or context.get("message") or "(empty message)")
     is_bot = bool(context.get("is_bot"))
     if is_bot:
-        return _pending_dispatch(task_id, agent_id)
+        return _wait_for_dispatch(task_id, agent_id)
     if not bool(context.get("mentioned_bot")):
-        return _pending_dispatch(task_id, agent_id)
+        return _wait_for_dispatch(task_id, agent_id)
+
+    # The canonical coordinator parses the complete structured mention list
+    # once and creates every fan-out dispatch.  Do not reduce that list to
+    # Hermes alone by writing a competing event from this callback.
+    if os.environ.get("LARK_COLLAB_EVENT_SOURCE", "distributed") == "coordinator":
+        return _wait_for_dispatch(task_id, agent_id)
 
     _, _, tenant, _ = _settings()
     stable_id = message_id or hashlib.sha256(

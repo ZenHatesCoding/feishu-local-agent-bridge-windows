@@ -52,6 +52,16 @@ describe('Feishu coordinator normalization', () => {
     });
   });
 
+  it('creates one complete fan-out set from a single Feishu event', () => {
+    const input = coordinatorInputForMessage(fakeMessage({
+      mentions: [
+        { key: '@_user_1', name: 'World' },
+        { key: '@_user_2', name: 'Chariot' },
+      ],
+    }), { tenantKey: 'tenant', agents });
+    expect(input?.targetAgentIds).toEqual(['world', 'chariot']);
+  });
+
   it('ignores direct messages and non-topic groups', () => {
     expect(coordinatorInputForMessage(fakeMessage({ chatType: 'p2p' }), {
       tenantKey: 'tenant', agents,

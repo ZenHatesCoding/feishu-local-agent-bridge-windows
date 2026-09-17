@@ -57,4 +57,14 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(common).toContain("'LARK_COLLAB_REAL_LARK_CLI_JS'");
     expect(run).toContain('Export-CollabRealLarkCliJs -Pilot $pilot');
   });
+
+  it('uses the silent coordinator as the only human-message writer when configured', () => {
+    const common = readPilotScript('Pilot.Common.ps1');
+    const runAgent = readPilotScript('run-agent.ps1');
+    const runHub = readPilotScript('run-hub.ps1');
+
+    expect(common).toContain("$config['coordinator']");
+    expect(runAgent).toContain("LARK_COLLAB_EVENT_SOURCE = if ($pilot.hub.coordinator");
+    expect(runHub).toContain('Enabled hub.coordinator requires process environment variable');
+  });
 });

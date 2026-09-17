@@ -88,13 +88,10 @@ assignment starts a new root at depth 1, so a long-lived topic never becomes
 unusable merely because it has accumulated legitimate work. The causal-depth
 ceiling only stops unbounded Agent-to-Agent recursion.
 
-When one human message mentions several bots, Feishu delivers that same message
-through each bot application's independent event connection. The Hub merges
-those authenticated observations by Feishu message ID. Each bridge may assert
-only its own real mention; the append-only routing expansion creates one
-dispatch per newly observed target and clears single-owner state once the
-message becomes fanout. Arrival order therefore cannot make only the first bot
-respond, including when Hermes reaches the Hub later than the Node bridges.
+When one human message mentions several bots, the silent coordinator receives
+the message once, resolves its complete structured mention list, and creates
+all target dispatches atomically. Execution bridges only wait for their own
+dispatches, so callback arrival order cannot make only the first bot respond.
 
 Dispatches have an explicit lifecycle: `pending -> accepted -> completed` or
 `pending -> accepted -> failed`. A child action must name an accepted parent
@@ -270,10 +267,14 @@ processes still use distinct Feishu profiles and environments. The pilot
 manifest describes launch/rollback commands; it does not install or log into
 agents on the user's behalf.
 
-Current distributed intake lets the mentioned execution bridge submit an
-event. A stricter production shape can use a fifth silent coordinator app as
-the single ordered event stream. It never runs a model or replies; execution
-bots consume only their authorized dispatches.
+The silent coordinator Feishu app is the canonical event source. It parses the
+complete structured mention list from one raw Feishu event and writes every
+fan-out dispatch in one Hub submission. It never runs a model or replies;
+execution bots, including Hermes, only consume their authorized dispatches.
+Thus `@World @Justice` cannot collapse into a single-target task because of
+callback ordering or a brief bridge reconnect. The coordinator must join the
+collaboration group and subscribe to group-message events; its credentials
+stay in the Git-ignored Pilot manifest or process environment.
 
 Whatever implementation evolves, these invariants remain: Feishu is the user
 interface, the Hub is task truth, agents preserve their individual abilities,

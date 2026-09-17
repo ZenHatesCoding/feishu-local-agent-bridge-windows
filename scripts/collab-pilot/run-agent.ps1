@@ -13,7 +13,10 @@ $env:LARK_COLLAB_TENANT_KEY = Get-CollabTenantKey
 $env:LARK_COLLAB_AGENT_ID = $Agent
 $env:LARK_COLLAB_NODE_ID = if ($pilot.nodeId) { [string]$pilot.nodeId } else { [Environment]::MachineName }
 $env:LARK_COLLAB_INSTANCE_ID = "$($env:LARK_COLLAB_NODE_ID):$Agent"
-$env:LARK_COLLAB_EVENT_SOURCE = 'distributed'
+# With a configured coordinator, every execution bridge consumes the one
+# canonical Hub dispatch.  No bot is allowed to infer a partial target set
+# from its own callback delivery.
+$env:LARK_COLLAB_EVENT_SOURCE = if ($pilot.hub.coordinator -and $pilot.hub.coordinator.enabled) { 'coordinator' } else { 'distributed' }
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir
 Export-CollabRealLarkCliJs -Pilot $pilot -LaunchFilePath $agentConfig.launch.filePath

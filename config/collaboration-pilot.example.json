@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "role": "all",
   "nodeId": "main-pc",
-  "hub": { "bindHost": "127.0.0.1", "publicUrl": "http://127.0.0.1:17321", "port": 17321, "leaseMinutes": 30, "maxCausalDepth": 8, "maxConversationTurns": 32, "tenantKey": "replace-with-a-private-shared-key" },
+  "hub": { "bindHost": "127.0.0.1", "publicUrl": "http://127.0.0.1:17321", "port": 17321, "leaseMinutes": 30, "maxCausalDepth": 8, "maxConversationTurns": 32, "tenantKey": "replace-with-a-private-shared-key", "coordinator": { "enabled": false, "tenant": "feishu", "appId": "cli_replace_with_silent_coordinator_app_id", "appSecretEnv": "LARK_COLLAB_COORDINATOR_SECRET" } },
   "larkCliJs": "",
   "commonEnvironment": { "LARK_CHANNEL_DISABLE_PROXY": "1" },
   "unsetEnvironment": ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"],

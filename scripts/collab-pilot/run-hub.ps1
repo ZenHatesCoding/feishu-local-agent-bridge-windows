@@ -1,5 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
+$pilot = Get-CollabPilotConfig
+
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $StateDir = Join-Path $RepoRoot '.runtime'
 $TokenFile = Join-Path $StateDir 'hub-token.txt'
@@ -15,6 +18,12 @@ $agentTokens = Get-Content -LiteralPath $AgentTokenFile -Raw | ConvertFrom-Json
 foreach ($property in $agentTokens.PSObject.Properties) {
   $safeId = ([string]$property.Name).ToUpperInvariant() -replace '[^A-Z0-9]', '_'
   [Environment]::SetEnvironmentVariable("LARK_COLLAB_AGENT_TOKEN_$safeId", ([string]$property.Value).Trim(), 'Process')
+}
+if ($pilot.hub.coordinator -and $pilot.hub.coordinator.enabled) {
+  $secretEnv = [string]$pilot.hub.coordinator.appSecretEnv
+  $secret = [Environment]::GetEnvironmentVariable($secretEnv, 'Process')
+  if (!$secret) { throw "Enabled hub.coordinator requires process environment variable $secretEnv." }
+  [Environment]::SetEnvironmentVariable($secretEnv, $secret, 'Process')
 }
 Remove-Item Env:HTTP_PROXY -ErrorAction SilentlyContinue
 Remove-Item Env:HTTPS_PROXY -ErrorAction SilentlyContinue

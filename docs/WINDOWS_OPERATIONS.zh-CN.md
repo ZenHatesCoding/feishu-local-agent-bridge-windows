@@ -27,6 +27,7 @@ Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台�
 - Windows、Node.js 20.12+、pnpm 和 Git；
 - 已安装并完成登录的本地 Agent；
 - 每个机器人各自的飞书 PersonalAgent 应用、权限、事件订阅和 bridge profile；
+- 一个静默 Coordinator 飞书应用（加入协作群、订阅群消息事件；不回复、不运行模型）；
 - 每个 Agent 的实际启动命令、工作区、profile 目录和必要环境变量；
 - 不在本项目适配范围内的 Agent bridge。它必须接入 Hub 协议，不能仅仅启动原生 CLI。
 
@@ -51,6 +52,28 @@ notepad .\.runtime\pilot.local.json
 ```
 
 预检不连接飞书，不停止现有 bridge，也不安装 Hermes。
+
+### 规范的多 @ 路由
+
+在 Git 忽略的 Pilot 清单中启用静默 Coordinator，使一条飞书消息一次性为全部被 @ 的
+Bot 创建完整 fan-out：
+
+```json
+{
+  "hub": {
+    "coordinator": {
+      "enabled": true,
+      "tenant": "feishu",
+      "appId": "cli_your_coordinator_app",
+      "appSecretEnv": "LARK_COLLAB_COORDINATOR_SECRET"
+    }
+  }
+}
+```
+
+只在启动 Pilot 的进程环境中设置该 App Secret，然后重启 Hub 与全部 Bot。Coordinator
+应用必须加入协作群并订阅群消息事件。启用后，包含 Hermes 在内的每个执行 Bot 都只等待
+Coordinator 创建的 dispatch，不会再从自己的回调写入不完整的目标集合。
 
 远程 Worker 使用独立且不受 Git 跟踪的 worker 清单、唯一的 `nodeId`、每个 Agent
 各自的 token；如果 Node 不在 `PATH`，清单中写绝对 Node 路径。先在本机预检、手动

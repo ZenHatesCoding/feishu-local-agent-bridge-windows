@@ -9,6 +9,15 @@ $agents = @(Get-CollabAgents)
 if ($agents.Count -eq 0) { $errors.Add('No enabled agents are configured.') }
 if ((Test-CollabRunsHub) -and !(Test-Path -LiteralPath (Join-Path $script:CollabRepoRoot 'dist\cli.js'))) { $errors.Add('dist\cli.js is missing; run pnpm build.') }
 if ((Get-CollabRole) -eq 'worker' -and !$pilot.hub.publicUrl) { $errors.Add('Worker role requires hub.publicUrl.') }
+if ($pilot.hub.coordinator -and $pilot.hub.coordinator.enabled) {
+  $coordinator = $pilot.hub.coordinator
+  if (!$coordinator.tenant -or !$coordinator.appId -or !$coordinator.appSecretEnv) {
+    $errors.Add('Enabled hub.coordinator requires tenant, appId, and appSecretEnv.')
+  }
+  if ($coordinator.tenant -and $coordinator.tenant -notin @('feishu', 'lark')) {
+    $errors.Add('hub.coordinator.tenant must be feishu or lark.')
+  }
+}
 $launchAgents = @(Get-CollabLocalAgents)
 foreach ($agent in $launchAgents) {
   if (!$agent.id -or !$agent.displayName) { $errors.Add('Every enabled agent needs id and displayName.'); continue }
