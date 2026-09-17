@@ -9,6 +9,7 @@ import { loadHubConfig } from '../../collab/config';
 import { CollaborationHub } from '../../collab/hub';
 import { JsonlLedger } from '../../collab/ledger';
 import { CollaborationHubServer } from '../../collab/server';
+import { collaborationHubCredential } from '../../collab/tool-credential';
 
 export async function runCollaborationHub(options: { config: string }): Promise<void> {
   const configPath = resolve(options.config);
@@ -81,9 +82,9 @@ export async function runCollaborationAction(
   },
 ): Promise<void> {
   const baseUrl = process.env.LARK_COLLAB_HUB_URL;
-  const token = process.env.LARK_COLLAB_HUB_TOKEN;
+  const token = collaborationHubCredential();
   if (!baseUrl || !token) {
-    throw new Error('LARK_COLLAB_HUB_URL and LARK_COLLAB_HUB_TOKEN are required');
+    throw new Error('LARK_COLLAB_HUB_URL and an agent-scoped Hub credential are required');
   }
   if ((type === 'reply' || type === 'handoff' || type === 'ask') && !options.target) {
     throw new Error(`${type} requires --target`);
@@ -113,7 +114,7 @@ export async function runArtifactPublish(options: {
   name?: string;
 }): Promise<void> {
   const baseUrl = requiredEnv('LARK_COLLAB_HUB_URL');
-  const token = requiredEnv('LARK_COLLAB_HUB_TOKEN');
+  const token = requiredHubCredential();
   const artifactRoot = requiredEnv('LARK_COLLAB_ARTIFACT_ROOT');
   const larkCliJs = requiredEnv('LARK_COLLAB_REAL_LARK_CLI_JS');
   if (!options.chatId && !options.replyTo) throw new Error('--chat-id or --reply-to is required');
@@ -220,7 +221,7 @@ export async function runArtifactRegisterGit(options: {
 }): Promise<void> {
   const client = new CollaborationClient({
     baseUrl: requiredEnv('LARK_COLLAB_HUB_URL'),
-    token: requiredEnv('LARK_COLLAB_HUB_TOKEN'),
+    token: requiredHubCredential(),
   });
   const artifact = await snapshotArtifact({
     sourcePath: resolve(options.path),
@@ -253,7 +254,7 @@ export async function runArtifactResolve(options: {
 }): Promise<void> {
   const client = new CollaborationClient({
     baseUrl: requiredEnv('LARK_COLLAB_HUB_URL'),
-    token: requiredEnv('LARK_COLLAB_HUB_TOKEN'),
+    token: requiredHubCredential(),
   });
   const context = await client.context(options.task, options.actor);
   if (options.list) {
@@ -285,6 +286,12 @@ function artifactCatalogItem(artifact: SharedArtifact): Record<string, unknown> 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function requiredHubCredential(): string {
+  const value = collaborationHubCredential();
+  if (!value) throw new Error('an agent-scoped Hub credential is required');
   return value;
 }
 

@@ -49,7 +49,7 @@ describe('collaboration artifact publisher', () => {
     servers.push(server);
     const address = await server.listen();
     process.env.LARK_COLLAB_HUB_URL = `http://127.0.0.1:${address.port}`;
-    process.env.LARK_COLLAB_HUB_TOKEN = 'test';
+    process.env.LARK_COLLAB_TOOL_HUB_CREDENTIAL = 'test';
     process.env.LARK_COLLAB_ARTIFACT_ROOT = join(root, 'artifacts');
     process.env.LARK_COLLAB_REAL_LARK_CLI_JS = fakeCli;
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -107,7 +107,7 @@ describe('collaboration artifact publisher', () => {
     servers.push(server);
     const address = await server.listen();
     process.env.LARK_COLLAB_HUB_URL = `http://127.0.0.1:${address.port}`;
-    process.env.LARK_COLLAB_HUB_TOKEN = 'test';
+    process.env.LARK_COLLAB_TOOL_HUB_CREDENTIAL = 'test';
     process.env.LARK_COLLAB_ARTIFACT_ROOT = join(root, 'artifacts');
     process.env.LARK_COLLAB_REAL_LARK_CLI_JS = fakeCli;
     process.env.TEST_BIND_MARKER = marker;

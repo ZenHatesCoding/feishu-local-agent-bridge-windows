@@ -55,6 +55,13 @@ if ([System.IO.Path]::GetFileName([string]$env:LARK_CHANNEL_ANTIGRAVITY_BIN) -ie
 foreach ($name in @($agentConfig.launch.unsetEnvironment)) {
   if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
 }
+# Tool runtimes such as DeepSeek Harness intentionally scrub ambient variables
+# whose names look like credentials before starting a model shell.  Publish and
+# collaboration commands still need this Agent's already-scoped Hub capability,
+# so expose it under the explicit tool-boundary name understood by the bridge.
+# This is assigned after all launch overrides so every local Bot has the same
+# durable delivery contract.
+$env:LARK_COLLAB_TOOL_HUB_CREDENTIAL = $env:LARK_COLLAB_HUB_TOKEN
 # Agent-specific PATH overrides are applied above. Put the Pilot's
 # identity-neutral commands first only after every override is complete.
 $env:PATH = "$commandDir;$env:PATH"

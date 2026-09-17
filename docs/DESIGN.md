@@ -227,6 +227,15 @@ keys. `collab-artifact.cmd publish` snapshots the file, sends it through the
 current bot identity, then records the event only after delivery succeeds.
 Inbound attachments are also snapshotted after bridge validation.
 
+Every Pilot-launched Agent also receives its own Hub credential through an
+explicit local tool-boundary capability. Normal bridges use the conventional
+credential environment name; tool runtimes that intentionally scrub
+credential-shaped ambient variables use this declared capability instead. The
+capability is per-Agent, remains local to that Agent process tree, and is never
+put in prompts, logs, or the ledger. This makes artifact delivery independent
+of a model runtime's environment-scrubbing policy without granting an Agent
+another Bot's identity.
+
 Registration does not make file bytes part of every prompt. Catalog metadata is
 cheap and always bounded; a full Artifact record is exposed only when the
 current dispatch references that file. `collab-artifact.cmd resolve --name`

@@ -67,4 +67,14 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(runAgent).toContain("LARK_COLLAB_EVENT_SOURCE = if ($pilot.hub.coordinator");
     expect(runHub).toContain('Enabled hub.coordinator requires process environment variable');
   });
+
+  it('projects every agent-scoped Hub credential into the explicit tool boundary', () => {
+    const run = readPilotScript('run-agent.ps1');
+    const launchEnvironment = run.indexOf('Set-CollabEnvironment $agentConfig.launch.environment');
+    const toolCredential = run.indexOf('$env:LARK_COLLAB_TOOL_HUB_CREDENTIAL = $env:LARK_COLLAB_HUB_TOKEN');
+    const launch = run.indexOf('& $filePath @arguments');
+
+    expect(toolCredential).toBeGreaterThan(launchEnvironment);
+    expect(toolCredential).toBeLessThan(launch);
+  });
 });
