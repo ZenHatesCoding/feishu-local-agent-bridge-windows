@@ -7,27 +7,26 @@
 
 ## 唯一推荐安装方式
 
-新电脑统一拉 **`main`**。它现在同时包含所有维护中的
+部署中心 Hub 时拉 **`release/hub`**。它现在同时包含所有维护中的
 Agent 适配器、DeepSeek Harness 部署脚本、协作 Hub、共享文件和 Windows 后台管理。
 
 ```powershell
-git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
+git clone --branch release/hub --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 ```
 
 ## 分支职责
 
-新部署统一使用 `main`。两条活跃工作线都从 `main` 开始，只有通过各自的验收后才合回
-主线；冻结线保留用于回退和历史独立部署。
+`release/*` 是部署基线，`develop/*` 是各自对应的开发线。其余分支均以
+`archive/*` 显式归档，仅用于回退或历史参考。
 
 | 分支 | 职责 | 管理策略 |
 | --- | --- | --- |
-| `main` | 稳定的统一产品与发布线 | **所有新安装统一使用** |
-| `codex/conversation-first-hub` | 活跃的 Hub 协议与会话语义工作线 | 从 `main` 开始；协议测试通过后合回 |
-| `feature/worker-windows-bootstrap` | 活跃的真实 Windows Worker 部署工作线 | 从 `main` 开始；真实第二台电脑 Feishu 验收后合回 |
-| `feature/feishu-multi-agent-hub` | 初代统一 Hub 里程碑 | 冻结；仅回退/历史使用 |
-| `antigravity` | 较早的 Antigravity 专用封装 | 冻结的独立部署回退线 |
-| `deepseek-harness` | 较早的 DeepSeek 专用封装 | 冻结的独立部署回退线 |
+| `release/hub` | 稳定的中心 Hub 部署 | **部署 Hub 时使用** |
+| `develop/hub` | Hub 协议与会话语义开发 | 协议测试通过后合入 `release/hub` |
+| `release/worker` | 稳定的第二台电脑 Worker 部署；Worker 不启动 Hub | 真实第二机 Feishu 验收通过后使用 |
+| `develop/worker` | 第二台电脑 Worker 部署开发 | 验收通过后合入 `release/worker` |
+| `archive/*` | 冻结里程碑与早期独立封装 | 仅回退/历史使用 |
 
 同一份 checkout 可以构建所有 bridge runtime。每个机器人仍需要独立的飞书应用/
 profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项目 Hook 接入。

@@ -15,10 +15,11 @@ const pairs: Array<readonly [string, string]> = [
 ];
 
 describe('documentation navigation', () => {
-  it('keeps main as the unified new-install branch and all supported agents in both READMEs', async () => {
+  it('keeps the Hub and Worker release branches as the new-install entries and all supported agents in both READMEs', async () => {
     const docs = await Promise.all(['README.md', 'README.zh.md'].map((file) => readFile(resolve(root, file), 'utf8')));
     for (const content of docs) {
-      expect(content).toContain('`main`');
+      expect(content).toContain('`release/hub`');
+      expect(content).toContain('`release/worker`');
       expect(content).toContain('Claude Code');
       expect(content).toContain('Codex');
       expect(content).toContain('Antigravity');

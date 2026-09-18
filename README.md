@@ -7,29 +7,28 @@ Feishu/Lark, either as independent bots or as a team collaborating in one topic.
 
 ## One Recommended Install
 
-For a new installation, clone **`main`**. It now
+For a Hub deployment, clone **`release/hub`**. It contains
 contains all maintained bridge adapters, DeepSeek Harness setup scripts, the
 collaboration Hub, shared-file support and Windows process management.
 
 ```powershell
-git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
+git clone --branch release/hub --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 ```
 
 ## Branch Roles
 
-New installations use `main`. The two active work lines start from `main` and
-are merged back only after their focused acceptance checks pass. Frozen lines
-remain available for rollback and historical standalone deployments.
+The `release/*` branches are deployment baselines and `develop/*` branches are
+their corresponding work lines. All other branches are explicit archives for
+rollback or historical reference.
 
 | Branch | Role | Policy |
 | --- | --- | --- |
-| `main` | Stable unified product and release line | **Use for every new installation** |
-| `codex/conversation-first-hub` | Active Hub protocol and conversation-semantics line | Start from `main`; merge after protocol tests pass |
-| `feature/worker-windows-bootstrap` | Active real-Windows-worker deployment line | Start from `main`; merge after a real second-PC Feishu check |
-| `feature/feishu-multi-agent-hub` | First unified Hub milestone | Frozen; rollback/history only |
-| `antigravity` | Earlier Antigravity-only packaging | Frozen standalone rollback path |
-| `deepseek-harness` | Earlier DeepSeek-only packaging | Frozen standalone rollback path |
+| `release/hub` | Stable central Hub deployment | **Use for a Hub installation** |
+| `develop/hub` | Hub protocol and conversation-semantics development | Merge into `release/hub` after protocol tests pass |
+| `release/worker` | Stable second-PC Worker deployment; the Worker does not start a Hub | Use after the real second-PC Feishu check passes |
+| `develop/worker` | Second-PC Worker deployment development | Merge into `release/worker` after that acceptance check |
+| `archive/*` | Frozen milestones and earlier standalone packages | Rollback/history only |
 
 The same checkout can build all bridge runtimes. Each bot still needs its own
 Feishu app/profile and local agent login. Hermes stays in its existing install
