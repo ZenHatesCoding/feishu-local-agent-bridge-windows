@@ -7,6 +7,10 @@
 
 ## Responsibility Boundary
 
+This page is for the central Hub computer. Clone `release/hub` for that role.
+A second computer that must not start a Hub should clone `release/worker` and
+follow its Worker deployment guide.
+
 The project deploys the local Hub, ledger, visibility/routing protocol,
 artifact store, maintained bridge adapters, Hermes Hook and background process
 management. The user supplies Windows/Git/Node/pnpm, installed and logged-in
@@ -24,7 +28,7 @@ Feishu App Secrets in the pilot manifest.
 ## Clone And Build
 
 ```powershell
-git clone https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
+git clone --branch release/hub --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 Set-Location C:\feishu-local-agent-bridge
 Set-ExecutionPolicy -Scope Process Bypass

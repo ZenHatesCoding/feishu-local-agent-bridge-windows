@@ -5,8 +5,8 @@
 [概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [多电脑联网](./NETWORKING.zh-CN.md) |
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
-本文面向从 GitHub 克隆项目的新电脑。新部署统一使用 `main`，不再需要为不同
-Agent 拉多份分支。
+本文面向部署中心 Hub 的新电脑：从 GitHub 克隆 `release/hub`。第二台只运行
+Worker 的电脑应克隆 `release/worker` 并使用 Worker 部署指南；不要在该机器启动 Hub。
 
 Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台电脑连接同一个 Hub。
 推荐从 `role: "all"` 开始：主电脑既是中心，也是现有 Bot 的执行节点；以后再增加

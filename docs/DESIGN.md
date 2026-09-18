@@ -273,7 +273,9 @@ authentication are separate diagnostic dimensions.
 
 ## Deployment Shape
 
-The latest feature branch builds every maintained adapter. Separate bridge
+`release/hub` builds every maintained adapter for the central deployment;
+`release/worker` is the second-PC deployment that connects to that Hub without
+starting another one. Separate bridge
 processes still use distinct Feishu profiles and environments. The pilot
 manifest describes launch/rollback commands; it does not install or log into
 agents on the user's behalf.
