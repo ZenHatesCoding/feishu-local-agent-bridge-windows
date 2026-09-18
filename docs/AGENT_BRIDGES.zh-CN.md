@@ -5,12 +5,9 @@
 
 ## 先回答分支问题
 
-新电脑只拉 `feature/feishu-multi-agent-hub`。当前分支已经统一包含 Claude Code、
-Codex、Antigravity、DeepSeek Harness 的 bridge 能力，以及 Hermes Hook 和协作 Hub。
-不需要为了部署不同 Agent 再切换或克隆其他分支。
-
-`main`、`antigravity`、`deepseek-harness` 是旧部署形态的历史/回退分支。它们可以
-继续独立使用，但不再是新部署文档的主路径。
+第二台只运行 Worker、绝不启动 Hub 的电脑拉 `release/worker`，并按 Worker 部署
+指南操作。中心 Hub 电脑使用 `release/hub`。开发使用对应的 `develop/worker` 或
+`develop/hub`；`archive/*` 仅用于回退和历史参考。
 
 ## 共同前置条件
 
