@@ -5,27 +5,27 @@ Feishu/Lark, either as independent bots or as a team collaborating in one topic.
 
 [中文说明](./README.zh.md)
 
-## One Recommended Branch
+## Worker Deployment Branch
 
-For a new installation, clone **`feature/feishu-multi-agent-hub`**. It now
-contains all maintained bridge adapters, DeepSeek Harness setup scripts, the
-collaboration Hub, shared-file support and Windows process management.
+For a second Windows machine that runs a Worker but never starts a Hub, clone
+**`release/worker`**. It contains the tested Worker bootstrap, bridge adapters
+and Windows process management.
 
 ```powershell
-git clone --branch feature/feishu-multi-agent-hub --single-branch `
+git clone --branch release/worker --single-branch `
   https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 ```
 
-Older branches remain useful as rollback/history, but are not required for a
-fresh deployment:
+`develop/worker` is the matching development branch. All `archive/*` branches
+are rollback/history only:
 
 | Branch | Historical scope | New-install recommendation |
 | --- | --- | --- |
-| `main` | Claude Code, Codex and Antigravity independent bridges | Use the latest feature branch instead |
-| `antigravity` | Earlier Antigravity-only packaging | History only |
-| `deepseek-harness` | Earlier DeepSeek-only packaging | History only |
-| `feature/feishu-multi-agent-hub` | Unified adapters plus collaboration | **Use this branch** |
+| `release/worker` | Stable second-PC Worker deployment | **Use for a new Worker machine** |
+| `develop/worker` | Worker bootstrap development | Merge after real second-PC acceptance |
+| `release/hub` / `develop/hub` | Central Hub deployment and development | Use on the Hub machine, not this Worker |
+| `archive/*` | Earlier packages and milestones | History only |
 
 The same checkout can build all bridge runtimes. Each bot still needs its own
 Feishu app/profile and local agent login. Hermes stays in its existing install

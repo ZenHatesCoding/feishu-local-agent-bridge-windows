@@ -5,25 +5,25 @@
 
 [English README](./README.md)
 
-## 一个推荐分支
+## Worker 部署分支
 
-新电脑统一拉 **`feature/feishu-multi-agent-hub`**。它现在同时包含所有维护中的
-Agent 适配器、DeepSeek Harness 部署脚本、协作 Hub、共享文件和 Windows 后台管理。
+第二台 Windows 机器只运行 Worker、绝不启动 Hub 时，拉 **`release/worker`**。
+它包含已验证的 Worker 启动流程、bridge 适配器和 Windows 后台管理。
 
 ```powershell
-git clone --branch feature/feishu-multi-agent-hub --single-branch `
+git clone --branch release/worker --single-branch `
   https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 ```
 
-旧分支保留历史和回退价值，但新部署不再需要分别拉取：
+`develop/worker` 是对应的开发分支；所有 `archive/*` 分支仅用于回退或历史参考：
 
 | 分支 | 历史用途 | 新电脑建议 |
 | --- | --- | --- |
-| `main` | Claude Code、Codex、Antigravity 独立桥 | 改用最新功能分支 |
-| `antigravity` | 较早的 Antigravity 专用封装 | 仅历史保留 |
-| `deepseek-harness` | 较早的 DeepSeek 专用封装 | 仅历史保留 |
-| `feature/feishu-multi-agent-hub` | 统一适配器与多 Agent 协作 | **统一使用** |
+| `release/worker` | 稳定的第二台电脑 Worker 部署 | **新 Worker 机器使用** |
+| `develop/worker` | Worker 启动流程开发 | 真实第二机验收后合入 |
+| `release/hub` / `develop/hub` | 中心 Hub 部署与开发 | 用于 Hub 机器，不用于本 Worker |
+| `archive/*` | 早期封装与里程碑 | 仅历史保留 |
 
 同一份 checkout 可以构建所有 bridge runtime。每个机器人仍需要独立的飞书应用/
 profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项目 Hook 接入。

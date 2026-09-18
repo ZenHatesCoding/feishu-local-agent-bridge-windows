@@ -35,7 +35,7 @@ on the box).
 ## Phase 1 — Clone + build
 
 ```powershell
-git clone --branch feature/feishu-multi-agent-hub --single-branch `
+git clone --branch release/worker --single-branch `
   https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git `
   C:\feishu-local-agent-bridge
 Set-Location C:\feishu-local-agent-bridge
