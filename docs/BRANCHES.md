@@ -1,12 +1,15 @@
 # Choose a deployment branch
 
 This repository contains Windows Feishu bridges for local coding agents.
-`main` is the starting page; deploy one of the two named branches.
+Deploy a `release/*` branch. Work only on its matching `develop/*` branch;
+`archive/*` is never a new-install entry point.
 
 | Branch | Use it for | New-computer setup |
 | --- | --- | --- |
-| `antigravity` | Google Antigravity (`agy`) | Clone the branch, run `scripts/bootstrap-antigravity-bridge.ps1`, then run `scripts/run-antigravity-bridge.ps1` and scan the Feishu QR code. |
-| `deepseek-harness` | DeepSeek Harness (`dsh`) | Clone the branch, run `scripts/bootstrap-deepseek-bridge.ps1`, then run `scripts/setup-deepseek-feishu.ps1`. |
+| `release/hub` | Central Hub deployment | Clone this branch for the computer that runs the Hub. |
+| `release/worker` | Second-PC Worker deployment | Clone this branch for a Worker machine. It connects to, but never starts, a Hub. |
+| `develop/hub` / `develop/worker` | Corresponding development lines | Do focused acceptance before merging into the matching release branch. |
+| `archive/*` | Historical deployments and migration protection points | Rollback/history only. |
 
 Each local clone has its own `.lark-channel` folder, workspace, sessions, and
 encrypted secrets. Do not copy these directories between computers or branches.
