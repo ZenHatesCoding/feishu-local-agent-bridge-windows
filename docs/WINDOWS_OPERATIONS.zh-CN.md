@@ -5,8 +5,8 @@
 [概念入门](./COLLABORATION_CONCEPTS.zh-CN.md) | [多电脑联网](./NETWORKING.zh-CN.md) |
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)
 
-本文面向从 GitHub 克隆项目的新电脑。新部署统一使用
-`feature/feishu-multi-agent-hub`，不再需要为不同 Agent 拉多份分支。
+本文面向部署中心 Hub 的新电脑，应克隆 `release/hub`。第二台只运行 Worker、
+绝不启动 Hub 的电脑应克隆 `release/worker`，并使用 Worker 部署指南。
 
 Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台电脑连接同一个 Hub。
 推荐从 `role: "all"` 开始：主电脑既是中心，也是现有 Bot 的执行节点；以后再增加
@@ -35,7 +35,7 @@ Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台�
 ## 从 GitHub 部署
 
 ```powershell
-git clone -b feature/feishu-multi-agent-hub https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git C:\feishu-multi-agent-hub
+git clone --branch release/hub --single-branch https://github.com/ZenHatesCoding/feishu-local-agent-bridge-windows.git C:\feishu-multi-agent-hub
 Set-Location C:\feishu-multi-agent-hub
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\collab-pilot\Setup-CollabPilot.ps1

@@ -5,13 +5,10 @@
 
 ## Branch Answer
 
-For a new computer, clone only `feature/feishu-multi-agent-hub`. It now contains
-the maintained Claude Code, Codex, Antigravity and DeepSeek Harness bridge
-paths, plus the Hermes Hook and collaboration Hub. No second agent-specific
-clone is required.
-
-`main`, `antigravity` and `deepseek-harness` preserve older standalone layouts
-for history and rollback. They are not the primary new-install path.
+For a second computer that runs a Worker but must not start a Hub, clone
+`release/worker` and follow the Worker deployment guide. The central Hub
+computer uses `release/hub`. Develop on the matching `develop/worker` or
+`develop/hub` branch; `archive/*` is for rollback/history only.
 
 ## Shared Prerequisites
 
