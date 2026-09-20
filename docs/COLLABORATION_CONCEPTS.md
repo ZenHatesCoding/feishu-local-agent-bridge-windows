@@ -174,9 +174,12 @@ The current implementation grows in three different ways:
 
 - **disk:** JSONL and artifact snapshots have no automatic retention yet;
 - **Hub memory:** startup replays the whole ledger and hot indexes remain loaded;
-- **Bot tokens:** topics are isolated and the Hub packet is bounded to the
-  original requirement plus recent semantic events and on-demand Artifacts.
+- **Bot tokens:** Hub prompts contain the current dispatch rather than a topic
+  transcript. A Bot can query only this node's `chatId:threadId` journal when
+  needed, with a bounded result count.
 
-An Agent's own resumed session may still retain earlier turns independently of
-the Hub packet. Source-sequenced summary checkpoints, native-session compaction
-and archival of cold completed tasks remain Planned P1 roadmap capabilities.
+Standard group/topic bridges start fresh model work, so they do not implicitly
+resume an ever-growing provider session. Hermes retains ownership of its native
+session; its provider-side retention remains independent of the Hub and local
+journal. Retention, native-session compaction and archival of cold completed
+tasks remain roadmap capabilities.

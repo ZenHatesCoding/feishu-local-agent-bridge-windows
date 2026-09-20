@@ -198,10 +198,10 @@ World 先向 Hub 提交 handoff
 
 - **磁盘**：JSONL 账本和 artifact 快照目前没有自动归档或保留期限；
 - **Hub 内存**：启动时会重放全部账本，运行时也保留任务、dispatch 和幂等索引；
-- **Bot token**：不同话题互不污染；Hub 交接包固定为原始需求、最近语义事件和按需
-  Artifact，不再重复注入完整可见账本。
+- **Bot token**：Hub 提示词只带当前 dispatch，不带话题全文。Bot 需要时才查询本机
+  `chatId:threadId` 账本，且结果数量有上限。
 
-Agent 自己恢复的模型 session/thread 仍可能独立保留更早对话，这是 Hub 交接包之外
-的另一层 token 增长。带来源序号的摘要检查点、原生 session 压缩和冷任务归档仍是
-P1。具体阶段和验收标准见
+标准 bridge 的群聊/话题轮次会启动新的模型工作，因此不会隐式恢复不断增长的 provider
+session。Hermes 仍自行管理原生 session；它的 provider 侧保留与 Hub 和本机账本相互独立。
+保留策略、原生 session 压缩和冷任务归档仍是路线图能力。具体阶段和验收标准见
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。

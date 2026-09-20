@@ -28,6 +28,11 @@ on a PowerShell, Codex, or ChatGPT window, and an exited component is started
 again automatically. `Start-CollabPilot.ps1` remains useful for temporary runs
 and development, but is not the durable cross-terminal startup path.
 
+The logon startup path also installs the named Hermes collaboration Hook before
+starting its detached gateway. A detached Hermes gateway is healthy even though
+its short-lived launcher has exited; Pilot keeps the Hook in place and reports
+the gateway separately instead of treating that exit as a failed Bot start.
+
 The repository supplies the Hub and orchestration. Users supply installed and
 logged-in agents, Feishu apps/profiles and real launch commands.
 
