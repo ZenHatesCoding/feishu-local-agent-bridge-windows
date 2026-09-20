@@ -6,7 +6,7 @@ export async function runLocalContext(input: {
   query?: string;
   limit?: string;
 }): Promise<void> {
-  const ledger = new LocalTopicLedger(resolveAppPaths().rootDir);
+  const ledger = new LocalTopicLedger(process.env.LARK_COLLAB_NODE_LEDGER_ROOT ?? resolveAppPaths().rootDir);
   const parsedLimit = input.limit ? Number(input.limit) : undefined;
   if (parsedLimit !== undefined && (!Number.isSafeInteger(parsedLimit) || parsedLimit < 1)) {
     throw new Error('--limit must be a positive integer');
