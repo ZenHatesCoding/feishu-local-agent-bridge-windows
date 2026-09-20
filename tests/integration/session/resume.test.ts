@@ -67,6 +67,19 @@ describe('agent-aware run-flow resume', () => {
     });
   });
 
+  it('does not restore a native session when a group turn requests fresh context', async () => {
+    const h = await createHarness('claude');
+    const cwdRealpath = await realpath(h.tmp.workspace);
+    h.sessions.set('chat-1', 'legacy-session', cwdRealpath);
+
+    const run = await start(h, { freshContext: true });
+
+    expect(run.ok).toBe(true);
+    if (!run.ok) throw new Error('expected fresh run');
+    expect(run.resumeFrom).toBeUndefined();
+    expect(h.agent.runOptions[0]).toMatchObject({ sessionId: undefined, threadId: undefined });
+  });
+
   it('resumes Codex thread from catalog and ignores legacy Claude SessionStore entries', async () => {
     const h = await createHarness('codex');
     const cwdRealpath = await realpath(h.tmp.workspace);
@@ -237,7 +250,7 @@ async function collect(events: AsyncIterable<unknown>): Promise<void> {
   }
 }
 
-async function start(h: Awaited<ReturnType<typeof createHarness>>) {
+async function start(h: Awaited<ReturnType<typeof createHarness>>, overrides: Partial<StartRunFlowInput> = {}) {
   const input = {
     scopeId: 'chat-1',
     scope: { source: 'im', chatId: 'chat-1', actorId: 'ou_user' },
@@ -254,6 +267,7 @@ async function start(h: Awaited<ReturnType<typeof createHarness>>) {
     workspaces: h.workspaces,
     executor: h.executor,
     now: 1000,
+    ...overrides,
   } satisfies StartRunFlowInput & { sessionCatalog: SessionCatalog };
   return startRunFlow(input);
 }

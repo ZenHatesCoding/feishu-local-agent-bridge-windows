@@ -75,6 +75,7 @@ import {
   type BridgeCollaborationAdapter,
 } from '../collab/bridge-adapter';
 import { stripRawFeishuMentionTokens } from '../collab/mentions';
+import { LocalTopicLedger } from '../collab/local-topic-ledger';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -179,7 +180,7 @@ export interface StartChannelDeps {
   sessionCatalog?: SessionCatalog;
   workspaces: WorkspaceStore;
   controls: Controls;
-  appPaths?: Pick<AppPaths, 'secretsFile' | 'keystoreSaltFile' | 'mediaDir'>;
+  appPaths?: Pick<AppPaths, 'rootDir' | 'secretsFile' | 'keystoreSaltFile' | 'mediaDir'>;
 }
 
 export async function startChannel(deps: StartChannelDeps): Promise<BridgeChannel> {
@@ -193,6 +194,10 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
   const pool = new ProcessPool(() => getMaxConcurrentRuns(controls.cfg));
   const executor = new RunExecutor({ agent, pool, activeRuns });
   const collaboration = bridgeCollaborationFromEnv();
+  const localTopicLedger = new LocalTopicLedger(
+    deps.appPaths?.rootDir ?? process.env.LARK_CHANNEL_HOME ?? join(process.cwd(), '.lark-channel'),
+  );
+  await localTopicLedger.load();
   const collaborationRuns = new Map<string, {
     promptContext: string;
     taskId: string;
@@ -323,6 +328,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           mode,
           collaboration,
           collaborationRuns,
+          localTopicLedger,
         });
       } catch (err) {
         log.fail('flush', err);
@@ -355,6 +361,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
           pool,
           collaboration,
           collaborationRuns,
+          localTopicLedger,
         }),
       ).catch((err) => log.fail('intake', err));
     },
@@ -559,6 +566,7 @@ interface IntakeDeps {
     taskId: string;
     dispatchId?: string;
   }>;
+  localTopicLedger: LocalTopicLedger;
 }
 
 type LogThreadModeOverride = (input: {
@@ -584,6 +592,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     pool,
     collaboration,
     collaborationRuns,
+    localTopicLedger,
   } = deps;
   const preview = msg.content.length > 80 ? `${msg.content.slice(0, 80)}…` : msg.content;
   // Resolve scope (and underlying chat mode) once at intake — every
@@ -633,6 +642,8 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     }
     return;
   }
+
+  await localTopicLedger.recordMessage(scope, msg);
 
   // Group-mention policy. p2p is always unrestricted; in groups (regular and
   // topic) we drop messages that don't @bot when the user has opted into the
@@ -719,6 +730,7 @@ interface RunBatchDeps {
     taskId: string;
     dispatchId?: string;
   }>;
+  localTopicLedger: LocalTopicLedger;
 }
 
 async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
@@ -738,6 +750,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     mode,
     collaboration,
     collaborationRuns,
+    localTopicLedger,
   } = deps;
   if (batch.length === 0) return;
   const firstMsg = batch[0];
@@ -751,6 +764,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     m.resources.map((r) => ({ messageId: m.messageId, resource: r })),
   );
   const attachments = await media.resolve(resourceItems, controls.profileConfig.attachments);
+  await localTopicLedger.recordAttachments(scope, attachments);
   if (attachments.length > 0) {
     log.info('media', 'resolved', { count: attachments.length });
     for (const attachment of attachments) {
@@ -856,6 +870,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     executor,
     now: Date.now(),
     stopGraceMs: getAgentStopGraceMs(controls.cfg),
+    freshContext: firstMsg.chatType !== 'p2p',
     env: collaborationRun ? {
       LARK_COLLAB_TASK_ID: collaborationRun.taskId,
       ...(collaborationRun.dispatchId ? { LARK_COLLAB_DISPATCH_ID: collaborationRun.dispatchId } : {}),
@@ -989,6 +1004,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         executor,
         now: Date.now(),
         stopGraceMs: getAgentStopGraceMs(controls.cfg),
+        freshContext: false,
         env: {
           LARK_COLLAB_TASK_ID: collaborationRun!.taskId,
           LARK_COLLAB_DISPATCH_ID: collaborationRun!.dispatchId,
@@ -1319,7 +1335,16 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         cardRenderOptions,
       });
     }
-    if (collaborationFinalState) await recordCollaborationResult(collaborationFinalState);
+    if (collaborationFinalState) {
+      await localTopicLedger.recordBotResult(
+        scope,
+        execution.runId,
+        stripRawFeishuMentionTokens(
+          extractCollaborationHandoff(renderText(finalAnswerOnlyState(collaborationFinalState))).visibleContent,
+        ),
+      );
+      await recordCollaborationResult(collaborationFinalState);
+    }
   } catch (err) {
     log.fail('stream', err);
     if (collaboration && collaborationRun?.dispatchId && !collaborationFinalized) {
@@ -1743,6 +1768,7 @@ function buildPrompt(
 
   const senderType = senderTypeOf(first);
   const mentions = mergeMentions(batch);
+  const localScope = first.threadId ? `${first.chatId}:${first.threadId}` : first.chatId;
 
   const prompt = buildAgentPrompt({
     context: {
@@ -1757,7 +1783,10 @@ function buildPrompt(
       messageIds: batch.map((m) => m.messageId),
       source: 'im',
     },
-    instructions: BRIDGE_AGENT_INSTRUCTIONS,
+    instructions: [
+      ...BRIDGE_AGENT_INSTRUCTIONS,
+      `本机已记录实际收到的本群/话题内容和本机附件路径。需要旧上下文时按需查询：lark-channel-bridge local-context search --scope "${localScope}" --query "关键词"；不要假定过去完整对话会自动塞入本轮上下文。`,
+    ],
     userInput: userPart,
     quotedMessages: quotes.map(toPromptQuote),
     interactiveCards: batch.map(toPromptInteractiveCard).filter(isDefined),

@@ -23,7 +23,7 @@ Hub、Pilot、鉴权、dispatch 等待和文件共享。**
 | 两个 Bot 在同一飞书群收发消息 | 已实现 | 每个 Bridge 独立连接飞书 |
 | Bot 之间真实 `@` | 已实现 | 每个飞书应用配置 bot-to-bot 消息权限和独立群准入 |
 | 共享文字任务上下文 | 已实现 | `all` 和 `worker` 通过 `publicUrl` 连接同一个中央 Hub |
-| 有界提示投影 | 已实现 | 原始需求、最近语义事件和按需 Artifact |
+| 本机观察话题账本与按需上下文 | 已实现 | 每台电脑只记录自己观察到的内容；提示词提供当前 dispatch 和本地查询入口 |
 | dispatch、所有权和可见性 | 已实现 P0 | 每个认证主体只能操作自己的 Agent 身份 |
 | 共享 PPT/PDF/Word 等文件 | 已实现 locator；计划自动下载 | Artifact 优先引用飞书文件，并在接收节点本地落盘 |
 | 共享代码工作区状态 | 已实现登记；计划自动取得 | Artifact 引用 Git repository、commit 和 path |

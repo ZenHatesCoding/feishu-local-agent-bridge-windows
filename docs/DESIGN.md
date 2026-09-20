@@ -110,6 +110,12 @@ means unknown, not absent from the group. Raw Feishu IDs are removed from
 visible collaboration text, and a delivery failure is reported in the topic
 instead of being silently logged.
 
+Each computer keeps an append-only local topic ledger containing only messages,
+downloaded attachments and Bot results that its own bridges actually observed.
+Bots on that computer can query it on demand. It is never copied to another
+computer and local paths are never treated as portable. Hub prompts carry the
+current dispatch and a local query command instead of a growing transcript.
+
 A collaboration marker is executable only when its opening and closing tags
 are both present. For a terminal unclosed marker, the Hub records one
 Hub-authorized `repair` action and returns a fixed correction instruction to
