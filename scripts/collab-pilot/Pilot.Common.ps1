@@ -252,6 +252,23 @@ function Test-CollabPid([object]$ProcessId) {
   return [bool](Get-Process -Id ([int]$ProcessId) -ErrorAction SilentlyContinue)
 }
 
+function Test-CollabHermesGateway([object]$Agent) {
+  if (!$Agent.hermesHook -or !$Agent.hermesHook.enabled) { return $false }
+
+  $python = Expand-CollabValue $Agent.original.start.filePath
+  $previousHermesHome = $env:HERMES_HOME
+  try {
+    $env:HERMES_HOME = Expand-CollabValue $Agent.hermesHook.home
+    & $python -c "import sys; from hermes_cli.main import main; sys.argv=['hermes','gateway','status']; main()" *> $null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  } finally {
+    if ($null -eq $previousHermesHome) { Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue }
+    else { $env:HERMES_HOME = $previousHermesHome }
+  }
+}
+
 function Start-CollabBackground([string]$Name, [string]$ScriptPath, [string[]]$ScriptArguments = @()) {
   $table = Read-CollabPidTable
   if (Test-CollabPid $table[$Name]) {
