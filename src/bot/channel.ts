@@ -195,7 +195,10 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
   const executor = new RunExecutor({ agent, pool, activeRuns });
   const collaboration = bridgeCollaborationFromEnv();
   const localTopicLedger = new LocalTopicLedger(
-    deps.appPaths?.rootDir ?? process.env.LARK_CHANNEL_HOME ?? join(process.cwd(), '.lark-channel'),
+    process.env.LARK_COLLAB_NODE_LEDGER_ROOT
+      ?? deps.appPaths?.rootDir
+      ?? process.env.LARK_CHANNEL_HOME
+      ?? join(process.cwd(), '.lark-channel'),
   );
   await localTopicLedger.load();
   const collaborationRuns = new Map<string, {

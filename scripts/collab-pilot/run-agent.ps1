@@ -23,6 +23,7 @@ $env:LARK_COLLAB_AGENT_ROSTER = @(
   }
 ) | ConvertTo-Json -Compress
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
+$env:LARK_COLLAB_NODE_LEDGER_ROOT = Join-Path $script:CollabStateDir 'local-topic-ledger'
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir
 Export-CollabRealLarkCliJs -Pilot $pilot -LaunchFilePath $agentConfig.launch.filePath
 
