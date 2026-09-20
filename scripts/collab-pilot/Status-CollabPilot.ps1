@@ -16,8 +16,11 @@ foreach ($name in $names) {
   $pidValue = if ($pids[$name]) { [int]$pids[$name] } else { 0 }
   $process = if ($pidValue -gt 0) { Get-Process -Id $pidValue -ErrorAction SilentlyContinue } else { $null }
   $children = if ($process) { @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$pidValue" -ErrorAction SilentlyContinue) } else { @() }
-  $agentConfig = Get-CollabAgent $name
-  $detachedGateway = !$process -and (Test-CollabHermesGateway $agentConfig)
+  $detachedGateway = $false
+  if ($name -ne 'hub') {
+    $agentConfig = Get-CollabAgent $name
+    $detachedGateway = !$process -and (Test-CollabHermesGateway $agentConfig)
+  }
   $errFile = Join-Path $script:CollabLogDir "$name.err.log"
   $lastError = if (Test-Path -LiteralPath $errFile) { (Get-Content -LiteralPath $errFile -Tail 3 -ErrorAction SilentlyContinue) -join ' | ' } else { '' }
   [pscustomobject]@{ Name = $name; PID = $pidValue; Running = [bool]($process -or $detachedGateway); Worker = if ($detachedGateway) { 'hermes-gateway (detached)' } else { ($children.Name -join ',') }; LastError = $lastError }
