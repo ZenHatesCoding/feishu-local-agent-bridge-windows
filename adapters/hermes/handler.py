@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import datetime
 import re
 import shutil
 import urllib.error
@@ -40,6 +41,33 @@ def _settings() -> tuple[str, str, str, str]:
     if not url or not token or not tenant:
         raise RuntimeError("collaboration Hub environment is incomplete")
     return url, token, tenant, agent
+
+
+def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> None:
+    """Record only what this node's Hermes gateway actually observed."""
+    root = os.environ.get("LARK_COLLAB_NODE_LEDGER_ROOT", "").strip()
+    chat_id = str(context.get("chat_id") or "")
+    thread_id = str(context.get("thread_id") or "")
+    if not root or not chat_id or not thread_id:
+        return
+    scope = f"{chat_id}:{thread_id}"
+    message_id = str(context.get("message_id") or context.get("session_id") or "")
+    identity = f"{kind}:{message_id}" if message_id else f"{kind}:{hashlib.sha256(content.encode('utf-8')).hexdigest()[:24]}"
+    record = {
+        "id": identity,
+        "scope": scope,
+        "recordedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "kind": "bot-result" if kind == "bot-result" else "message",
+        "messageId": message_id or None,
+        "senderId": str(context.get("user_id") or "") or None,
+        "content": content,
+    }
+    try:
+        os.makedirs(root, exist_ok=True)
+        with open(os.path.join(root, "local-topic-ledger.jsonl"), "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 def _request(path: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -205,6 +233,7 @@ def _on_start(context: dict[str, Any]) -> None:
         return
 
     message = str(context.get("message_full") or context.get("message") or "")
+    _record_local_topic(context, "message", message)
     _register_artifacts(task_id, agent_id, message, "inbound")
 
     dispatch_id = str(dispatch["id"])
@@ -247,6 +276,7 @@ def _on_end(context: dict[str, Any]) -> None:
             "idempotencyKey": f"fail:{dispatch_id}:{session_id}",
         })
         return
+    _record_local_topic(context, "bot-result", response)
     _register_artifacts(task_id, agent_id, response, "outbound")
     digest = hashlib.sha256(response.encode("utf-8")).hexdigest()[:24]
     _request("/v1/events", body={
