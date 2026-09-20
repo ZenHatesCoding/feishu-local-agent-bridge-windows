@@ -230,10 +230,7 @@ collaboration_context
     currentOwner
     yourDispatch: reason, objective, hop（当前因果链深度）, status
     rules
-  projection: 覆盖序号、实际纳入序号和省略数量
-  entries: 原始需求和最近的可见语义事件
-  artifactCatalog: 不含路径与 locator 的精简目录
-  selectedArtifacts: 与本轮 dispatch 明确相关的完整文件记录
+  localJournal: 本机话题 scope 与 local-context 查询命令
 
 bridge_context
   chatId, threadId, sender, mentions, messageIds...
@@ -245,42 +242,32 @@ bridge_context
 
 - `taskId` 告诉 Agent 正在处理哪个持续任务；
 - `currentOwner` 消除“现在到底谁负责”的歧义；
-- `yourDispatch` 是本轮唯一目标，不让共享历史淹没当前指令；
-- `entries` 提供经过权限过滤和有界投影的语义事实；
-- `artifactCatalog` 只用于识别文件，`selectedArtifacts` 才授权本轮取得完整文件记录；
+- `yourDispatch` 是本轮唯一目标，不让历史淹没当前指令；
+- `localJournal` 只提供当前话题的本机按需查询入口，不自动注入历史；
 - `rules` 要求先做结构化动作，再真实 `@`，并禁止泄露思维链和秘密；
 - 用户原话保持原样放在最后，模型仍能理解自然语言意图。
 
-Agent 被要求输出结论、证据、产物路径和下一步，而不是输出私有推理过程。最终
-可见答复会自动记录回任务上下文，成为后来接手者可以复用的状态。
+Agent 被要求输出结论、证据、产物路径和下一步，而不是输出私有推理过程。最终可见答复
+会同时记录为 Hub 任务事件和本机节点账本记录，供后续按需使用。
 
-Hub 的账本仍是完整、追加式的事实来源。当前已经由 Hub 为所有 Bot 生成同一套确定性
-提示投影：原始任务消息、最多最近 8 条 message/action/complete 语义事件，以及本轮
-dispatch。routing、lease、dispatch、ack 和 artifact 登记等机械事件不再作为对话重复
-喂给模型。单条语义内容超过 3000 字符时会明确标记为摘录并给出原始长度；投影同时
-声明覆盖序号、实际纳入序号和省略数量，不做不可见的静默裁剪。
-因此，同一个长期话题也不会再把全部可见账本逐轮重复加入提示词。
+Hub 账本仍是完整、追加式的控制面事实来源，但不再被逐轮重放到 Bot 提示词。每台电脑
+在自己的运行目录写独立 JSONL 账本：飞书话题以 `chatId:threadId` 为键，因此同一个群的
+两个话题不能互相读取。普通非话题群只能以群 ID 为键，因为飞书没有提供更细的可见边界。
+账本只含该机实际收到的消息、该机已经下载的附件和该机 Bot 的结果；它不会同步给另一台
+电脑，本机路径也绝不是跨机器 Artifact locator。
 
-文件按需进入，而不是按话题年龄累积。提示词最多携带 20 条精简目录，只含 ID、名称、
-创建者、种类和大小，不含本机路径、locator 或哈希。只有当前目标或来源明确引用文件
-ID/名称，或者提到文件类型、创建者、版本（例如“World 那版 PPT”）时，Hub 才把匹配
-的最新版完整记录放入 `selectedArtifacts`。Agent 若还需要别的文件，使用
-`collab-artifact.cmd resolve --name` 精确取得，禁止扫描整个 artifact 目录。这个判断由
-确定性 Hub 代码完成，因此不把 Hermes 变成每轮必经的秘书模型，也不额外付一次模型
-token 和故障依赖。
-
-容量边界仍需诚实说明：JSONL 会持续追加，Hub 启动时仍会重放完整账本并保留热索引。
-Claude、Codex 或 Hermes 自己恢复的原生 session 也可能保留先前对话；紧凑 Hub 交接包
-消除了“完整账本再次注入”，但不会抹掉模型提供方管理的 session 历史。带来源序号的
-语义摘要检查点、原生 session 压缩、完成任务归档和热内存卸载仍是计划 P1。未来可以
-让 Hermes 或其他 Agent 显式产出可审计摘要，但 Hub 本身不会调用 LLM 决定路由或基础
-上下文。详见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+Bot 需要旧信息时，使用当前 scope 执行 `lark-channel-bridge local-context read` 或
+`search`；查询会先按 scope 过滤，最多返回 50 条。标准 bridge 的普通群和话题轮次会
+启动新的模型工作，而不是恢复先前 provider session，所以账本不会变成隐式、无限增长的
+提示词。Hermes 保留对自己原生 session 的控制；Hook 同样不会收到 Hub 历史重放，但模型
+提供方一侧的 session 保留不由本项目控制。账本保留策略、Hub 冷存储和 Hermes 原生 session
+压缩仍是路线图工作。
 
 ## 转发层级是因果链，不是话题寿命
 
 `hop` 只表示当前这条委派因果链的深度。用户每次在话题中重新指定 Agent，都会
 创建深度为 1 的新根 dispatch；Agent 在该轮运行中 `ask` 或 `handoff` 时，子
-dispatch 才在父 dispatch 的基础上加 1。因此，一个长期话题可以经历任意多轮
+dispatch 才在父 dispatch 的基础上加 1。因此，同一个长期话题可以经历任意多轮
 正常工作，不会因为历史累计到 8 次就永久失效。
 
 仍保留因果深度上限，是为了阻止错误提示或模型行为造成 Agent 之间无限互相唤醒；

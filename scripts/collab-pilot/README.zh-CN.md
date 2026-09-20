@@ -26,6 +26,9 @@ notepad .\.runtime\pilot.local.json
 组件意外退出后，监督进程会自动重新拉起。`Start-CollabPilot.ps1` 仍可用于临时运行和
 开发调试，但不承担跨终端的常驻保证。
 
+登录启动路径会在启动 Hermes 脱离式网关前安装具名协作 Hook。Hermes 的短命启动器退出
+并不表示 Bot 启动失败；Pilot 会保留 Hook，并把已脱离启动器的网关作为独立健康状态处理。
+
 仓库负责 Hub 和运行编排；使用者负责安装并登录自己的 Agent、准备飞书应用与 profile，并填写实际启动命令。完整说明见 [`docs/WINDOWS_OPERATIONS.zh-CN.md`](../../docs/WINDOWS_OPERATIONS.zh-CN.md)。
 
 Antigravity 使用 `agy.exe` 时，启动器会自动读取 Windows 当前用户代理，并只把它传给 Antigravity 进程；飞书连接仍由 `LARK_CHANNEL_DISABLE_PROXY=1` 保持直连。如果飞书回复 `Authentication required` 而本地客户端已登录，请先确认 Windows 代理正在运行，再单独重启该 Agent。

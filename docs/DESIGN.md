@@ -152,10 +152,7 @@ Before the original user message, an authorized bridge injects:
 ```text
 collaboration_context
   contract: taskId, currentOwner, yourDispatch, rules
-  projection: coverage, included sequences, omission counts
-  entries: original requirement plus recent visible semantic events
-  artifactCatalog: compact metadata, without paths or locators
-  selectedArtifacts: files explicitly relevant to this dispatch
+  localJournal: this node's topic scope and the local-context query command
 
 bridge_context
   chatId, threadId, sender, mentions, message IDs
@@ -163,38 +160,28 @@ bridge_context
 original user message
 ```
 
-`yourDispatch` remains the single objective for this run; shared history cannot
-bury it. The model is asked for conclusions, evidence, artifact paths and next
-steps, not private reasoning. Its final visible response becomes a reusable
-task event for later authorized participants.
+`yourDispatch` remains the single objective for this run; history cannot bury
+it. The model is asked for conclusions, evidence, artifact paths and next
+steps, not private reasoning. Its final visible response is recorded both as a
+Hub task event and in the local node journal.
 
-The ledger remains the complete append-only fact source. The implemented Hub
-prompt endpoint produces one deterministic projection for every Bot: the
-original task message, at most eight recent semantic message/action/completion
-events, and the current dispatch. Routing, lease, dispatch, acknowledgement and
-artifact events are not repeated as conversation. A semantic entry longer than
-3,000 characters is explicitly marked as an excerpt with its original length.
-The projection reports its covered sequence, included sequences and omission
-counts, so reduction is observable rather than silent.
+The Hub ledger remains the complete append-only control-plane fact source, but
+it is no longer replayed into Bot prompts. Each node writes a separate JSONL
+journal under its own runtime directory. Its key is `chatId:threadId` for a
+Feishu topic, so two topics in one group cannot read one another's records.
+An ordinary non-topic group has the group ID as its scope because Feishu gives
+it no finer visible boundary. The journal contains only messages that node
+received, files that node downloaded, and that node's Bot results. It is never
+synced to another node; a local path is never a cross-node Artifact locator.
 
-Artifacts follow demand, not topic age. The prompt carries at most twenty
-catalog rows containing ID, name, producer, kind and size. Full path, locator
-and digest appear only in `selectedArtifacts` when the current objective or
-source references an exact ID/name, or refers to a file type, producer or
-version such as “World's latest PPT.” A Bot can resolve another exact catalog
-entry with `collab-artifact.cmd resolve`; it must not scan the artifact
-directory. This selection is deterministic Hub code, so Hermes is not a
-mandatory secretary model or a per-turn token dependency.
-
-JSONL still grows continuously, startup still replays the complete ledger and
-hot indexes remain in memory. Native Claude/Codex/Hermes sessions may also keep
-their own prior conversation; the compact Hub packet prevents duplicate ledger
-injection but does not erase provider-managed session history. Source-sequenced
-semantic checkpoints, native-session compaction, cold-task archival and
-hot-memory unloading remain Planned P1 in the
-[distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md). An optional Agent,
-including Hermes, may later publish an auditable checkpoint, but the Hub never
-calls an LLM to decide routing or baseline context.
+On demand, a Bot uses `lark-channel-bridge local-context read` or `search`
+with its current scope. Queries are scope-filtered and return at most 50
+records. Normal group and topic runs in the standard bridges start fresh model
+work instead of resuming a previous provider session, so the journal is not an
+implicit ever-growing prompt. Hermes keeps ownership of its native session;
+the Hook also receives no Hub-history replay, but provider-side session
+retention is outside this project's control. Journal retention, Hub-ledger cold
+storage and Hermes-native session compaction remain roadmap work.
 
 ## Causal Depth, Not Topic Age
 
