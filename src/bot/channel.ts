@@ -74,6 +74,7 @@ import {
   extractCollaborationHandoff,
   type BridgeCollaborationAdapter,
 } from '../collab/bridge-adapter';
+import { stripRawFeishuMentionTokens } from '../collab/mentions';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -969,9 +970,120 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   let collaborationFinalState: RunState | undefined;
   let collaborationFinalized = false;
 
-  const recordCollaborationResult = async (state: RunState): Promise<void> => {
+  const retryMalformedCollaborationMarker = async (
+    correctionPrompt: string,
+  ): Promise<{ state: RunState; runId: string } | undefined> => {
+    let retryFlow: Awaited<ReturnType<typeof startRunFlow>> | undefined;
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+      retryFlow = await startRunFlow({
+        scopeId: scope,
+        scope: scopeContext,
+        prompt: correctionPrompt,
+        attachments: [],
+        access: accessDecision,
+        capability,
+        profileConfig: controls.profileConfig,
+        sessions,
+        sessionCatalog,
+        workspaces,
+        executor,
+        now: Date.now(),
+        stopGraceMs: getAgentStopGraceMs(controls.cfg),
+        env: {
+          LARK_COLLAB_TASK_ID: collaborationRun!.taskId,
+          LARK_COLLAB_DISPATCH_ID: collaborationRun!.dispatchId,
+          LARK_COLLAB_CHAT_ID: chatId,
+          ...(threadId ? { LARK_COLLAB_THREAD_ID: threadId } : {}),
+          LARK_COLLAB_REPLY_TO: lastMsg.messageId,
+        },
+        observability: {
+          profile: controls.profile,
+          agent: capability.agentId,
+          source: 'im',
+          stage: 'collaboration-marker-correction',
+        },
+      });
+      if (retryFlow.ok || retryFlow.rejectReason.code !== 'run-already-active') break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const acceptedRetry = retryFlow;
+    if (!acceptedRetry?.ok) {
+      log.warn('collab', 'marker-correction-unavailable', {
+        taskId: collaborationRun!.taskId,
+        reason: acceptedRetry?.rejectReason.code,
+      });
+      return undefined;
+    }
+
+    const retryRecordSession = (evt: AgentEvent): void => {
+      recordRunSessionEvent({
+        scopeId: scope,
+        sessions,
+        sessionCatalog,
+        capability,
+        policy: acceptedRetry.policy,
+        event: evt,
+      });
+    };
+    const state = await processAgentStream(
+      acceptedRetry.execution.handle,
+      acceptedRetry.execution.subscribe(),
+      scope,
+      idleTimeoutMs,
+      retryRecordSession,
+      async () => {},
+    );
+    return { state, runId: acceptedRetry.execution.runId };
+  };
+
+  const recordCollaborationResult = async (
+    state: RunState,
+    runId = execution.runId,
+    originalVisibleContent?: string,
+  ): Promise<void> => {
     if (!collaboration || !collaborationRun?.dispatchId) return;
     const extracted = extractCollaborationHandoff(renderText(finalAnswerOnlyState(state)));
+    if (extracted.malformed) {
+      log.warn('collab', 'marker-validation-failed', {
+        taskId: collaborationRun.taskId,
+        kind: extracted.malformed.kind,
+        targetAgentId: extracted.malformed.targetAgentId,
+      });
+      try {
+        const correctionPrompt = await collaboration.requestMarkerRepair({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          runId,
+          ...extracted.malformed,
+        });
+        const correction = await retryMalformedCollaborationMarker(correctionPrompt);
+        if (correction?.state.terminal === 'done') {
+          const corrected = extractCollaborationHandoff(renderText(finalAnswerOnlyState(correction.state)));
+          if (!corrected.malformed && (corrected.handoff || corrected.reply || corrected.ask)) {
+            await recordCollaborationResult(
+              correction.state,
+              correction.runId,
+              originalVisibleContent ?? extracted.visibleContent,
+            );
+            return;
+          }
+        }
+      } catch (err) {
+        log.fail('collab-marker-repair', err);
+      }
+      await collaboration.finishRun(
+        collaborationRun.taskId,
+        originalVisibleContent ?? extracted.visibleContent,
+        runId,
+        collaborationRun.dispatchId,
+        false,
+      );
+      collaborationFinalized = true;
+      await channel.send(chatId, {
+        markdown: '协作转交格式校验失败：Hub 已要求当前 bot 重做一次，但仍未生成可执行的完整标签。',
+      }, sendOpts);
+      return;
+    }
     if (extracted.handoff) {
       try {
         const target = await collaboration.createHandoff({
@@ -979,7 +1091,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           dispatchId: collaborationRun.dispatchId,
           targetAgentId: extracted.handoff.targetAgentId,
           content: extracted.handoff.content,
-          runId: execution.runId,
+          runId,
         });
         await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
@@ -987,6 +1099,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         });
       } catch (err) {
         log.fail('collab-handoff', err);
+        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.handoff.targetAgentId, err);
       }
     }
     if (extracted.reply) {
@@ -996,7 +1109,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           dispatchId: collaborationRun.dispatchId,
           targetAgentId: extracted.reply.targetAgentId,
           content: extracted.reply.content,
-          runId: execution.runId,
+          runId,
         });
         await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
@@ -1004,12 +1117,31 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         });
       } catch (err) {
         log.fail('collab-reply', err);
+        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.reply.targetAgentId, err);
+      }
+    }
+    if (extracted.ask) {
+      try {
+        const target = await collaboration.createAsk({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          targetAgentId: extracted.ask.targetAgentId,
+          content: extracted.ask.content,
+          runId,
+        });
+        await channel.send(chatId, { markdown: target.content }, {
+          ...sendOpts,
+          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+        });
+      } catch (err) {
+        log.fail('collab-ask', err);
+        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.ask.targetAgentId, err);
       }
     }
     await collaboration.finishRun(
       collaborationRun.taskId,
-      extracted.visibleContent,
-      execution.runId,
+      stripRawFeishuMentionTokens(originalVisibleContent ?? extracted.visibleContent),
+      runId,
       collaborationRun.dispatchId,
       state.terminal === 'done',
     );
@@ -1018,7 +1150,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       taskId: collaborationRun.taskId,
       dispatchId: collaborationRun.dispatchId,
       status: state.terminal === 'done' ? 'completed' : 'failed',
-      chars: extracted.visibleContent.length,
+      chars: stripRawFeishuMentionTokens(originalVisibleContent ?? extracted.visibleContent).length,
     });
   };
 
@@ -1214,7 +1346,7 @@ async function sendFinalReply(input: {
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
 }): Promise<void> {
-  const body = extractCollaborationHandoff(renderText(input.state)).visibleContent;
+  const body = stripRawFeishuMentionTokens(extractCollaborationHandoff(renderText(input.state)).visibleContent);
 
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
@@ -1250,9 +1382,26 @@ async function sendFinalReply(input: {
   }
 }
 
+async function sendCollaborationDeliveryFailure(
+  channel: LarkChannel,
+  chatId: string,
+  sendOpts: { replyTo: string; replyInThread?: boolean },
+  targetAgentId: string,
+  err: unknown,
+): Promise<void> {
+  const detail = err instanceof Error ? err.message : String(err);
+  await channel.send(chatId, {
+    markdown: `未能向协作目标 \`${targetAgentId}\` 发送真实 @：${stripRawFeishuMentionTokens(detail)}`,
+  }, sendOpts).catch((sendErr) => log.fail('collab-delivery-failure-notice', sendErr));
+}
+
 const TOPIC_MARKDOWN_CHUNK_LIMIT = 3500;
 
-/** Keep every long response segment inside the original Feishu topic. */
+/**
+ * The channel SDK deliberately removes replyTo after its first long-message
+ * chunk.  That makes the remaining text a new group message.  For a Feishu
+ * topic, every chunk must explicitly remain a reply to the topic message.
+ */
 async function sendMarkdownReply(
   channel: LarkChannel,
   chatId: string,

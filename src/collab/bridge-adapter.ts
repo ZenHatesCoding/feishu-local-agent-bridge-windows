@@ -2,9 +2,11 @@ import type { NormalizedMessage } from '@larksuite/channel';
 import { CollaborationClient } from './client';
 import { stripTargetMentionPrefix } from './mentions';
 import type { AgentIdentity, Dispatch } from './types';
+import type { AgentRegistration } from './types';
 import type { NormalizedAttachment } from '../media/attachment';
 import { snapshotArtifact } from './artifact-store';
 import { taskIdFor } from './task-id';
+import { parseAgentRoster, resolveMentionedAgents } from './agent-roster';
 
 export interface BridgeCollaborationDecision {
   managed: boolean;
@@ -25,13 +27,39 @@ export interface CollaborationReplyIntent {
   content: string;
 }
 
+export interface CollaborationAskIntent {
+  targetAgentId: string;
+  content: string;
+}
+
+export interface MalformedCollaborationIntent {
+  kind: 'handoff' | 'reply' | 'ask';
+  targetAgentId: string;
+  content: string;
+}
+
 export function extractCollaborationHandoff(content: string): {
   visibleContent: string;
   handoff?: CollaborationHandoffIntent;
   reply?: CollaborationReplyIntent;
+  ask?: CollaborationAskIntent;
+  malformed?: MalformedCollaborationIntent;
 } {
-  const match = /<collaboration_(handoff|reply)\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_\1>/i.exec(content);
-  if (!match) return { visibleContent: content };
+  const match = /<collaboration_(handoff|reply|ask)\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_\1>/i.exec(content);
+  if (!match) {
+    // A control marker is valid only when it is closed.  A terminal, separate
+    // unclosed marker is surfaced as a validation failure so the originating
+    // agent can correct itself; it is never executed as a delegation.
+    const malformed = /(?:^|\n\s*)(<collaboration_(handoff|reply|ask)\s+target="([a-z0-9_-]+)">\s*([\s\S]*))$/i.exec(content);
+    if (!malformed) return { visibleContent: content };
+    const kind = malformed[2]!.toLocaleLowerCase() as MalformedCollaborationIntent['kind'];
+    const targetAgentId = malformed[3]!.trim();
+    const intentContent = malformed[4]!.trim();
+    return {
+      visibleContent: content.slice(0, malformed.index).trim(),
+      ...(targetAgentId && intentContent ? { malformed: { kind, targetAgentId, content: intentContent } } : {}),
+    };
+  }
   const kind = match[1]!.toLocaleLowerCase();
   const targetAgentId = match[2]!.trim();
   const intentContent = match[3]!.trim();
@@ -40,7 +68,9 @@ export function extractCollaborationHandoff(content: string): {
     ...(targetAgentId && intentContent
       ? kind === 'handoff'
         ? { handoff: { targetAgentId, content: intentContent } }
-        : { reply: { targetAgentId, content: intentContent } }
+        : kind === 'ask'
+          ? { ask: { targetAgentId, content: intentContent } }
+          : { reply: { targetAgentId, content: intentContent } }
       : {}),
   };
 }
@@ -52,6 +82,7 @@ export class BridgeCollaborationAdapter {
     private readonly tenantKey: string,
     private readonly eventSource: 'distributed' | 'coordinator' = 'distributed',
     private readonly artifactRoot?: string,
+    private readonly agentRoster: AgentRegistration[] = [],
   ) {}
 
   registerIdentity(openId: string): Promise<void> {
@@ -84,7 +115,7 @@ export class BridgeCollaborationAdapter {
         ...(msg.senderName ? { name: msg.senderName } : {}),
       },
       content: msg.content || '(empty message)',
-      targetAgentIds: msg.mentionedBot ? [this.agentId] : [],
+      targetAgentIds: actorType === 'human' ? this.observedHumanTargets(msg) : [],
     });
 
     let dispatch = result.dispatches.find((item) => item.targetAgentId === this.agentId);
@@ -146,23 +177,7 @@ export class BridgeCollaborationAdapter {
     content: string;
     runId: string;
   }): Promise<AgentIdentity & { content: string }> {
-    const identity = (await this.client.identities()).agents
-      .find((agent) => agent.id === input.targetAgentId);
-    if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
-    // The bridge adds the one real structured mention when it sends the
-    // message; a hand-written "@open_id Name" prefix would render as a second,
-    // unreadable mention. Keep the ledger and the visible message identical.
-    const content = stripTargetMentionPrefix(input.content, identity);
-    await this.client.submit({
-      type: 'handoff',
-      idempotencyKey: `bridge-handoff:${this.agentId}:${input.runId}:${input.targetAgentId}`,
-      taskId: input.taskId,
-      actorAgentId: this.agentId,
-      causedByDispatchId: input.dispatchId,
-      targetAgentId: input.targetAgentId,
-      content,
-    });
-    return { ...identity, content };
+    return this.createDelegation('handoff', input);
   }
 
   async createReply(input: {
@@ -172,13 +187,60 @@ export class BridgeCollaborationAdapter {
     content: string;
     runId: string;
   }): Promise<AgentIdentity & { content: string }> {
+    return this.createDelegation('reply', input);
+  }
+
+  async createAsk(input: {
+    taskId: string;
+    dispatchId: string;
+    targetAgentId: string;
+    content: string;
+    runId: string;
+  }): Promise<AgentIdentity & { content: string }> {
+    return this.createDelegation('ask', input);
+  }
+
+  /**
+   * Ask the Hub to authorize the single recovery turn permitted for a malformed
+   * collaboration marker. The Hub owns the limit and ledger entry; every bridge
+   * runs the returned prompt against its own agent session.
+   */
+  async requestMarkerRepair(input: {
+    taskId: string;
+    dispatchId: string;
+    runId: string;
+    kind: MalformedCollaborationIntent['kind'];
+    targetAgentId: string;
+    content: string;
+  }): Promise<string> {
+    const result = await this.client.submit({
+      type: 'repair',
+      idempotencyKey: `bridge-marker-repair:${this.agentId}:${input.runId}`,
+      taskId: input.taskId,
+      actorAgentId: this.agentId,
+      causedByDispatchId: input.dispatchId,
+      content: `Unclosed collaboration_${input.kind} marker for ${input.targetAgentId}.`,
+      repair: {
+        kind: input.kind,
+        targetAgentId: input.targetAgentId,
+        content: input.content,
+      },
+    });
+    if (!result.repairPrompt) throw new Error('Hub did not authorize a collaboration marker repair');
+    return result.repairPrompt;
+  }
+
+  private async createDelegation(
+    type: 'reply' | 'handoff' | 'ask',
+    input: { taskId: string; dispatchId: string; targetAgentId: string; content: string; runId: string },
+  ): Promise<AgentIdentity & { content: string }> {
     const identity = (await this.client.identities()).agents
       .find((agent) => agent.id === input.targetAgentId);
     if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
     const content = stripTargetMentionPrefix(input.content, identity);
     await this.client.submit({
-      type: 'reply',
-      idempotencyKey: `bridge-reply:${this.agentId}:${input.runId}:${input.targetAgentId}`,
+      type,
+      idempotencyKey: `bridge-${type}:${this.agentId}:${input.runId}:${input.targetAgentId}`,
       taskId: input.taskId,
       actorAgentId: this.agentId,
       causedByDispatchId: input.dispatchId,
@@ -187,7 +249,6 @@ export class BridgeCollaborationAdapter {
     });
     return { ...identity, content };
   }
-
   async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {
     if (!this.artifactRoot) return;
     for (const attachment of attachments) {
@@ -227,6 +288,16 @@ export class BridgeCollaborationAdapter {
       delayMs = Math.min(Math.round(delayMs * 1.5), 1_000);
     } while (Date.now() <= deadline);
     return undefined;
+  }
+
+  private observedHumanTargets(msg: NormalizedMessage): string[] {
+    // Every delivery of a Feishu rich-text message carries its entire
+    // structured mention list.  Preserve that source fact instead of reducing
+    // it to the receiving bridge.  The self fallback keeps older SDK payloads
+    // compatible while preventing an unmentioned bridge from inventing work.
+    const targets = new Set(resolveMentionedAgents(msg, this.agentRoster));
+    if (msg.mentionedBot) targets.add(this.agentId);
+    return [...targets];
   }
 
   private async acceptDispatch(
@@ -273,6 +344,7 @@ export function bridgeCollaborationFromEnv(): BridgeCollaborationAdapter | undef
     tenantKey!,
     eventSource,
     process.env.LARK_COLLAB_ARTIFACT_ROOT,
+    parseAgentRoster(process.env.LARK_COLLAB_AGENT_ROSTER),
   );
 }
 

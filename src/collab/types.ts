@@ -51,7 +51,7 @@ export interface MessageInput {
 
 export interface ActionInput {
   /** `reply` is a normal group-chat turn; it never transfers work ownership. */
-  type: 'reply' | 'handoff' | 'ask' | 'return' | 'complete';
+  type: 'reply' | 'handoff' | 'ask' | 'return' | 'complete' | 'repair';
   idempotencyKey: string;
   taskId: string;
   actorAgentId: AgentId;
@@ -59,6 +59,12 @@ export interface ActionInput {
   causedByDispatchId: string;
   targetAgentId?: AgentId;
   content: string;
+  /** Structured evidence for the Hub-owned single retry of a malformed control marker. */
+  repair?: {
+    kind: 'handoff' | 'reply' | 'ask';
+    targetAgentId: AgentId;
+    content: string;
+  };
   references?: string[];
   occurredAt?: string;
 }
@@ -196,4 +202,6 @@ export interface HubResult {
   task: TaskProjection;
   dispatches: Dispatch[];
   duplicate: boolean;
+  /** A Hub-authored, one-time instruction for the originating bot to repair a malformed control marker. */
+  repairPrompt?: string;
 }

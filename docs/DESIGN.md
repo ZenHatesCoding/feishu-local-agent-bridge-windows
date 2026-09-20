@@ -106,6 +106,14 @@ real mention. Agents never guess identity from group membership. Hub actions
 and Feishu delivery use stable idempotency keys, so a retry does not create a
 second unit of work.
 
+A collaboration marker is executable only when its opening and closing tags
+are both present. For a terminal unclosed marker, the Hub records one
+Hub-authorized `repair` action and returns a fixed correction instruction to
+the originating bridge. That bridge asks the same Bot to regenerate only the
+complete marker. No dispatch or real mention is created from malformed text;
+the Hub permits at most one repair for the active run, after which the run is
+recorded as failed if the marker is still invalid.
+
 The identity registry contains routing metadata, never credentials. Each bot's
 credentials remain in its profile. The pilot prepends an identity-neutral
 `lark-cli` entry point that preserves the current bridge environment; stale
@@ -121,6 +129,7 @@ as another.
 | `ask` | Keep current owner | Focused review or consultation |
 | `return` | Keep current owner | Return findings/artifacts |
 | `complete` | Close task | Owner confirms completion |
+| `repair` | Keep current owner | One Hub-authorized retry for an invalid collaboration marker |
 
 Only the current owner may hand off, ask or complete. The Hub maintains an
 owner lease and derives state by replaying its append-only ledger, so bots do
