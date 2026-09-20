@@ -58,6 +58,16 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(run).toContain('Export-CollabRealLarkCliJs -Pilot $pilot');
   });
 
+  it('keeps Hermes hooks installed when its gateway detaches from the launcher', () => {
+    const common = readPilotScript('Pilot.Common.ps1');
+    const start = readPilotScript('Start-CollabAgent.ps1');
+    const status = readPilotScript('Status-CollabPilot.ps1');
+
+    expect(common).toContain('function Test-CollabHermesGateway');
+    expect(start).toContain('started as a detached Hermes gateway');
+    expect(status).toContain('hermes-gateway (detached)');
+  });
+
   it('uses the silent coordinator as the only human-message writer when configured', () => {
     const common = readPilotScript('Pilot.Common.ps1');
     const runAgent = readPilotScript('run-agent.ps1');

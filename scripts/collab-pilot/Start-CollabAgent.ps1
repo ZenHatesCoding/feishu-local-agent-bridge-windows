@@ -34,7 +34,16 @@ try {
     -ScriptArguments @('-Agent', $Agent)
   Start-Sleep -Seconds 4
   if (!(Test-CollabPid $pidValue)) {
-    throw "$Agent launcher exited. See $script:CollabLogDir\$Agent.err.log"
+    if ($agentConfig.hermesHook -and $agentConfig.hermesHook.enabled -and (Test-CollabHermesGateway $agentConfig)) {
+      # Hermes hands the gateway to its own service process.  Its short-lived
+      # launcher is therefore not a failure and must not trigger hook removal.
+      $table = Read-CollabPidTable
+      if ($table.Contains($Agent)) { $table.Remove($Agent) }
+      Write-CollabPidTable $table
+      Write-Output "$Agent started as a detached Hermes gateway."
+    } else {
+      throw "$Agent launcher exited. See $script:CollabLogDir\$Agent.err.log"
+    }
   }
   Write-Output "$Agent started in background (PID $pidValue)."
 } catch {
