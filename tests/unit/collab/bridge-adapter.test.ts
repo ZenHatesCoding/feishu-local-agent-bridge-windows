@@ -69,6 +69,19 @@ describe('BridgeCollaborationAdapter', () => {
       .toEqual({ visibleContent: 'Finding', ask: { targetAgentId: 'chariot', content: 'Review the risk' } });
   });
 
+  it('flags an unclosed terminal marker for correction instead of delegating it', () => {
+    expect(extractCollaborationHandoff('Finding\n<collaboration_handoff target="chariot">Please rebut point 2'))
+      .toEqual({
+        visibleContent: 'Finding',
+        malformed: { kind: 'handoff', targetAgentId: 'chariot', content: 'Please rebut point 2' },
+      });
+  });
+
+  it('does not treat an unclosed marker embedded in ordinary text as a correction request', () => {
+    expect(extractCollaborationHandoff('Explain <collaboration_handoff target="chariot"> as a literal example.'))
+      .toEqual({ visibleContent: 'Explain <collaboration_handoff target="chariot"> as a literal example.' });
+  });
+
   it('never lets raw Feishu IDs leak into visible collaboration text', () => {
     expect(stripRawFeishuMentionTokens('请 @ou_abc123 Star 接手')).toBe('请 Star 接手');
   });
@@ -107,6 +120,35 @@ describe('BridgeCollaborationAdapter', () => {
     await adapter.finishRun(decision.taskId!, 'World accepted architecture A', 'run-1', decision.dispatchId!, true);
     expect(JSON.stringify(hub.getContext(decision.taskId!, 'world')))
       .toContain('World accepted architecture A');
+  });
+
+  it('asks the Hub for one generic marker-repair prompt, without creating a delegation', async () => {
+    const { hub, client } = await fixture();
+    const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');
+    const decision = await adapter.intake(message({
+      id: 'repair-1', senderType: 'user', senderId: 'user', content: 'Get Justice to review this',
+    }));
+
+    const prompt = await adapter.requestMarkerRepair({
+      taskId: decision.taskId!,
+      dispatchId: decision.dispatchId!,
+      runId: 'run-repair-1',
+      kind: 'ask',
+      targetAgentId: 'chariot',
+      content: 'Review the risks.',
+    });
+
+    expect(prompt).toContain('SYSTEM VALIDATION ERROR');
+    expect(prompt).toContain('<collaboration_ask target="chariot">');
+    expect(hub.listDispatches('chariot')).toHaveLength(0);
+    await expect(adapter.requestMarkerRepair({
+      taskId: decision.taskId!,
+      dispatchId: decision.dispatchId!,
+      runId: 'run-repair-2',
+      kind: 'ask',
+      targetAgentId: 'chariot',
+      content: 'Review the risks.',
+    })).rejects.toThrow('only once per run');
   });
 
   it('preserves all structured human mentions when one bridge reports the event', async () => {

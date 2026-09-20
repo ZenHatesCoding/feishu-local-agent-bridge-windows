@@ -216,7 +216,12 @@ export class CollaborationHub {
             .filter((dispatch) => dispatch.taskId === previousTaskId && dispatch.sourceSequence === sourceRecord.sequence)
             .map((dispatch) => ({ ...dispatch }))
         : [];
-      return { task: cloneTask(task), dispatches, duplicate: true };
+      return {
+        task: cloneTask(task),
+        dispatches,
+        duplicate: true,
+        ...(input.type === 'repair' ? { repairPrompt: markerRepairPrompt(input) } : {}),
+      };
     }
 
     const taskId = input.type === 'message' ? taskIdFor(input.address) : input.taskId;
@@ -238,7 +243,12 @@ export class CollaborationHub {
       .map((record) => record.event.kind === 'dispatch' ? this.dispatches.get(record.event.dispatchId) : undefined)
       .filter((dispatch): dispatch is Dispatch => Boolean(dispatch))
       .map((dispatch) => ({ ...dispatch }));
-    return { task: cloneTask(resultTask), dispatches: createdDispatches, duplicate: false };
+    return {
+      task: cloneTask(resultTask),
+      dispatches: createdDispatches,
+      duplicate: false,
+      ...(input.type === 'repair' ? { repairPrompt: markerRepairPrompt(input) } : {}),
+    };
   }
 
   private recordsForMessage(taskId: string, input: MessageInput): LedgerRecord[] {
@@ -292,6 +302,9 @@ export class CollaborationHub {
     }
 
     const parent = this.requireActiveParentDispatch(task.id, input.actorAgentId, input.causedByDispatchId);
+    if (input.type === 'repair' && this.hasRepairFromParent(task.id, input.actorAgentId, parent.id)) {
+      throw new Error('a malformed collaboration marker may be repaired only once per run');
+    }
     const nextHop = parent.hop + 1;
     if ((input.type === 'handoff' || input.type === 'ask') && nextHop > this.maxCausalDepth) {
       throw new Error(`maximum causal delegation depth exceeded (${this.maxCausalDepth})`);
@@ -362,6 +375,16 @@ export class CollaborationHub {
       record.taskId === taskId
       && record.event.kind === 'action'
       && record.event.action === 'handoff'
+      && record.event.actorAgentId === actorAgentId
+      && record.event.causedByDispatchId === parentDispatchId,
+    );
+  }
+
+  private hasRepairFromParent(taskId: string, actorAgentId: string, parentDispatchId: string): boolean {
+    return this.records.some((record) =>
+      record.taskId === taskId
+      && record.event.kind === 'action'
+      && record.event.action === 'repair'
       && record.event.actorAgentId === actorAgentId
       && record.event.causedByDispatchId === parentDispatchId,
     );
@@ -514,6 +537,10 @@ export class CollaborationHub {
       if (artifact.locator?.provider === 'object' && !artifact.locator.uri) {
         throw new Error('object artifact locator requires uri');
       }
+    } else if (input.type === 'repair') {
+      if (!input.repair || !input.repair.targetAgentId.trim() || !input.repair.content.trim()) {
+        throw new Error('repair requires structured malformed marker evidence');
+      }
     }
   }
 
@@ -550,6 +577,18 @@ function addParticipant(task: TaskProjection, agentId: string): void {
 
 function cloneTask(task: TaskProjection): TaskProjection {
   return { ...task, address: { ...task.address }, participants: [...task.participants] };
+}
+
+function markerRepairPrompt(input: ActionInput): string {
+  const repair = input.repair;
+  if (!repair) throw new Error('repair requires structured malformed marker evidence');
+  return [
+    'SYSTEM VALIDATION ERROR: your immediately preceding final answer contained an unclosed collaboration control marker.',
+    `You attempted a collaboration_${repair.kind} for target "${repair.targetAgentId}", but omitted its closing tag.`,
+    'Do not explain the error and do not repeat your prior visible answer.',
+    `Reply with exactly one complete <collaboration_${repair.kind} target="${repair.targetAgentId}">...</collaboration_${repair.kind}> marker.`,
+    `Keep the same concise objective: ${repair.content}`,
+  ].join('\n');
 }
 
 function canSee(event: LedgerEvent, agentId: string): boolean {

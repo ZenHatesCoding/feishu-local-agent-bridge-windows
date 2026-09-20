@@ -970,9 +970,120 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   let collaborationFinalState: RunState | undefined;
   let collaborationFinalized = false;
 
-  const recordCollaborationResult = async (state: RunState): Promise<void> => {
+  const retryMalformedCollaborationMarker = async (
+    correctionPrompt: string,
+  ): Promise<{ state: RunState; runId: string } | undefined> => {
+    let retryFlow: Awaited<ReturnType<typeof startRunFlow>> | undefined;
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+      retryFlow = await startRunFlow({
+        scopeId: scope,
+        scope: scopeContext,
+        prompt: correctionPrompt,
+        attachments: [],
+        access: accessDecision,
+        capability,
+        profileConfig: controls.profileConfig,
+        sessions,
+        sessionCatalog,
+        workspaces,
+        executor,
+        now: Date.now(),
+        stopGraceMs: getAgentStopGraceMs(controls.cfg),
+        env: {
+          LARK_COLLAB_TASK_ID: collaborationRun!.taskId,
+          LARK_COLLAB_DISPATCH_ID: collaborationRun!.dispatchId,
+          LARK_COLLAB_CHAT_ID: chatId,
+          ...(threadId ? { LARK_COLLAB_THREAD_ID: threadId } : {}),
+          LARK_COLLAB_REPLY_TO: lastMsg.messageId,
+        },
+        observability: {
+          profile: controls.profile,
+          agent: capability.agentId,
+          source: 'im',
+          stage: 'collaboration-marker-correction',
+        },
+      });
+      if (retryFlow.ok || retryFlow.rejectReason.code !== 'run-already-active') break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const acceptedRetry = retryFlow;
+    if (!acceptedRetry?.ok) {
+      log.warn('collab', 'marker-correction-unavailable', {
+        taskId: collaborationRun!.taskId,
+        reason: acceptedRetry?.rejectReason.code,
+      });
+      return undefined;
+    }
+
+    const retryRecordSession = (evt: AgentEvent): void => {
+      recordRunSessionEvent({
+        scopeId: scope,
+        sessions,
+        sessionCatalog,
+        capability,
+        policy: acceptedRetry.policy,
+        event: evt,
+      });
+    };
+    const state = await processAgentStream(
+      acceptedRetry.execution.handle,
+      acceptedRetry.execution.subscribe(),
+      scope,
+      idleTimeoutMs,
+      retryRecordSession,
+      async () => {},
+    );
+    return { state, runId: acceptedRetry.execution.runId };
+  };
+
+  const recordCollaborationResult = async (
+    state: RunState,
+    runId = execution.runId,
+    originalVisibleContent?: string,
+  ): Promise<void> => {
     if (!collaboration || !collaborationRun?.dispatchId) return;
     const extracted = extractCollaborationHandoff(renderText(finalAnswerOnlyState(state)));
+    if (extracted.malformed) {
+      log.warn('collab', 'marker-validation-failed', {
+        taskId: collaborationRun.taskId,
+        kind: extracted.malformed.kind,
+        targetAgentId: extracted.malformed.targetAgentId,
+      });
+      try {
+        const correctionPrompt = await collaboration.requestMarkerRepair({
+          taskId: collaborationRun.taskId,
+          dispatchId: collaborationRun.dispatchId,
+          runId,
+          ...extracted.malformed,
+        });
+        const correction = await retryMalformedCollaborationMarker(correctionPrompt);
+        if (correction?.state.terminal === 'done') {
+          const corrected = extractCollaborationHandoff(renderText(finalAnswerOnlyState(correction.state)));
+          if (!corrected.malformed && (corrected.handoff || corrected.reply || corrected.ask)) {
+            await recordCollaborationResult(
+              correction.state,
+              correction.runId,
+              originalVisibleContent ?? extracted.visibleContent,
+            );
+            return;
+          }
+        }
+      } catch (err) {
+        log.fail('collab-marker-repair', err);
+      }
+      await collaboration.finishRun(
+        collaborationRun.taskId,
+        originalVisibleContent ?? extracted.visibleContent,
+        runId,
+        collaborationRun.dispatchId,
+        false,
+      );
+      collaborationFinalized = true;
+      await channel.send(chatId, {
+        markdown: '协作转交格式校验失败：Hub 已要求当前 bot 重做一次，但仍未生成可执行的完整标签。',
+      }, sendOpts);
+      return;
+    }
     if (extracted.handoff) {
       try {
         const target = await collaboration.createHandoff({
@@ -980,7 +1091,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           dispatchId: collaborationRun.dispatchId,
           targetAgentId: extracted.handoff.targetAgentId,
           content: extracted.handoff.content,
-          runId: execution.runId,
+          runId,
         });
         await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
@@ -998,7 +1109,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           dispatchId: collaborationRun.dispatchId,
           targetAgentId: extracted.reply.targetAgentId,
           content: extracted.reply.content,
-          runId: execution.runId,
+          runId,
         });
         await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
@@ -1016,7 +1127,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           dispatchId: collaborationRun.dispatchId,
           targetAgentId: extracted.ask.targetAgentId,
           content: extracted.ask.content,
-          runId: execution.runId,
+          runId,
         });
         await channel.send(chatId, { markdown: target.content }, {
           ...sendOpts,
@@ -1029,8 +1140,8 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     }
     await collaboration.finishRun(
       collaborationRun.taskId,
-      stripRawFeishuMentionTokens(extracted.visibleContent),
-      execution.runId,
+      stripRawFeishuMentionTokens(originalVisibleContent ?? extracted.visibleContent),
+      runId,
       collaborationRun.dispatchId,
       state.terminal === 'done',
     );
@@ -1039,7 +1150,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       taskId: collaborationRun.taskId,
       dispatchId: collaborationRun.dispatchId,
       status: state.terminal === 'done' ? 'completed' : 'failed',
-      chars: stripRawFeishuMentionTokens(extracted.visibleContent).length,
+      chars: stripRawFeishuMentionTokens(originalVisibleContent ?? extracted.visibleContent).length,
     });
   };
 

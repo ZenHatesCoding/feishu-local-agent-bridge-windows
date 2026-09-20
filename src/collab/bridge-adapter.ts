@@ -32,14 +32,34 @@ export interface CollaborationAskIntent {
   content: string;
 }
 
+export interface MalformedCollaborationIntent {
+  kind: 'handoff' | 'reply' | 'ask';
+  targetAgentId: string;
+  content: string;
+}
+
 export function extractCollaborationHandoff(content: string): {
   visibleContent: string;
   handoff?: CollaborationHandoffIntent;
   reply?: CollaborationReplyIntent;
   ask?: CollaborationAskIntent;
+  malformed?: MalformedCollaborationIntent;
 } {
   const match = /<collaboration_(handoff|reply|ask)\s+target="([a-z0-9_-]+)">\s*([\s\S]*?)\s*<\/collaboration_\1>/i.exec(content);
-  if (!match) return { visibleContent: content };
+  if (!match) {
+    // A control marker is valid only when it is closed.  A terminal, separate
+    // unclosed marker is surfaced as a validation failure so the originating
+    // agent can correct itself; it is never executed as a delegation.
+    const malformed = /(?:^|\n\s*)(<collaboration_(handoff|reply|ask)\s+target="([a-z0-9_-]+)">\s*([\s\S]*))$/i.exec(content);
+    if (!malformed) return { visibleContent: content };
+    const kind = malformed[2]!.toLocaleLowerCase() as MalformedCollaborationIntent['kind'];
+    const targetAgentId = malformed[3]!.trim();
+    const intentContent = malformed[4]!.trim();
+    return {
+      visibleContent: content.slice(0, malformed.index).trim(),
+      ...(targetAgentId && intentContent ? { malformed: { kind, targetAgentId, content: intentContent } } : {}),
+    };
+  }
   const kind = match[1]!.toLocaleLowerCase();
   const targetAgentId = match[2]!.trim();
   const intentContent = match[3]!.trim();
@@ -178,6 +198,36 @@ export class BridgeCollaborationAdapter {
     runId: string;
   }): Promise<AgentIdentity & { content: string }> {
     return this.createDelegation('ask', input);
+  }
+
+  /**
+   * Ask the Hub to authorize the single recovery turn permitted for a malformed
+   * collaboration marker. The Hub owns the limit and ledger entry; every bridge
+   * runs the returned prompt against its own agent session.
+   */
+  async requestMarkerRepair(input: {
+    taskId: string;
+    dispatchId: string;
+    runId: string;
+    kind: MalformedCollaborationIntent['kind'];
+    targetAgentId: string;
+    content: string;
+  }): Promise<string> {
+    const result = await this.client.submit({
+      type: 'repair',
+      idempotencyKey: `bridge-marker-repair:${this.agentId}:${input.runId}`,
+      taskId: input.taskId,
+      actorAgentId: this.agentId,
+      causedByDispatchId: input.dispatchId,
+      content: `Unclosed collaboration_${input.kind} marker for ${input.targetAgentId}.`,
+      repair: {
+        kind: input.kind,
+        targetAgentId: input.targetAgentId,
+        content: input.content,
+      },
+    });
+    if (!result.repairPrompt) throw new Error('Hub did not authorize a collaboration marker repair');
+    return result.repairPrompt;
   }
 
   private async createDelegation(
