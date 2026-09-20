@@ -24,6 +24,7 @@ import {
   runServiceUnregister,
 } from './commands/service';
 import { runStart } from './commands/start';
+import { runLocalContext } from './commands/local-context';
 import {
   runArtifactPublish,
   runArtifactRegisterGit,
@@ -39,6 +40,22 @@ program
   .name('lark-channel-bridge')
   .description('Bridge Feishu/Lark messenger with local CLI coding agents')
   .version(pkg.version, '-v, --version');
+
+const localContext = program
+  .command('local-context')
+  .description('Read this computer\'s observed topic ledger; never queries the Hub');
+
+for (const mode of ['read', 'search'] as const) {
+  localContext
+    .command(mode)
+    .requiredOption('--scope <chat-or-topic>', 'chat ID, or chatId:threadId for a topic')
+    .option('--query <keywords>', 'required for search; space-separated words')
+    .option('--limit <count>', 'maximum records to return (default 12, maximum 50)')
+    .action(async (opts: { scope: string; query?: string; limit?: string }) => {
+      if (mode === 'search' && !opts.query?.trim()) throw new Error('search requires --query');
+      await runLocalContext(opts);
+    });
+}
 
 const hub = program
   .command('hub')

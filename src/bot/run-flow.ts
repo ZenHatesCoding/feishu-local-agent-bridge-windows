@@ -34,6 +34,8 @@ export interface StartRunFlowInput {
   executor: RunExecutor;
   now: number;
   stopGraceMs?: number;
+  /** Start from the supplied prompt instead of restoring a long native session. */
+  freshContext?: boolean;
   env?: NodeJS.ProcessEnv;
   observability?: {
     profile: string;
@@ -113,7 +115,7 @@ export async function startRunFlow(input: StartRunFlowInput): Promise<StartRunFl
   let resumeFrom: string | undefined;
   let sessionId: string | undefined;
   let threadId: string | undefined;
-  if (input.sessionCatalog) {
+  if (!input.freshContext && input.sessionCatalog) {
     const catalogEntry = input.sessionCatalog.activeFor({
       scopeId: input.scopeId,
       agentId: input.capability.agentId,
@@ -128,7 +130,7 @@ export async function startRunFlow(input: StartRunFlowInput): Promise<StartRunFl
       resumeFrom = threadId;
     }
   }
-  if (!resumeFrom && input.capability.agentId === 'claude') {
+  if (!input.freshContext && !resumeFrom && input.capability.agentId === 'claude') {
     resumeFrom = input.sessions.resumeFor(input.scopeId, workspace.cwdRealpath);
     sessionId = resumeFrom;
     const stale = input.sessions.getRaw(input.scopeId);

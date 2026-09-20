@@ -26,7 +26,7 @@ cross-node artifact retrieval and production-grade dispatch remain roadmap work.
 | Bots send/receive in one Feishu group | Implemented | Every Bridge connects to Feishu independently |
 | Real Bot-to-Bot mentions | Implemented | Each app configures bot-message permission and group admission |
 | Shared text task context | Implemented | `all` and `worker` nodes use one Hub `publicUrl` |
-| Bounded prompt projection | Implemented | Original requirement, recent semantic events, on-demand Artifacts |
+| Local observed-topic ledger and on-demand context | Implemented | Each node records only what it observed; prompts carry current dispatch and a local query entry point |
 | Dispatch, ownership and visibility | P0 implemented | Each authenticated principal operates only its Agent identity |
 | PPT/PDF/Word artifact sharing | Locator implemented; download planned | Feishu locator plus receiver-side materialization |
 | Shared code workspace state | Registration implemented; retrieval planned | Git repository, commit and path locator |
