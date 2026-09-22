@@ -100,7 +100,7 @@ Dispatches have an explicit lifecycle: `pending -> accepted -> completed` or
 dispatch for the same task and actor. This prevents stale work from spawning
 new work and makes failed runs auditable instead of leaving them accepted.
 
-An Agent delegates by placing one `collaboration_reply` or
+An Agent delegates by placing one `collaboration_reply`, `collaboration_ask` or
 `collaboration_handoff` marker in its final answer. The Bridge, rather than the
 model, consumes that marker, records the causal action, resolves the target's
 current identity, and sends the one real mention in the same topic. The prompt
@@ -109,6 +109,16 @@ an `open_id`, a shell command, or a global bot list. Absence from that roster
 means unknown, not absent from the group. Raw Feishu IDs are removed from
 visible collaboration text, and a delivery failure is reported in the topic
 instead of being silently logged.
+
+An `ask` has one additional bridge-owned completion rule shared by every Bot
+adapter: the consulted Bot returns only its result and artifacts. Once the Hub
+has atomically recorded that return, it resolves the **current** owner and
+creates the return dispatch; the producing Bridge sends that same final result
+with one real Feishu mention of that owner. A consulted model must not emit a
+second `reply`/`handoff`/`ask` marker to wake the owner. The Bridge ignores such
+a marker for that run, so Codex, Claude, Antigravity, DeepSeek Harness and
+Hermes cannot produce duplicate owner wake-ups merely because their prompting
+or model behavior differs.
 
 Each computer keeps an append-only local topic ledger containing only messages,
 downloaded attachments and Bot results that its own bridges actually observed.
@@ -137,7 +147,7 @@ as another.
 | `assign` | Move to the human-mentioned agent | Initial selection or manual reassignment |
 | `handoff` | Transfer to target | Continue the main task |
 | `ask` | Keep current owner | Focused review or consultation |
-| `return` | Keep current owner | Return findings/artifacts |
+| `return` | Keep current owner | Return findings/artifacts and bridge-wake the current owner once |
 | `complete` | Close task | Owner confirms completion |
 | `repair` | Keep current owner | One Hub-authorized retry for an invalid collaboration marker |
 

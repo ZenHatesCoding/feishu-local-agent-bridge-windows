@@ -143,12 +143,19 @@ tenantKey + chatId + threadId -> taskId
 原子创建所有 dispatch；后到回调只会幂等重放。因此回调到达顺序不会再导致只有第一个
 bot 响应。
 
-Agent 需要委派时，只在最终回答中输出一个 `collaboration_reply` 或
+Agent 需要委派时，只在最终回答中输出一个 `collaboration_reply`、`collaboration_ask` 或
 `collaboration_handoff` 标记。Bridge 而不是模型负责消费标记、写入带父 dispatch 的
 动作、解析目标当前身份，并在同一话题发送唯一的真实 mention。提示词只提供 Hub 已在
 当前飞书群观察到的 roster；其中没有 `open_id`、shell 命令或全局 bot 名单。roster 未
 出现某个名字只表示未知，不能据此判断该 bot 不在群里。面向群聊的协作文本会移除裸
 飞书 ID；投递失败会在话题中明确报告，不再只写日志。
+
+`ask` 还有一条由 bridge 统一执行的收尾规则，适用于**所有** Bot adapter：被咨询的
+Bot 只返回自己的结论和 Artifact。Hub 原子记录该 `return` 后，会解析**当前**负责人并
+创建 return dispatch；产生结果的 bridge 再把同一条最终结果带着一次真实飞书 `@` 发给
+该负责人。被咨询的模型不应自行输出第二个 `reply` / `handoff` / `ask` 标记来叫醒负责人；
+若仍输出，bridge 会在这次咨询中忽略它。这样 Codex、Claude、Antigravity、DeepSeek
+Harness 和 Hermes 不会因为提示词或模型习惯不同而重复回唤负责人。
 
 每台电脑维护一份追加式本地话题账本，只记录本机 bridge 实际收到的消息、已下载附件和
 Bot 结果，供本机 Bot 按需查询。它不会复制到另一台电脑，也不会把本机路径当成可跨机
@@ -173,7 +180,7 @@ Hub 为每个任务维护当前负责人和有期限的 lease。协作动作有�
 | `assign` | 交给用户 `@` 的 Agent | 被 `@` 的 Agent | 首次选择或人工改派 |
 | `handoff` | 转给目标 Agent | 目标 Agent | 正式接手后续工作 |
 | `ask` | 不变 | 被咨询 Agent | 局部审查或专业咨询 |
-| `return` | 不变 | 必要时返回当前负责人 | 交回结果与产物 |
+| `return` | 不变 | bridge 一次真实回唤当前负责人 | 交回结果与产物 |
 | `complete` | 任务关闭 | 无 | 当前负责人确认完成 |
 | `repair` | 不变 | 无 | Hub 授权一次无效协作标记重做 |
 

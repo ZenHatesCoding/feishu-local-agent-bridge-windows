@@ -122,6 +122,45 @@ describe('BridgeCollaborationAdapter', () => {
       .toContain('World accepted architecture A');
   });
 
+  it('returns every completed consultation to the Hub-resolved current owner', async () => {
+    const { hub, client } = await fixture();
+    hub.registerAgentIdentity('world', 'ou_world', {});
+    hub.registerAgentIdentity('chariot', 'ou_chariot', {});
+    const world = new BridgeCollaborationAdapter(client, 'world', 'tenant');
+    const chariot = new BridgeCollaborationAdapter(client, 'chariot', 'tenant');
+    const assigned = await world.intake(message({
+      id: 'human-consultation', senderType: 'user', senderId: 'user', content: 'Own and assess this',
+    }));
+    await world.createAsk({
+      taskId: assigned.taskId!,
+      dispatchId: assigned.dispatchId!,
+      targetAgentId: 'chariot',
+      content: 'Assess the risk and report your conclusion.',
+      runId: 'run-ask',
+    });
+    const consultation = await chariot.intake(message({
+      id: 'world-consultation', senderType: 'app', senderId: 'world-bot', content: 'Please assess the risk',
+    }));
+
+    expect(consultation.dispatchReason).toBe('ask');
+    const finalized = await chariot.finishRun(
+      consultation.taskId!,
+      'The material risk is bounded.',
+      'run-chariot-answer',
+      consultation.dispatchId!,
+      true,
+    );
+
+    expect(finalized.returnTarget).toMatchObject({
+      id: 'world', openId: 'ou_world', dispatchId: expect.any(String),
+    });
+    expect(hub.listDispatches('world')).toContainEqual(expect.objectContaining({
+      id: finalized.returnTarget!.dispatchId,
+      reason: 'return',
+      status: 'pending',
+    }));
+  });
+
   it('asks the Hub for one generic marker-repair prompt, without creating a delegation', async () => {
     const { hub, client } = await fixture();
     const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');

@@ -1,7 +1,9 @@
 import type {
   LarkChannel,
   LarkChannelOptions,
+  MentionInfo,
   NormalizedMessage,
+  SendOptions,
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
 import { dirname, join } from 'node:path';
@@ -205,6 +207,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
     promptContext: string;
     taskId: string;
     dispatchId?: string;
+    dispatchReason?: 'mention' | 'fanout' | 'reply' | 'handoff' | 'ask' | 'return';
   }>();
 
   // Resolve the App Secret to plaintext. The config field can be a literal
@@ -705,6 +708,7 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
         promptContext: decision.promptContext,
         taskId: decision.taskId,
         ...(decision.dispatchId ? { dispatchId: decision.dispatchId } : {}),
+        ...(decision.dispatchReason ? { dispatchReason: decision.dispatchReason } : {}),
       });
     }
   }
@@ -732,6 +736,7 @@ interface RunBatchDeps {
     promptContext: string;
     taskId: string;
     dispatchId?: string;
+    dispatchReason?: 'mention' | 'fanout' | 'reply' | 'handoff' | 'ask' | 'return';
   }>;
   localTopicLedger: LocalTopicLedger;
 }
@@ -950,10 +955,17 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     log.info('flush', 'idle-watchdog', { idleTimeoutMs });
   }
 
-  const replyMode = effectiveReplyMode(capability, getMessageReplyMode(controls.cfg));
+  // A consultation result must carry its one real owner mention on the final
+  // result message.  Streaming has already created a message before the Hub
+  // can atomically resolve the current owner, so consultation runs always use
+  // the final text path.
+  const isConsultationRun = collaborationRun?.dispatchReason === 'ask';
+  const replyMode = isConsultationRun
+    ? 'text'
+    : effectiveReplyMode(capability, getMessageReplyMode(controls.cfg));
   log.info('flush', 'reply-mode', { mode: replyMode });
   const cotMessages = getCotMessages(controls.cfg);
-  const cotEnabled = cotMessages !== 'off';
+  const cotEnabled = !isConsultationRun && cotMessages !== 'off';
 
   // Re-read prefs on every flush so toggling /config mid-stream takes
   // effect immediately. Cheap object lookups, no allocation when on.
@@ -1059,10 +1071,21 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     state: RunState,
     runId = execution.runId,
     originalVisibleContent?: string,
-  ): Promise<void> => {
+  ): Promise<{ ownerMention?: MentionInfo } | undefined> => {
     if (!collaboration || !collaborationRun?.dispatchId) return;
     const extracted = extractCollaborationHandoff(renderText(finalAnswerOnlyState(state)));
-    if (extracted.malformed) {
+    // A consulted Bot returns one result to the owner.  It must not create a
+    // second owner wake-up by emitting a reply marker itself; all adapters get
+    // this rule, independent of the underlying model or harness.
+    const ignoreControlMarker = collaborationRun.dispatchReason === 'ask'
+      && (extracted.handoff || extracted.reply || extracted.ask || extracted.malformed);
+    if (ignoreControlMarker) {
+      log.warn('collab', 'consultation-control-marker-ignored', {
+        taskId: collaborationRun.taskId,
+        dispatchId: collaborationRun.dispatchId,
+      });
+    }
+    if (extracted.malformed && !ignoreControlMarker) {
       log.warn('collab', 'marker-validation-failed', {
         taskId: collaborationRun.taskId,
         kind: extracted.malformed.kind,
@@ -1103,7 +1126,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       }, sendOpts);
       return;
     }
-    if (extracted.handoff) {
+    if (extracted.handoff && !ignoreControlMarker) {
       try {
         const target = await collaboration.createHandoff({
           taskId: collaborationRun.taskId,
@@ -1121,7 +1144,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.handoff.targetAgentId, err);
       }
     }
-    if (extracted.reply) {
+    if (extracted.reply && !ignoreControlMarker) {
       try {
         const target = await collaboration.createReply({
           taskId: collaborationRun.taskId,
@@ -1139,7 +1162,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.reply.targetAgentId, err);
       }
     }
-    if (extracted.ask) {
+    if (extracted.ask && !ignoreControlMarker) {
       try {
         const target = await collaboration.createAsk({
           taskId: collaborationRun.taskId,
@@ -1157,7 +1180,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.ask.targetAgentId, err);
       }
     }
-    await collaboration.finishRun(
+    const finalization = await collaboration.finishRun(
       collaborationRun.taskId,
       stripRawFeishuMentionTokens(originalVisibleContent ?? extracted.visibleContent),
       runId,
@@ -1171,6 +1194,15 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       status: state.terminal === 'done' ? 'completed' : 'failed',
       chars: stripRawFeishuMentionTokens(originalVisibleContent ?? extracted.visibleContent).length,
     });
+    if (!finalization.returnTarget) return;
+    return {
+      ownerMention: {
+        key: finalization.returnTarget.openId,
+        openId: finalization.returnTarget.openId,
+        name: finalization.returnTarget.displayName,
+        isBot: true,
+      },
+    };
   };
 
   try {
@@ -1328,16 +1360,8 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         async () => {},
       );
       collaborationFinalState = finalState;
-      await sendFinalReply({
-        channel,
-        chatId,
-        scope,
-        state: filterForPrefs(finalState),
-        replyMode,
-        sendOpts,
-        cardRenderOptions,
-      });
     }
+    let ownerMention: MentionInfo | undefined;
     if (collaborationFinalState) {
       await localTopicLedger.recordBotResult(
         scope,
@@ -1346,7 +1370,19 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           extractCollaborationHandoff(renderText(finalAnswerOnlyState(collaborationFinalState))).visibleContent,
         ),
       );
-      await recordCollaborationResult(collaborationFinalState);
+      ownerMention = (await recordCollaborationResult(collaborationFinalState))?.ownerMention;
+    }
+    if (replyMode === 'text' && collaborationFinalState) {
+      await sendFinalReply({
+        channel,
+        chatId,
+        scope,
+        state: filterForPrefs(collaborationFinalState),
+        replyMode,
+        sendOpts,
+        cardRenderOptions,
+        ...(ownerMention ? { mentions: [ownerMention] } : {}),
+      });
     }
   } catch (err) {
     log.fail('stream', err);
@@ -1373,18 +1409,25 @@ async function sendFinalReply(input: {
   replyMode: ReturnType<typeof getMessageReplyMode>;
   sendOpts: { replyTo: string; replyInThread?: boolean };
   cardRenderOptions: { signCallback?: (action: string) => string };
+  mentions?: MentionInfo[];
 }): Promise<void> {
   const body = stripRawFeishuMentionTokens(extractCollaborationHandoff(renderText(input.state)).visibleContent);
+  const sendOpts: SendOptions & { replyTo: string } = input.mentions?.length
+    ? { ...input.sendOpts, mentions: input.mentions }
+    : input.sendOpts;
 
   if (input.replyMode === 'card') {
     const result = await input.channel.send(
       input.chatId,
       { card: renderCard(input.state, input.cardRenderOptions) },
-      input.sendOpts,
+      sendOpts,
     );
     log.info('outbound', 'sent', outboundLogFields(input, 'card', body, result));
   } else if (input.replyMode === 'markdown') {
-    if (body.trim()) {
+    if (body.trim() && input.mentions?.length) {
+      const result = await sendMarkdownReply(input.channel, input.chatId, body, sendOpts);
+      log.info('outbound', 'sent', outboundLogFields(input, 'markdown', body, result));
+    } else if (body.trim()) {
       try {
         await input.channel.stream(
           input.chatId,
@@ -1393,19 +1436,19 @@ async function sendFinalReply(input: {
               await ctrl.setContent(body);
             },
           },
-          input.sendOpts,
+          sendOpts,
         );
         log.info('outbound', 'sent', outboundLogFields(input, 'markdown-stream', body));
       } catch (err) {
         log.warn('outbound', 'markdown-stream-fallback', {
           err: err instanceof Error ? err.message : String(err),
         });
-        const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
+        const result = await sendMarkdownReply(input.channel, input.chatId, body, sendOpts);
         log.info('outbound', 'sent', outboundLogFields(input, 'markdown', body, result));
       }
     }
   } else if (body.trim()) {
-    const result = await sendMarkdownReply(input.channel, input.chatId, body, input.sendOpts);
+    const result = await sendMarkdownReply(input.channel, input.chatId, body, sendOpts);
     log.info('outbound', 'sent', outboundLogFields(input, 'text', body, result));
   }
 }
@@ -1413,7 +1456,7 @@ async function sendFinalReply(input: {
 async function sendCollaborationDeliveryFailure(
   channel: LarkChannel,
   chatId: string,
-  sendOpts: { replyTo: string; replyInThread?: boolean },
+  sendOpts: SendOptions,
   targetAgentId: string,
   err: unknown,
 ): Promise<void> {
@@ -1434,7 +1477,7 @@ async function sendMarkdownReply(
   channel: LarkChannel,
   chatId: string,
   body: string,
-  sendOpts: { replyTo: string; replyInThread?: boolean },
+  sendOpts: SendOptions & { replyTo: string },
 ): Promise<{ messageId: string; chunkIds?: string[] }> {
   const chunks = sendOpts.replyInThread ? splitMarkdownForTopic(body) : [body];
   const ids: string[] = [];
