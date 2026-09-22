@@ -14,7 +14,18 @@ export interface BridgeCollaborationDecision {
   promptContext?: string;
   taskId?: string;
   dispatchId?: string;
+  /** The dispatch contract that started this Bot run. */
+  dispatchReason?: Dispatch['reason'];
   reason?: string;
+}
+
+/**
+ * A completed consultation has a Hub-authorized return dispatch.  The bridge
+ * that produced the answer must use this identity for the one real Feishu
+ * mention that wakes the owner; the model never needs to guess a recipient.
+ */
+export interface CollaborationRunFinalization {
+  returnTarget?: AgentIdentity & { dispatchId: string };
 }
 
 export interface CollaborationHandoffIntent {
@@ -141,10 +152,11 @@ export class BridgeCollaborationAdapter {
     runId: string,
     dispatchId: string,
     success: boolean,
-  ): Promise<void> {
+  ): Promise<CollaborationRunFinalization> {
     try {
+      let returnTarget: CollaborationRunFinalization['returnTarget'];
       if (success && content.trim()) {
-        await this.client.submit({
+        const result = await this.client.submit({
           type: 'return',
           idempotencyKey: `agent-result:${this.agentId}:${runId}`,
           taskId,
@@ -152,12 +164,22 @@ export class BridgeCollaborationAdapter {
           causedByDispatchId: dispatchId,
           content,
         });
+        const returnDispatch = result.dispatches.find((dispatch) => dispatch.reason === 'return');
+        if (returnDispatch) {
+          const identity = (await this.client.identities()).agents
+            .find((agent) => agent.id === returnDispatch.targetAgentId);
+          if (!identity) {
+            throw new Error(`return owner has not registered its Feishu identity: ${returnDispatch.targetAgentId}`);
+          }
+          returnTarget = { ...identity, dispatchId: returnDispatch.id };
+        }
       }
       await this.client.acknowledge(dispatchId, {
         agentId: this.agentId,
         status: success ? 'completed' : 'failed',
         idempotencyKey: `${success ? 'complete' : 'fail'}:${dispatchId}:${runId}`,
       });
+      return returnTarget ? { returnTarget } : {};
     } catch (err) {
       if (success) {
         await this.client.acknowledge(dispatchId, {
@@ -317,6 +339,7 @@ export class BridgeCollaborationAdapter {
       promptContext: context.promptContext,
       taskId,
       dispatchId: dispatch.id,
+      dispatchReason: dispatch.reason,
     };
   }
 }

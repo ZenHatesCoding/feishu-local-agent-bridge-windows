@@ -106,6 +106,16 @@ real mention. Agents never guess identity from group membership. Hub actions
 and Feishu delivery use stable idempotency keys, so a retry does not create a
 second unit of work.
 
+An `ask` has one additional bridge-owned completion rule shared by every Bot
+adapter: the consulted Bot returns only its result and artifacts. Once the Hub
+has atomically recorded that return, it resolves the **current** owner and
+creates the return dispatch; the producing Bridge sends that same final result
+with one real Feishu mention of that owner. A consulted model must not issue a
+second delegation to wake the owner. The Bridge ignores a control marker for
+that run, so Codex, Claude, Antigravity, DeepSeek Harness and
+Hermes cannot produce duplicate owner wake-ups merely because their prompting
+or model behavior differs.
+
 Each computer keeps an append-only local topic ledger containing only messages,
 downloaded attachments and Bot results that its own bridges actually observed.
 Bots on that computer can query it on demand. It is never copied to another
@@ -133,7 +143,7 @@ as another.
 | `assign` | Move to the human-mentioned agent | Initial selection or manual reassignment |
 | `handoff` | Transfer to target | Continue the main task |
 | `ask` | Keep current owner | Focused review or consultation |
-| `return` | Keep current owner | Return findings/artifacts |
+| `return` | Keep current owner | Return findings/artifacts and bridge-wake the current owner once |
 | `complete` | Close task | Owner confirms completion |
 | `repair` | Keep current owner | One Hub-authorized retry for an invalid collaboration marker |
 

@@ -26,7 +26,7 @@ export function buildCollaborationContext(input: {
         'A normal group-chat turn may invite one participant with: collab-delegate.cmd reply --target TARGET_ID --content TEXT. It grants one reply turn and sends the real Feishu @ without transferring work ownership.',
         'For explicit work transfer or consultation, run: collab-delegate.cmd handoff|ask --target TARGET_ID --content TEXT.',
         'Never use a bare lark-cli message or text-only @ to delegate: it cannot authorize work.',
-        'For an ask, the target records its answer with hub return, then really @ mentions the current owner.',
+        'If yourDispatch.reason is ask, finish the requested consultation with the result and artifact paths only. Do not run collab-delegate.cmd or emit collaboration_reply, collaboration_ask or collaboration_handoff to wake the owner: the Bridge records the return and sends the one real @ to the current owner.',
         'Complete only the assigned objective and return structured results and artifact paths.',
         `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>" --reply-in-thread. Do not use raw lark-cli --file in a collaboration task.`,
       ],
