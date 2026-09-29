@@ -5,6 +5,7 @@ export type { ClaudePermissionMode } from '../config/permissions';
 
 export type AgentEvent =
   | { type: 'system'; sessionId?: string; threadId?: string; cwd?: string; model?: string }
+  | { type: 'activity'; summary?: string }
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
   | { type: 'tool_use'; id: string; name: string; input: unknown }

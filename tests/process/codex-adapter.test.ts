@@ -342,6 +342,7 @@ describe('CodexAdapter process contract', () => {
 
     expect(await collect(run.events)).toEqual([
       { type: 'system', threadId: 'thread-retry' },
+      { type: 'activity', summary: 'agent stream active' },
       { type: 'text', delta: 'after retry' },
       { type: 'done', threadId: 'thread-retry', terminationReason: 'normal' },
     ]);

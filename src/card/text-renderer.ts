@@ -27,10 +27,20 @@ export function renderText(state: RunState): string {
   } else if (state.terminal === 'error' && state.errorMsg) {
     parts.push(`⚠️ agent 失败:${state.errorMsg}`);
   } else if (state.terminal === 'running' && state.footer) {
-    parts.push(footerLine(state.footer));
+    parts.push(state.progress ? renderProgressText(state.progress) : footerLine(state.footer));
   }
 
   return parts.join('\n\n');
+}
+
+export function renderProgressText(progress: NonNullable<RunState['progress']>): string {
+  if (progress.status === 'tool_running') {
+    return `_🧰 工具仍在运行，已处理 ${progress.elapsedMinutes} 分钟…_`;
+  }
+  if (progress.status === 'waiting') {
+    return `_⏳ 正在等待 agent 返回，已运行 ${progress.elapsedMinutes} 分钟…_`;
+  }
+  return `_🔄 任务仍在处理中，已运行 ${progress.elapsedMinutes} 分钟…_`;
 }
 
 function renderBlock(block: Block): string {

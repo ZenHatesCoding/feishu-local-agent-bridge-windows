@@ -199,7 +199,10 @@ async function* createEventStream(
       const parsed = parseStreamJsonLine(line);
       if (parsed?.error) resultError ??= parsed.error;
       const delta = parsed?.delta ?? '';
-      if (!delta) continue;
+      if (!delta) {
+        if (parsed?.activity) yield { type: 'activity', summary: parsed.activity };
+        continue;
+      }
       text += delta;
       yield { type: 'text', delta };
     }
@@ -242,7 +245,9 @@ async function* createEventStream(
   yield { type: 'done', terminationReason: 'normal' };
 }
 
-function parseStreamJsonLine(line: string): { delta?: string; error?: string } | undefined {
+export function parseStreamJsonLine(
+  line: string,
+): { delta?: string; error?: string; activity?: string } | undefined {
   try {
     const value = JSON.parse(line) as {
       event?: string;
@@ -260,7 +265,8 @@ function parseStreamJsonLine(line: string): { delta?: string; error?: string } |
         error: value.result.error || value.result.response || `Antigravity CLI returned ${value.result.status}`,
       };
     }
-    return {};
+    if (value.event === 'result') return {};
+    return { activity: 'agent stream active' };
   } catch {
     return {};
   }

@@ -47,7 +47,11 @@ export function renderCard(state: RunState, options: RunCardRenderOptions = {}):
   }
 
   if (state.terminal === 'running') {
-    if (state.footer) elements.push(footerStatus(state.footer));
+    if (state.progress) {
+      elements.push(progressStatus(state.progress));
+    } else if (state.footer) {
+      elements.push(footerStatus(state.footer));
+    }
     elements.push(stopButton(options));
   }
 
@@ -59,6 +63,16 @@ export function renderCard(state: RunState, options: RunCardRenderOptions = {}):
     },
     body: { elements },
   };
+}
+
+function progressStatus(progress: NonNullable<RunState['progress']>): object {
+  if (progress.status === 'tool_running') {
+    return noteMd(`🧰 工具仍在运行，已处理 ${progress.elapsedMinutes} 分钟…`);
+  }
+  if (progress.status === 'waiting') {
+    return noteMd(`⏳ 正在等待 agent 返回，已运行 ${progress.elapsedMinutes} 分钟…`);
+  }
+  return noteMd(`🔄 任务仍在处理中，已运行 ${progress.elapsedMinutes} 分钟…`);
 }
 
 function* groupBlocks(blocks: Block[]): Generator<Group> {
@@ -206,6 +220,9 @@ function summaryText(state: RunState): string {
   if (state.terminal === 'idle_timeout') return '已超时';
   if (state.terminal === 'error') return '出错';
   if (state.terminal === 'done') return '已完成';
+  if (state.progress?.status === 'tool_running') return `工具运行中 · ${state.progress.elapsedMinutes} 分钟`;
+  if (state.progress?.status === 'waiting') return `等待 Agent · ${state.progress.elapsedMinutes} 分钟`;
+  if (state.progress) return `处理中 · ${state.progress.elapsedMinutes} 分钟`;
   if (state.footer === 'tool_running') return '正在调用工具';
   if (state.footer === 'streaming') return '正在输出';
   return '思考中';

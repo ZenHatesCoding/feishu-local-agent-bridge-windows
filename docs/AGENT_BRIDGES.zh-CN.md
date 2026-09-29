@@ -22,6 +22,18 @@ Worker、不能启动 Hub 的电脑拉 `release/worker`，并按 Worker 部署�
 飞书应用需要启用机器人能力和长连接消息事件。首次 profile 创建时按终端流程提供
 App ID/App Secret；秘密进入本地加密存储，不写进脚本和 Git。
 
+## 运行探活与进度
+
+所有已维护的 bridge 适配器都会把底层进程中“有协议活动、但没有可展示正文”的事件
+转换成不含隐私信息的活动心跳。心跳会刷新公共 idle watchdog，但不会暴露工具输入、
+工具输出或模型推理。底层进程如果确实没有任何活动，仍会在配置的
+`runIdleTimeoutMinutes` 到期后被终止。
+
+任务运行满五分钟后，bridge 每五分钟报告一次粗粒度状态：仍在处理、工具仍在运行，
+或正在等待 Agent 返回。卡片和 Markdown 模式更新已有流式回复；最终批量输出模式和
+COT 模式发送一条简短状态。该状态只表达耗时和存活情况，不会虚构完成进度，也不会
+泄露私有执行细节。
+
 ## 无人值守交付件
 
 所有由 bridge 启动的 Agent 都是无人值守后台进程。bridge 会设置
@@ -91,8 +103,8 @@ node .\dist\cli.js run `
 `agy --print` 的等待上限默认是 60 分钟；这是防止遗留进程的安全上限，不是普通任务
 时限。Antigravity 在研究、找图和文档制作期间通常没有可靠的增量文本，因此 bridge
 不会开启空白 markdown 流，而是在完成后一次性发送最终回复。入站时不会额外发送
-“已收到/正在处理”之类的固定消息；所有 Bot 一律使用飞书原生消息状态和 bridge 的
-公共运行状态机制。可在 profile 的 `antigravity.printTimeout` 中明确覆盖该上限。
+固定确认消息；长任务统一使用上文所述的五分钟探活状态。可在 profile 的
+`antigravity.printTimeout` 中明确覆盖该上限。
 
 ## DeepSeek Harness
 
@@ -135,7 +147,8 @@ $env:LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = `
 prompt，长话题不再受 Windows 命令行长度限制。Justice/Antigravity 与
 Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。Harness 的答案是最终
 批量输出，不是可靠的增量流。因此 bridge 不维持空白 markdown stream，也不发送
-固定的入站确认；任务完成后用普通话题回复一次性交付最终答案。
+固定的入站确认；任务完成后用普通话题回复一次性交付最终答案。长任务仍使用统一的
+五分钟探活状态。
 
 ## Hermes
 

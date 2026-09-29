@@ -24,6 +24,21 @@ Enable the bot capability and persistent-connection message event in each
 Feishu app. App Secrets go to the local encrypted profile store, never scripts
 or Git.
 
+## Run Liveness And Progress
+
+All maintained bridge adapters report privacy-safe activity heartbeats when
+their underlying process emits a protocol event that has no user-visible text.
+These heartbeats reset the common idle watchdog without exposing tool input,
+tool output or model reasoning. A process that emits no real activity still
+reaches the configured `runIdleTimeoutMinutes` deadline.
+
+For runs lasting at least five minutes, the bridge reports a coarse status at
+five-minute intervals: processing, tool still running, or waiting for the Agent
+to return. Card and Markdown modes update their existing streamed reply;
+final-output and COT modes send a short standalone status. This status is
+elapsed-time and liveness information, not synthetic task completion or private
+execution detail.
+
 ## Unattended Artifact Delivery
 
 Every bridge-launched Agent runs as an unattended background worker. The bridge
@@ -87,9 +102,8 @@ safety limit rather than a normal task duration, and can be overridden through
 `antigravity.printTimeout`. Because Antigravity does not provide dependable
 incremental text while researching or building documents, the bridge sends the
 final answer once as a normal reply instead of opening a markdown stream. It
-does not post a synthetic “received/working” message at intake; Feishu's native
-message state and the bridge's common run-state mechanism apply equally to all
-Bots.
+does not post a synthetic acknowledgement at intake; a long run uses the common
+five-minute liveness status described above.
 
 ## DeepSeek Harness
 
@@ -123,7 +137,8 @@ headless profile. Prompts are carried over stdin so long topics never depend on
 the Windows command-line limit. Harness produces its answer as a final batch
 rather than a dependable incremental stream. The bridge posts that completed
 answer once as a normal topic reply and does not open an empty markdown stream
-or post a synthetic intake acknowledgement.
+or post a synthetic intake acknowledgement. A long run still uses the common
+five-minute liveness status.
 
 ## Hermes
 

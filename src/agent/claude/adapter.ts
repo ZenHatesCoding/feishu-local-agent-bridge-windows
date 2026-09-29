@@ -223,7 +223,12 @@ async function* createEventStream(
       } catch {
         continue;
       }
-      yield* translateEvent(parsed);
+      const translated = [...translateEvent(parsed)];
+      if (translated.length === 0) {
+        yield { type: 'activity', summary: 'agent stream active' };
+      } else {
+        yield* translated;
+      }
     }
   } finally {
     if (silentExitTimer) clearTimeout(silentExitTimer);

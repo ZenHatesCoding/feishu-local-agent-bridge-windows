@@ -16,12 +16,19 @@ export type Block =
 
 export type FooterStatus = 'thinking' | 'tool_running' | 'streaming' | null;
 export type Terminal = 'running' | 'done' | 'interrupted' | 'error' | 'idle_timeout';
+export type RunProgressStatus = 'active' | 'tool_running' | 'waiting';
+
+export interface RunProgress {
+  elapsedMinutes: number;
+  status: RunProgressStatus;
+}
 
 export interface RunState {
   blocks: Block[];
   reasoning: { content: string; active: boolean };
   footer: FooterStatus;
   terminal: Terminal;
+  progress?: RunProgress;
   errorMsg?: string;
   /** Set when terminal === 'idle_timeout' — how long claude was idle before
    * the watchdog gave up (so the message can say "N 分钟无响应"). */
@@ -43,6 +50,9 @@ function closeStreamingText(blocks: Block[]): Block[] {
 
 export function reduce(state: RunState, evt: AgentEvent): RunState {
   switch (evt.type) {
+    case 'activity':
+      return state;
+
     case 'text': {
       const last = state.blocks[state.blocks.length - 1];
       if (last && last.kind === 'text' && last.streaming) {
@@ -134,6 +144,18 @@ export function reduce(state: RunState, evt: AgentEvent): RunState {
     default:
       return state;
   }
+}
+
+export function markRunProgress(
+  state: RunState,
+  elapsedMinutes: number,
+  status: RunProgressStatus,
+): RunState {
+  if (state.terminal !== 'running') return state;
+  return {
+    ...state,
+    progress: { elapsedMinutes, status },
+  };
 }
 
 export function markInterrupted(state: RunState): RunState {

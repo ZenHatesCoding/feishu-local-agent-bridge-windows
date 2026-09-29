@@ -4,6 +4,7 @@ import {
   initialState,
   markIdleTimeout,
   markInterrupted,
+  markRunProgress,
   reduce,
   type RunState,
 } from '../../../src/card/run-state.js';
@@ -83,6 +84,15 @@ describe('run card renderer snapshots', () => {
     expect(renderText(markInterrupted(state))).toMatchSnapshot();
     expect(renderText(markIdleTimeout(state, 10))).toMatchSnapshot();
     expect(renderText(stateFrom([{ type: 'error', message: 'process failed', terminationReason: 'failed' }]))).toMatchSnapshot();
+  });
+
+  it('renders privacy-safe long-run progress without exposing tool details', () => {
+    const progress = markRunProgress(initialState, 10, 'active');
+    expect(renderText(progress)).toContain('任务仍在处理中，已运行 10 分钟');
+    expect(JSON.stringify(renderCard(progress))).toContain('处理中 · 10 分钟');
+
+    const waiting = markRunProgress(initialState, 15, 'waiting');
+    expect(renderText(waiting)).toContain('正在等待 agent 返回，已运行 15 分钟');
   });
 
   it('injects signed bridge callback values for managed run controls', () => {

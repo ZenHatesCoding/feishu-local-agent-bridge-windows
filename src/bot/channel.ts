@@ -24,10 +24,11 @@ import {
   initialState,
   markIdleTimeout,
   markInterrupted,
+  markRunProgress,
   reduce,
   type RunState,
 } from '../card/run-state';
-import { renderText } from '../card/text-renderer';
+import { renderProgressText, renderText } from '../card/text-renderer';
 import { tryHandleCommand, type Controls } from '../commands';
 import type { AppConfig } from '../config/schema';
 import {
@@ -999,6 +1000,18 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     cotEnabled || replyMode === 'card' ? undefined : addWorkingReaction(channel, lastMsg.messageId);
   let collaborationFinalState: RunState | undefined;
   let collaborationFinalized = false;
+  let lastStandaloneProgressMinutes = 0;
+  const sendStandaloneProgress = async (state: RunState): Promise<void> => {
+    if (
+      state.terminal !== 'running' ||
+      !state.progress ||
+      state.progress.elapsedMinutes <= lastStandaloneProgressMinutes
+    ) {
+      return;
+    }
+    lastStandaloneProgressMinutes = state.progress.elapsedMinutes;
+    await channel.send(chatId, { markdown: renderProgressText(state.progress) }, sendOpts);
+  };
 
   const retryMalformedCollaborationMarker = async (
     correctionPrompt: string,
@@ -1226,7 +1239,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           scope,
           idleTimeoutMs,
           recordSession,
-          async () => {},
+          sendStandaloneProgress,
         );
         await cotDone;
         if (cotPublisher.degradedReason) {
@@ -1348,16 +1361,16 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         },
       });
     } else {
-      // text mode: drain the agent stream without sending anything during
-      // the run, then post the final rendered text once as a plain markdown
-      // (msg_type=post) message — no card, no streaming, no typewriter.
+      // text mode: keep the final answer as one plain markdown post. Long
+      // runs may emit the common five-minute liveness notice while the final
+      // batch is still pending; there is still no empty answer stream.
       const finalState = await processAgentStream(
         handle,
         eventStream,
         scope,
         idleTimeoutMs,
         recordSession,
-        async () => {},
+        sendStandaloneProgress,
       );
       collaborationFinalState = finalState;
     }
@@ -1555,7 +1568,7 @@ function outboundLogFields(
  * on every state transition. Used by both card and markdown reply modes —
  * the only difference between the two is what `flush` does with the state.
  */
-async function processAgentStream(
+export async function processAgentStream(
   handle: RunHandle,
   events: AsyncIterable<AgentEvent>,
   scope: string,
@@ -1564,7 +1577,15 @@ async function processAgentStream(
   flush: (state: RunState) => Promise<void>,
 ): Promise<RunState> {
   const runStart = Date.now();
+  const progressIntervalMs = 5 * 60_000;
+  let lastAgentActivityAt = runStart;
   let state: RunState = initialState;
+  let flushQueue = Promise.resolve();
+  const enqueueFlush = (snapshot: RunState): Promise<void> => {
+    const next = flushQueue.then(() => flush(snapshot));
+    flushQueue = next.catch(() => {});
+    return next;
+  };
 
   // Idle watchdog: claude going silent for `idleTimeoutMs` is treated as
   // "presumed hung", we stop() and surface a timeout marker on the card.
@@ -1582,6 +1603,7 @@ async function processAgentStream(
   //  - any non-tool event arrives while the set is empty.
   let idleFired = false;
   let timer: NodeJS.Timeout | undefined;
+  let progressTimer: NodeJS.Timeout | undefined;
   const inFlightTools = new Set<string>();
   const armOrPauseIdle = (): void => {
     if (!idleTimeoutMs) return;
@@ -1599,9 +1621,32 @@ async function processAgentStream(
   };
   armOrPauseIdle();
 
+  progressTimer = setInterval(() => {
+    if (state.terminal !== 'running') return;
+    const now = Date.now();
+    const status =
+      inFlightTools.size > 0
+        ? 'tool_running'
+        : now - lastAgentActivityAt <= progressIntervalMs
+          ? 'active'
+          : 'waiting';
+    state = markRunProgress(
+      state,
+      Math.max(1, Math.floor((now - runStart) / 60_000)),
+      status,
+    );
+    log.info('agent', 'progress', {
+      scope,
+      elapsedMinutes: state.progress?.elapsedMinutes,
+      status,
+    });
+    void enqueueFlush(state).catch((err) => log.fail('progress', err));
+  }, progressIntervalMs);
+
   try {
     for await (const evt of events) {
       if (handle.interrupted) break;
+      lastAgentActivityAt = Date.now();
 
       // Track tool flight before re-arming the idle timer so the arm step
       // sees the correct set size. tool_use opens a window; tool_result
@@ -1636,6 +1681,7 @@ async function processAgentStream(
         }
         continue;
       }
+      if (evt.type === 'activity') continue;
 
       const prevTerminal = state.terminal;
       const prevFooter = state.footer;
@@ -1643,7 +1689,7 @@ async function processAgentStream(
       if (state.footer !== prevFooter || state.terminal !== prevTerminal) {
         log.info('card', 'transition', { footer: state.footer, terminal: state.terminal });
       }
-      await flush(state);
+      await enqueueFlush(state);
       // Stop iterating as soon as we have a terminal state. Some claude
       // versions don't close stdout immediately after the result event, which
       // would leave the for-await waiting forever otherwise.
@@ -1651,6 +1697,7 @@ async function processAgentStream(
     }
   } finally {
     if (timer) clearTimeout(timer);
+    if (progressTimer) clearInterval(progressTimer);
   }
 
   // If state already reached a terminal event (done/error/etc.) before the
@@ -1668,7 +1715,7 @@ async function processAgentStream(
   }
   log.info('card', 'final', { scope, terminal: state.terminal, interrupted: handle.interrupted });
   reportMetric('run_e2e_ms', Date.now() - runStart, { terminal: state.terminal });
-  await flush(state);
+  await enqueueFlush(state);
   if (handle.interrupted) {
     await handle.run.stop();
   }
