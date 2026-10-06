@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+<title id="title">电脑端聊天工作台线框 / Desktop chat wireframe</title><desc id="desc">左侧话题导航，中间聊天和输入区，右侧任务状态与文件。示例 Agent 为 Analyst 和 Builder。</desc>
+<rect width="1200" height="680" fill="#f4f6f8"/>
+<g font-family="Segoe UI,Microsoft YaHei,sans-serif" fill="#263348" font-size="16">
+<text x="24" y="33" font-size="20">LAN 协作工作台 · 电脑布局</text><text x="981" y="33" fill="#607087">方案线框 · 未实现</text>
+<rect x="16" y="52" width="1168" height="610" rx="12" fill="#fff" stroke="#d2dae4"/>
+<path d="M240 52V662 M884 52V662 M240 121H1184" stroke="#d2dae4" fill="none"/>
+<text x="36" y="91" font-size="18">项目与话题</text><text x="36" y="144">＋ 新建话题</text><text x="36" y="198" fill="#607087">产品开发</text>
+<rect x="28" y="218" width="200" height="66" rx="8" fill="#eaf0fb"/><text x="42" y="246">接口重构</text><text x="42" y="269" font-size="13">Builder 执行中 · 2 条未读</text>
+<text x="42" y="323">性能分析</text><text x="42" y="347" font-size="13" fill="#607087">已完成 · 分析报告</text><text x="42" y="401">测试方案</text><text x="42" y="425" font-size="13" fill="#607087">等待我的决定</text>
+<text x="36" y="631">待处理  3       我的账号</text>
+<text x="264" y="84" font-size="20">接口重构</text><text x="264" y="108" font-size="13" fill="#607087">你 · Analyst · Builder</text><text x="735" y="88">搜索    已连接</text>
+<text x="268" y="163">你</text><text x="317" y="163" font-size="13" fill="#607087">10:20</text><text x="268" y="193">请先分析接口边界，再交给实现 Agent。</text>
+<text x="268" y="249">Analyst · Agent</text><text x="268" y="280">建议将消息接入与模型执行分开。</text><text x="268" y="308">关键结论和接口说明已整理为文件。</text>
+<rect x="268" y="326" width="340" height="62" rx="8" fill="#f4f6f8" stroke="#d2dae4"/><text x="283" y="351">接口设计.md</text><text x="283" y="373" font-size="13" fill="#607087">查看 · 下载 · 已校验</text>
+<rect x="268" y="408" width="588" height="40" rx="8" fill="#edf3f0"/><text x="282" y="434" font-size="14">Analyst → Builder   交接：按接口设计完成实现</text>
+<rect x="268" y="468" width="588" height="65" rx="8" fill="#f4f6f8"/><text x="282" y="494">Builder 正在执行</text><text x="282" y="518" font-size="13" fill="#607087">实现接口与验证 · 进度在此更新</text>
+<rect x="260" y="556" width="604" height="90" rx="10" fill="#fff" stroke="#aab8cc"/><text x="278" y="581" font-size="14">@ Builder       普通回复 ▾</text><text x="278" y="610" fill="#607087">追加约束、引用消息或上传文件…</text><text x="278" y="635" font-size="14">＋ 附件</text><rect x="776" y="614" width="73" height="26" rx="6" fill="#3159a4"/><text x="797" y="633" fill="#fff" font-size="14">发送</text>
+<text x="906" y="89" font-size="18">任务状态</text><text x="906" y="155" fill="#607087">当前负责人</text><text x="906" y="184">Builder</text><text x="906" y="230" fill="#607087">步骤</text><text x="906" y="260">✓ 分析接口边界</text><text x="906" y="290">● 实现与验证</text><text x="906" y="320">○ 汇总交付</text><text x="906" y="371" fill="#607087">下一步</text><text x="906" y="401">提交结果与测试证据</text><text x="906" y="453" fill="#607087">成果</text><text x="906" y="483">接口设计.md</text><rect x="906" y="563" width="252" height="40" rx="8" fill="#fff" stroke="#aab8cc"/><text x="970" y="589">停止当前运行</text><text x="906" y="632" font-size="13" fill="#607087">仅显示有权查看的任务与文件</text>
+</g></svg>

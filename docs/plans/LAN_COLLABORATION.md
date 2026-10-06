@@ -18,6 +18,60 @@ Messages contain replies, references, filtered progress, results and files. User
 
 Agent names, models, runtime types and workspaces are configurable, unrelated to existing local Bot names. Multiple Agents may use the same runtime with separate identities and credentials. Shared state contains requirements, conclusions, evidence and deliverables; private reasoning, raw tool traces and secrets remain local.
 
+### Desktop and mobile delivery
+
+Mobile is part of the product. The first release provides desktop Web and phone-specific Web/PWA, including home-screen entry where supported. Later Android/iOS packages use Capacitor with native files/camera, sharing, secure credentials and deep links. Both use the same internal center/account/protocol; phones are clients, not Codex Workers. PWA installation is distinct from a native package.
+
+Android may use controlled packages/enterprise distribution; iOS requires applicable signing/distribution and macOS/Xcode build tooling, without constraining center or Worker platforms. [Capacitor](https://capacitorjs.com/docs), [build environment](https://capacitorjs.com/docs/getting-started/environment-setup).
+
+Enrollment QR contains center HTTPS address/deployment identity, followed by login/one-time invitation, never permanent Agent/admin secrets. Phone routing, DNS and trusted certificates must work; never bypass certificate checks. PWA/Service Workers use a trusted secure context. [Service Worker requirements](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API).
+
+### Desktop chat
+
+Wide layout has roughly 240px project/topic navigation, a flexible readable-width timeline and roughly 300px task sidebar. Narrow windows collapse the task sidebar first, then navigation into a drawer. Layout depends on width, not device labels.
+
+Header shows title, participants, search and connection. Authorized task sidebar shows owner, steps, next action, artifacts and controls. Timeline entries show avatar, human/Agent identity, time, Markdown/code/tables/files. Handoff/consultation events link to results; progress updates merge into a run block instead of flooding messages.
+
+Fixed composer displays selected targets, attachments and reply/assign/consult mode. Searchable structured mentions support multiple Agents and availability. Enter sends, Shift+Enter inserts a newline; IME composition cannot send accidentally. Images/PDF use a panel/dialog; code supports copy/diff/download; Office files use download/system apps rather than promised online editing.
+
+Keep older-message reading position and show a new-message control; follow streaming only when already at the bottom. Long answers expand without progress updates shifting the view.
+
+![Desktop chat planning wireframe](./assets/lan-chat-desktop.svg)
+
+### Phone chat
+
+Home lists topic title, latest result, unread and run state. Navigation is Conversations / Needs attention / Me. Needs attention collects personal decisions, failed work requiring recovery and completed results awaiting review.
+
+Chat uses one full-screen column: back/title/menu header, tappable owner/state strip, timeline and fixed composer. Hide home navigation in chat to make room for keyboard/messages. State opens a task drawer; menu exposes participants, files, search and settings.
+
+Selected-Agent chips/action mode remain visible. Mention picker is a nearly full-screen searchable list. Keyboard return inserts a newline; sending has its own button. Respect safe areas/keyboard height, keep composer visible, and use approximately 44px or larger touch targets.
+
+Long answers preview/expand, code scrolls within its block, and tables scroll or provide row views without widening the page. Copy/quote support long press and visible menus. Files/photos/camera show upload progress/cancel and are sent only after validation. Images open full-screen, PDF uses available device preview, Office uses system apps.
+
+Bottom sheets summarize target/task/objective for handoff/consultation/recovery. Stop addresses a specific run and reports center acknowledgment. Unread links locate messages; list scroll survives returning. Landscape/tablets recover two/three columns as width permits.
+
+![Phone chat and task drawer planning wireframe](./assets/lan-chat-mobile.svg)
+
+These are information/layout wireframes, not implemented screenshots. Agent names are configuration examples.
+
+### Multi-device continuity and data
+
+Committed messages, task state, permissions and account read cursors synchronize. Closing a client does not stop Workers. Request IDs deduplicate sends/actions. Drafts are device-local initially, with no automatic cross-device overwrite/send.
+
+Offline input stays an unsent draft. User confirms sending after reconnect; do not replay stale handoff/stop actions. Timed-out submitted requests query their existing outcome before retrying with the same ID.
+
+Cache app shell/minimal settings only; generic Service Worker caching excludes authorized messages/private attachments. Explicit system-app downloads are device copies that cannot be remotely recalled when access changes. Native credentials use system secure storage and logout clears managed session data. Center validates permissions on both devices.
+
+### Network and notification behavior
+
+Foreground reachable clients receive live messages/progress/results and configured alerts, suppressing duplicate sounds. Background/lock/suspension does not stop Workers; center retains results, but LAN mode does not promise lock-screen alerts. Foreground resume catches up via cursors.
+
+Outside a network that routes to the center, show disconnected, retain drafts and disable new mutations. Cellular connectivity alone provides no internal route. Reconnect restores authentication/subscriptions, unread and current state without replaying old actions.
+
+Default deployment uses no external push. Neither PWA nor native wrapper guarantees persistent mobile background LAN connections. iOS home-screen Web Push requires platform/push infrastructure and is not LAN-only notification. [WebKit](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+
+Only if external notification transport is explicitly permitted later, add APNs/Android push with minimal wake-up data and no message/file/permission content. Retrieve content when center is reachable. This is a separate optional deployment capability, not automatic cellular access to internal resources. [Apple push service](https://developer.apple.com/documentation/usernotifications/setting-up-a-remote-notification-server).
+
 ## System shape
 
 The collaboration center hosts Web/user APIs, conversation/event services, the Hub, SQLite persistence and an authorized file service. These have distinct responsibilities but can share one Node.js service and persistence boundary. Workers initiate internal HTTPS/event connections; inbound Worker ports are unnecessary. Internal Git carries code revisions. Each Worker separately connects to external models.
@@ -104,7 +158,7 @@ Deploy a new all node, a hub-only always-on center with Workers, or a center wit
 
 The first complete release includes login, conversations, structured mentions, independent Agents, reply/handoff/ask/return, task status, progress/stop, files, internal Git locators and reconnect recovery. Use Codex and Claude on two new nodes as the reference combination; other existing bridges use the same interface. Names/models are configurable.
 
-Exclude meetings, calendars, approvals, collaborative office editing, complex mobile clients and public federation. Complete chat channels may later share the same Hub/Workers.
+First release includes phone Web/PWA with the complete task loop; native Android/iOS packages follow. Exclude meetings, calendars, approvals, collaborative office editing and public federation. Complete chat channels may later share the same Hub/Workers.
 
 Implementation sequence:
 
@@ -112,11 +166,14 @@ Implementation sequence:
 2. Add transactional center storage, user/node/Agent identity, conversations, messages/dispatch/outbox, claim and leases.
 3. Integrate Worker claim/recovery, output, markers and stop; complete two-node text collaboration.
 4. Add files, authorized materialization and Git references; complete file-bearing handoff.
-5. Deliver workspace, state projection, diagnostics, installation and backup/recovery; add complete chat channels where needed.
+5. Deliver desktop workspace and phone Web/PWA, state projection, diagnostics, installation and backup/recovery; add complete chat channels where needed.
+6. Package Android/iOS with files/camera, sharing, secure storage and deep links; external system notifications are a separate optional deployment capability.
 
 Each increment delivers a verifiable capability. Shared interface tests preserve Feishu compatibility; deployment acceptance uses new nodes/instances only.
 
 Acceptance covers explicit multi-target execution, no unmentioned runs, analysis-to-implementation handoff with authorization/files, ordinary replies preserving ownership, ask/return exactly one owner notification, forged actors/unrelated Agents rejected, topic and file visibility consistency, reconnect/restarts/duplicates/duplicate instances, uncertain execution without silent side-effect retries, persistent results/ownership/files, title changes preserving conversation identity, external model access with internal collaboration/file/code traffic, and startup/stop/backup/recovery without affecting the existing Feishu deployment.
+
+Additional mobile acceptance covers continuous cross-device conversation, structured mentions/files/handoff/consult/stop, IME/keyboard/safe areas/touch/narrow layouts, Worker continuation during lock, foreground catch-up, unsent offline drafts, idempotent timeout recovery, and separate PWA/native distribution/certificate checks.
 
 ## Selected plan
 
