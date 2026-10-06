@@ -9,6 +9,7 @@ const pairs: Array<readonly [string, string]> = [
   ['docs/DESIGN.md', 'docs/DESIGN.zh-CN.md'],
   ['docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md', 'docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md'],
   ['docs/NETWORKING.md', 'docs/NETWORKING.zh-CN.md'],
+  ['docs/plans/LAN_COLLABORATION.md', 'docs/plans/LAN_COLLABORATION.zh-CN.md'],
   ['docs/PRODUCT_VISION.md', 'docs/PRODUCT_VISION.zh-CN.md'],
   ['docs/WINDOWS_OPERATIONS.md', 'docs/WINDOWS_OPERATIONS.zh-CN.md'],
   ['scripts/collab-pilot/README.md', 'scripts/collab-pilot/README.zh-CN.md'],

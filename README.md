@@ -83,6 +83,8 @@ This README is the human entry point; coding agents start at
 [AGENTS.md](./AGENTS.md). Every maintained detailed document links back here
 and to its language counterpart.
 
+LAN deployment design: [LAN collaboration plan](./docs/plans/LAN_COLLABORATION.md).
+
 ## Build Once
 
 ```powershell

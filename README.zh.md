@@ -76,6 +76,8 @@ Agent 获得经过授权的结论和持久共享文件，不会获得前一个 A
 README 是给使用者的统一入口；编码 Agent 从 [AGENTS.md](./AGENTS.md) 进入。每份维护中
 的详细文档都会链接回这里和另一语言版本。
 
+独立内网部署设计：[局域网协作方案](./docs/plans/LAN_COLLABORATION.zh-CN.md)。
+
 ## 一次构建
 
 ```powershell
