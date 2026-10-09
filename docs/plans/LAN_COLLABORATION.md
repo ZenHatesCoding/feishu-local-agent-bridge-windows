@@ -137,6 +137,11 @@ risk-gated cadence of human teams:
   are no transitional phases such as "polling first, push later" or
   "read-only first, complete later" that exist to cap human effort risk. If a
   direction proves wrong, rebuild it — that cost is acceptable.
+- **Cut phases by verification environment, not by risk.** No multi-computer
+  LAN exists at this stage, so phases are defined by "which verification
+  needs which environment": everything that can be built and verified on one
+  machine is completed there (see the verification ladder below), and the
+  real-LAN day keeps only what the environment itself introduces.
 - **Acceptance is a test suite.** Every acceptance scenario below becomes an
   automated test: integration tests for the Hub/Worker protocol and end-to-end
   tests for the browser experience. The quality gate is a green suite plus a
@@ -151,14 +156,49 @@ risk-gated cadence of human teams:
   second physical-PC acceptance, is already a stable baseline; the new system
   builds directly on those collaboration semantics.
 
+### Verification ladder: exhaust single-machine verification first
+
+Phasing serves one goal: minimize the cost of debugging in a real LAN
+environment. Three levels:
+
+| Level | Environment | Coverage |
+| --- | --- | --- |
+| L0 single-machine simulation | Local multi-process: the center plus N simulated nodes (separate data directories, credentials and loopback address aliases), a fault-injection proxy (disconnect/latency/reordering), process-crash injection and browser end-to-end tests | **Every** protocol and product acceptance scenario: structured mentions, handoff/ask/return, ownership, visibility, idempotency, claim/lease/fencing, dual-instance races, reconnect recovery, file delivery and workbench UX (IME/resize/drafts). The original Feishu deployment runs on this machine, so "no impact on the existing deployment" is verified here too |
+| L1 sandbox rehearsal (optional, recommended) | Windows Sandbox or Hyper-V as a stand-in second node: real network stack, firewall, certificate trust and clean-system install path | Environment differences loopback cannot expose: port opening, system-proxy interference, certificate trust chains and first runs of the installer on a clean system |
+| L2 real-LAN day | Two physical computers | Environment-only items: real certificate issuance (e.g. Tailscale), hostname resolution, boot startup, physical disconnect behavior and CLI logins on the other machine |
+
+Four hard constraints support the ladder:
+
+1. **The simulation harness is a first-class deliverable, not an
+   afterthought.** Track 1 builds the one-command multi-node topology
+   skeleton, including fault-injection and crash-injection hooks; it grows
+   with the center/worker/workbench tracks and runs in CI. Most acceptance
+   scenarios are automated at L0.
+2. **A simulated node and a real node differ only in manifest values.**
+   Address, certificates and data directories are configuration differences,
+   never code paths — otherwise L0 verification says nothing about L2.
+3. **Install/start/stop/backup scripts are tested in final form at L0/L1**,
+   including on a clean system; they never run for the first time on the LAN
+   day.
+4. **The LAN day runs from a pre-baked runbook** — acceptance checklist,
+   diagnostic commands and log collection. The expected outcome is executing
+   a checklist, not starting to debug.
+
+This playbook has a precedent in this project: the Feishu distributed P0 was
+first verified by the two-credential single-HTTP-Hub integration test on one
+machine and then passed its second physical-PC acceptance in one run. The LAN
+system scales the same pattern — the broader the simulation coverage (it adds
+the web workbench, files and SSE), the cheaper the real-machine day.
+
 ### Implementation tracks
 
 1. **Contracts and extraction** (first; unblocks every other track): extract
    the channel-neutral collaboration/execution interfaces, keep current
-   Feishu behavior locked by contract tests, and create the independent LAN
-   configuration and deployment namespace. Align task-state names with the
-   A2A TaskState machine and workbench event streams with the AG-UI event
-   taxonomy.
+   Feishu behavior locked by contract tests, create the independent LAN
+   configuration and deployment namespace, and build the single-machine
+   simulation skeleton (one-command multi-node topology with fault-injection
+   and crash-injection hooks). Align task-state names with the A2A TaskState
+   machine and workbench event streams with the AG-UI event taxonomy.
 2. **Center track**: transactional storage, user/node/Agent identity, stable
    conversation IDs, messages/dispatch/outbox, claim/lease/heartbeat, SSE
    event streams, and the file service with authorized downloads.
@@ -168,17 +208,18 @@ risk-gated cadence of human teams:
    (mainstream coding CLIs ship MCP clients, so access needs no adapter).
 4. **Workbench track**: desktop three-pane workspace, structured mentions,
    task panel, streaming rendering, reconnect recovery and file cards.
-5. **Integration and operations**: install/backup/recovery packages,
-   diagnostics and run metrics, and real-machine acceptance on two new
-   nodes; add Zulip/Mattermost adapters through the same channel interface
-   when a mature chat entry is needed.
+5. **Integration and operations**: install/backup/recovery packages tested in
+   final form at L0/L1, diagnostics and run metrics, and the real-LAN-day
+   runbook; add Zulip/Mattermost adapters through the same channel interface
+   when a mature chat entry is needed. Real-machine acceptance on two new
+   nodes happens after the L1 sandbox rehearsal passes.
 
 Tracks 2-4 run in parallel once track 1's contracts land, and together they
 deliver the complete task loop; there is no intermediate deliverable such as a
 chat shell that cannot complete tasks. Each track is done when its acceptance
-scenarios pass automatically. The delivery gate is every acceptance scenario in
-this section passing the automated suite plus real-machine acceptance on new
-nodes and instances only.
+scenarios pass automatically at L0. The delivery gate is every acceptance
+scenario in this section passing the L0 automated suite plus real-machine
+acceptance on new nodes and instances only, executed from the runbook.
 
 Acceptance covers explicit multi-target execution, no unmentioned runs, analysis-to-implementation handoff with authorization/files, ordinary replies preserving ownership, ask/return exactly one owner notification, forged actors/unrelated Agents rejected, topic and file visibility consistency, reconnect/restarts/duplicates/duplicate instances, uncertain execution without silent side-effect retries, persistent results/ownership/files, title changes preserving conversation identity, external model access with internal collaboration/file/code traffic, and startup/stop/backup/recovery without affecting the existing Feishu deployment.
 
