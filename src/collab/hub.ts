@@ -106,6 +106,14 @@ export class CollaborationHub {
     return dispatch ? { ...dispatch } : undefined;
   }
 
+  /** All dispatches of one task, in ledger order. */
+  listTaskDispatches(taskId: string): Dispatch[] {
+    return [...this.dispatches.values()]
+      .filter((item) => item.taskId === taskId)
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((item) => ({ ...item }));
+  }
+
   registerAgentIdentity(
     agentId: string,
     openId: string | undefined,

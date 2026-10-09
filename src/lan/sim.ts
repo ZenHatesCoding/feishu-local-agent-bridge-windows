@@ -19,6 +19,10 @@ export interface LanSimTopologyOptions {
   /** Fixed port for the center; 0/undefined picks a free port. */
   port?: number;
   heartbeatTimeoutMs?: number;
+  /** Deployment identity; defaults to 'lan-sim'. */
+  deploymentId?: string;
+  /** Optional built workbench directory to serve from the center. */
+  webDir?: string;
 }
 
 /**
@@ -65,12 +69,13 @@ export class LanSimTopology {
     await mkdir(options.dataDir, { recursive: true });
     const password = `pw-${randomUUID().slice(0, 10)}`;
     const center = new LanCenter({
-      deploymentId: 'lan-sim',
+      deploymentId: options.deploymentId ?? 'lan-sim',
       dataDir: options.dataDir,
       listen: { host: '127.0.0.1', port: options.port ?? 0 },
       users: [{ username: 'owner', password }],
       agents: options.nodes.map((node) => ({ id: node.agentId, displayName: node.displayName })),
       ...(options.heartbeatTimeoutMs ? { heartbeatTimeoutMs: options.heartbeatTimeoutMs } : {}),
+      ...(options.webDir ? { webDir: options.webDir } : {}),
     });
     await center.initialize();
     const address = await center.listen();
