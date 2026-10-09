@@ -14,8 +14,6 @@ export class FakeAgentAdapter implements AgentAdapter {
   readonly id: string;
   readonly displayName: string;
   private readonly script: FakeAgentScript | undefined;
-  /** Set when the running fake should stop early (mirrors process kill). */
-  private stopping = false;
 
   constructor(options: { id?: string; displayName?: string; script?: FakeAgentScript } = {}) {
     this.id = options.id ?? 'fake';
@@ -29,24 +27,27 @@ export class FakeAgentAdapter implements AgentAdapter {
 
   run(opts: AgentRunOptions): AgentRun {
     const steps = this.script?.steps ?? this.defaultSteps(opts.prompt);
-    const events = this.stream(steps);
+    // Stop flag is per-run: a cancelled run must not poison the adapter for
+    // the worker's next dispatch.
+    const stopping = { value: false };
+    const events = this.stream(steps, stopping);
     return {
       runId: opts.runId,
       events,
       stop: async () => {
-        this.stopping = true;
+        stopping.value = true;
       },
       waitForExit: async (timeoutMs: number) => {
         await new Promise((resolve) => setTimeout(resolve, Math.min(timeoutMs, 25)));
-        return !this.stopping;
+        return !stopping.value;
       },
     };
   }
 
-  private async *stream(steps: FakeAgentStep[]): AsyncGenerator<AgentEvent> {
+  private async *stream(steps: FakeAgentStep[], stopping: { value: boolean }): AsyncGenerator<AgentEvent> {
     yield { type: 'system', sessionId: `fake-${randomUUID().slice(0, 8)}` };
     for (const step of steps) {
-      if (this.stopping) {
+      if (stopping.value) {
         yield { type: 'error', message: 'fake agent stopped', terminationReason: 'interrupted' };
         return;
       }

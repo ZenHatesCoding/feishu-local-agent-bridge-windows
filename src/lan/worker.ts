@@ -205,7 +205,10 @@ export class LanWorker {
       if (termination === 'completed') {
         await this.submitDelegations(visible, dispatch, runId);
         const hasContent = visible.visibleContent.trim().length > 0;
-        if (hasContent && dispatch.reason !== 'ask') {
+        // Every successful turn with content records a return action; the
+        // Hub turns it into a wake-up dispatch for the owner when (and only
+        // when) this run answered an ask.
+        if (hasContent) {
           await this.submitAction({
             type: 'return',
             idempotencyKey: `lan-return:${this.config.agent.id}:${runId}`,
