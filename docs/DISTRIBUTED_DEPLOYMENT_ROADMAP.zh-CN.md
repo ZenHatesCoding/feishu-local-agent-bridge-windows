@@ -218,16 +218,16 @@ token 指标、摘要检查点来源、原生 session 压缩和冷任务归档�
 
 ## 分阶段实施
 
-### P0：跨机文字协作 MVP（代码已实现，待第二台真机验收）
+### P0：跨机文字协作 MVP（已实现，已通过第二台真机验收）
 
 - 已拆分 `bindHost`、`publicUrl` 和 `role`；
 - worker 连接远程 Hub，不启动本机 Hub；
 - 统一分发 tenant key，使用每 Agent 独立凭据；
 - 先通过私有 VPN 连接，不开放裸 HTTP 公网端口；
-- 已增加两个独立 Agent 凭据客户端经同一 HTTP Hub 交接的集成测试；第二台真机待验收。
+- 两个独立 Agent 凭据客户端经同一 HTTP Hub 交接的集成测试与第二台真机验收均已通过。
 
-验收：电脑 A 的 World 在飞书正式交接后，电脑 B 的 Chariot 能取得相同 taskId、
-筛选后的前序结论和自己的 dispatch，且未授权 Agent 不能读取。
+验收（已通过）：电脑 A 的 World 在飞书正式交接后，电脑 B 的 Chariot 能取得相同
+taskId、筛选后的前序结论和自己的 dispatch，且未授权 Agent 不能读取。
 
 ### P0：跨机文件交付
 

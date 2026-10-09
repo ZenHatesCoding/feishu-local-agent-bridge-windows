@@ -153,18 +153,18 @@ MVP; SQLite or PostgreSQL later provides transactions and uniqueness constraints
 
 ## Delivery Phases
 
-### P0: Text-Only Remote MVP (implemented in code; second-PC acceptance pending)
+### P0: Text-Only Remote MVP (implemented; second-PC acceptance passed)
 
 - split `bindHost`, `publicUrl` and process role (implemented);
 - prevent workers from starting a local Hub;
 - provision a common tenant key and per-Agent credentials;
 - run over a private VPN, not bare public HTTP;
-- use the implemented two-credential HTTP handoff integration test; complete
-  the second physical-PC acceptance test.
+- the two-credential HTTP handoff integration test and the second physical-PC
+  acceptance test have both passed.
 
-Acceptance: World on computer A transfers through Feishu, Chariot on computer B
-receives the same task ID, filtered conclusions and its own dispatch, while an
-unauthorized Agent cannot read them.
+Acceptance (passed): World on computer A transfers through Feishu, Chariot on
+computer B receives the same task ID, filtered conclusions and its own
+dispatch, while an unauthorized Agent cannot read them.
 
 ### P0: Remote Artifacts
 

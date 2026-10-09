@@ -57,7 +57,7 @@ Use independent components directly, adapt mature product designs, or connect co
 | Mattermost | Separate Bot identities, channels/threads and integration interfaces | Optional enterprise entry point; avoid inheriting a complete office platform |
 | Matrix | Immutable event IDs, cursors, threads and explicit mention | Event/recovery design reference or existing deployment adapter; no federation/E2EE requirement for the first release |
 | UI component systems | Accessible controls, layouts, menus/forms and status | React with mature components; custom conversation rows, Agent selection and task sidebar |
-| Realtime components | Connections, reconnect, rooms and notifications | Socket.IO is an option; persistence, acknowledgment and authority belong to the center |
+| Realtime components | Connections, reconnect, rooms and notifications | Plain WebSockets plus an event queue/cursor (modeled on Zulip event queues and Matrix sync cursors); Socket.IO optional — persistence, acknowledgment and authority belong to the center |
 | Upload components | Chunking and resumable transfer | Ordinary HTTPS first; introduce a tus implementation when large files justify it |
 | Internal Git | Revisions, branches and access | Existing Git or Forgejo; do not share whole Agent workspaces |
 
@@ -118,7 +118,7 @@ Code moves through internal Git repository/commit/path locators. Agents use inde
 
 Separate user login/membership, Agent-scoped credentials and node enrollment. Browsers receive no Hub admin token. Local accounts, admin invitations and one-time enrollment can start the product; existing enterprise identity may later be adapted without mandatory external OAuth.
 
-Use internal HTTPS and trusted/internal-CA certificates, expose only center ingress and scope firewalls. External model proxy settings apply only to the appropriate child runtime; LAN addresses bypass proxies.
+Use internal HTTPS for service traffic; prefer Tailscale HTTPS certificates (auto-issued for MagicDNS machine names) or DNS-01 issuance on an owned domain, and adopt an internal CA only when devices and staff are controllable. Expose only center ingress and scope firewalls. External model proxy settings apply only to the appropriate child runtime; LAN addresses bypass proxies.
 
 Deploy a new all node, a hub-only always-on center with Workers, or a center with some Agents plus additional Workers. Each node receives a separate manifest and its own CLI setup/login. Configuration declares names, runtimes, models, workspaces, concurrency and permissions without assuming existing Bot rosters. Uninstall affects only the new deployment.
 
@@ -128,15 +128,57 @@ The first complete release includes login, conversations, structured mentions, i
 
 First release delivers the complete task loop in a desktop browser workspace. Exclude meetings, calendars, approvals, collaborative office editing and public federation. Complete chat channels may later share the same Hub/Workers.
 
-Implementation sequence:
+### Development model: designed for AI execution
 
-1. Extract neutral collaboration/execution interfaces and independent LAN configuration while retaining Feishu behavior.
-2. Add transactional center storage, user/node/Agent identity, conversations, messages/dispatch/outbox, claim and leases.
-3. Integrate Worker claim/recovery, output, markers and stop; complete two-node text collaboration.
-4. Add files, authorized materialization and Git references; complete file-bearing handoff.
-5. Deliver desktop workspace, state projection, diagnostics, installation and backup/recovery; add complete chat channels where needed.
+This plan is implemented by AI developers and does not follow the small-step,
+risk-gated cadence of human teams:
 
-Each increment delivers a verifiable capability. Shared interface tests preserve Feishu compatibility; deployment acceptance uses new nodes/instances only.
+- **Build the target form directly.** Code output is not the bottleneck; there
+  are no transitional phases such as "polling first, push later" or
+  "read-only first, complete later" that exist to cap human effort risk. If a
+  direction proves wrong, rebuild it — that cost is acceptable.
+- **Acceptance is a test suite.** Every acceptance scenario below becomes an
+  automated test: integration tests for the Hub/Worker protocol and end-to-end
+  tests for the browser experience. The quality gate is a green suite plus a
+  real-machine smoke run, not staged human trials.
+- **Contracts first, then parallel tracks.** Neutral channel contracts land
+  first; the center, Workers and workbench then proceed in parallel, and the
+  multi-Agent development itself runs on the existing Feishu collaboration
+  system. Protocol invariants — authorization, visibility, idempotency and
+  causal chains — are done right the first time, because they are the most
+  expensive things to redo; UI and interaction may iterate or restart freely.
+- **Verified baseline.** Feishu cross-machine collaboration, including the
+  second physical-PC acceptance, is already a stable baseline; the new system
+  builds directly on those collaboration semantics.
+
+### Implementation tracks
+
+1. **Contracts and extraction** (first; unblocks every other track): extract
+   the channel-neutral collaboration/execution interfaces, keep current
+   Feishu behavior locked by contract tests, and create the independent LAN
+   configuration and deployment namespace. Align task-state names with the
+   A2A TaskState machine and workbench event streams with the AG-UI event
+   taxonomy.
+2. **Center track**: transactional storage, user/node/Agent identity, stable
+   conversation IDs, messages/dispatch/outbox, claim/lease/heartbeat, SSE
+   event streams, and the file service with authorized downloads.
+3. **Worker track**: claim/recovery/stop, result submission, marker
+   delegation and run progress streaming; reuse the existing Agent adapters
+   and evaluate implementing the unified Agent tool entry as an MCP server
+   (mainstream coding CLIs ship MCP clients, so access needs no adapter).
+4. **Workbench track**: desktop three-pane workspace, structured mentions,
+   task panel, streaming rendering, reconnect recovery and file cards.
+5. **Integration and operations**: install/backup/recovery packages,
+   diagnostics and run metrics, and real-machine acceptance on two new
+   nodes; add Zulip/Mattermost adapters through the same channel interface
+   when a mature chat entry is needed.
+
+Tracks 2-4 run in parallel once track 1's contracts land, and together they
+deliver the complete task loop; there is no intermediate deliverable such as a
+chat shell that cannot complete tasks. Each track is done when its acceptance
+scenarios pass automatically. The delivery gate is every acceptance scenario in
+this section passing the automated suite plus real-machine acceptance on new
+nodes and instances only.
 
 Acceptance covers explicit multi-target execution, no unmentioned runs, analysis-to-implementation handoff with authorization/files, ordinary replies preserving ownership, ask/return exactly one owner notification, forged actors/unrelated Agents rejected, topic and file visibility consistency, reconnect/restarts/duplicates/duplicate instances, uncertain execution without silent side-effect retries, persistent results/ownership/files, title changes preserving conversation identity, external model access with internal collaboration/file/code traffic, and startup/stop/backup/recovery without affecting the existing Feishu deployment.
 
