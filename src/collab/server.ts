@@ -66,7 +66,6 @@ export class CollaborationHubServer {
           instanceId?: string;
           version?: string;
         };
-        if (!body.openId) throw new Error('openId is required');
         return json(res, 200, {
           agent: this.hub.registerAgentIdentity(agentId, body.openId, {
             ...(body.nodeId ? { nodeId: body.nodeId } : {}),
@@ -100,13 +99,16 @@ export class CollaborationHubServer {
         const dispatch = this.hub.getDispatch(dispatchId);
         if (!dispatch || dispatch.taskId !== taskId) return json(res, 404, { error: 'dispatch not found' });
         if (dispatch.targetAgentId !== agentId) throw new AuthorizationError('dispatch belongs to another agent');
+        const roster = 'chatId' in task.address
+          ? this.hub.listChatAgentIdentities(task.address.chatId)
+          : this.hub.listTaskAgentIdentities(task.id);
         return json(res, 200, {
           promptContext: buildCollaborationContext({
             task,
             dispatch,
             entries: this.hub.getContext(taskId, agentId),
             artifacts: this.hub.getArtifacts(taskId, agentId),
-            agents: this.hub.listChatAgentIdentities(task.address.chatId),
+            agents: roster,
           }),
         });
       }

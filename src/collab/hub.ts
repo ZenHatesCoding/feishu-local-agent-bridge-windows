@@ -6,6 +6,7 @@ import type {
   ArtifactInput,
   AgentId,
   AgentRegistration,
+  CollaborationLedger,
   ContextEntry,
   ContextVisibility,
   Dispatch,
@@ -17,7 +18,6 @@ import type {
   SharedArtifact,
   TaskProjection,
 } from './types';
-import { JsonlLedger } from './ledger';
 
 export interface CollaborationHubOptions {
   agents: AgentRegistration[];
@@ -44,7 +44,7 @@ export class CollaborationHub {
   private sequence = 0;
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly ledger: JsonlLedger, options: CollaborationHubOptions) {
+  constructor(private readonly ledger: CollaborationLedger, options: CollaborationHubOptions) {
     this.agents = new Map(options.agents.map((agent) => [agent.id, agent]));
     this.leaseMs = options.leaseMs ?? 30 * 60_000;
     this.maxCausalDepth = options.maxCausalDepth ?? 8;
@@ -108,16 +108,17 @@ export class CollaborationHub {
 
   registerAgentIdentity(
     agentId: string,
-    openId: string,
+    openId: string | undefined,
     runtime: Pick<AgentIdentity, 'nodeId' | 'instanceId' | 'version'> = {},
   ): AgentIdentity {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error(`unknown agent: ${agentId}`);
-    if (!openId.trim()) throw new Error('agent openId is required');
-    const identity = {
+    const trimmedOpenId = openId?.trim();
+    if (openId !== undefined && !trimmedOpenId) throw new Error('agent openId cannot be empty');
+    const identity: AgentIdentity = {
       id: agent.id,
       displayName: agent.displayName,
-      openId: openId.trim(),
+      ...(trimmedOpenId ? { openId: trimmedOpenId } : {}),
       ...runtime,
       lastSeenAt: this.now().toISOString(),
     };
@@ -133,9 +134,17 @@ export class CollaborationHub {
   listChatAgentIdentities(chatId: string): AgentIdentity[] {
     const participantIds = new Set<string>();
     for (const task of this.tasks.values()) {
-      if (task.address.chatId !== chatId) continue;
+      if (!('chatId' in task.address) || task.address.chatId !== chatId) continue;
       for (const agentId of task.participants) participantIds.add(agentId);
     }
+    return this.listAgentIdentities().filter((identity) => participantIds.has(identity.id));
+  }
+
+  /** Agents the Hub has actually observed participating in this task's conversation. */
+  listTaskAgentIdentities(taskId: string): AgentIdentity[] {
+    const task = this.tasks.get(taskId);
+    if (!task) return [];
+    const participantIds = new Set(task.participants);
     return this.listAgentIdentities().filter((identity) => participantIds.has(identity.id));
   }
 

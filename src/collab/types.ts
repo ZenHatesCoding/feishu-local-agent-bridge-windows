@@ -7,11 +7,24 @@ export type ContextVisibility =
   | { kind: 'private-runtime'; agent: AgentId }
   | { kind: 'secret' };
 
-export interface TaskAddress {
+/** Address of a Feishu-topic-backed collaboration task. */
+export interface FeishuTaskAddress {
   tenantKey: string;
   chatId: string;
   threadId: string;
 }
+
+/**
+ * Channel-neutral address for a collaboration task that is not backed by a
+ * Feishu topic (for example the LAN workbench). External platform IDs are the
+ * channel adapter's business and never appear here.
+ */
+export interface LanTaskAddress {
+  deploymentId: string;
+  conversationId: string;
+}
+
+export type TaskAddress = FeishuTaskAddress | LanTaskAddress;
 
 export interface AgentRegistration {
   id: AgentId;
@@ -19,11 +32,12 @@ export interface AgentRegistration {
   aliases?: string[];
 }
 
-/** Runtime-only Feishu identity, registered by a connected bridge. */
+/** Runtime identity, registered by a connected bridge or worker. */
 export interface AgentIdentity {
   id: AgentId;
   displayName: string;
-  openId: string;
+  /** Feishu open_id of the bot behind this agent; absent for non-Feishu channels. */
+  openId?: string;
   nodeId?: string;
   instanceId?: string;
   version?: string;
@@ -166,6 +180,16 @@ export interface LedgerRecord {
   address?: TaskAddress;
   recordedAt: string;
   event: LedgerEvent;
+}
+
+/**
+ * Durable append-only event store behind the Hub. One `append` call is one
+ * transaction: replay never observes a partial batch. Implementations must be
+ * safe for the Hub's single-writer serialization.
+ */
+export interface CollaborationLedger {
+  readAll(): Promise<LedgerRecord[]>;
+  append(records: LedgerRecord[]): Promise<void>;
 }
 
 export interface Dispatch {

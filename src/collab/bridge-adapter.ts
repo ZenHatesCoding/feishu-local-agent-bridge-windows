@@ -19,13 +19,18 @@ export interface BridgeCollaborationDecision {
   reason?: string;
 }
 
+/** A Hub identity narrowed to what the Feishu channel needs to emit a real mention. */
+export interface FeishuAgentIdentity extends AgentIdentity {
+  openId: string;
+}
+
 /**
  * A completed consultation has a Hub-authorized return dispatch.  The bridge
  * that produced the answer must use this identity for the one real Feishu
  * mention that wakes the owner; the model never needs to guess a recipient.
  */
 export interface CollaborationRunFinalization {
-  returnTarget?: AgentIdentity & { dispatchId: string };
+  returnTarget?: FeishuAgentIdentity & { dispatchId: string };
 }
 
 export interface CollaborationHandoffIntent {
@@ -168,10 +173,10 @@ export class BridgeCollaborationAdapter {
         if (returnDispatch) {
           const identity = (await this.client.identities()).agents
             .find((agent) => agent.id === returnDispatch.targetAgentId);
-          if (!identity) {
+          if (!identity?.openId) {
             throw new Error(`return owner has not registered its Feishu identity: ${returnDispatch.targetAgentId}`);
           }
-          returnTarget = { ...identity, dispatchId: returnDispatch.id };
+          returnTarget = { ...identity, openId: identity.openId, dispatchId: returnDispatch.id };
         }
       }
       await this.client.acknowledge(dispatchId, {
@@ -198,7 +203,7 @@ export class BridgeCollaborationAdapter {
     targetAgentId: string;
     content: string;
     runId: string;
-  }): Promise<AgentIdentity & { content: string }> {
+  }): Promise<FeishuAgentIdentity & { content: string }> {
     return this.createDelegation('handoff', input);
   }
 
@@ -208,7 +213,7 @@ export class BridgeCollaborationAdapter {
     targetAgentId: string;
     content: string;
     runId: string;
-  }): Promise<AgentIdentity & { content: string }> {
+  }): Promise<FeishuAgentIdentity & { content: string }> {
     return this.createDelegation('reply', input);
   }
 
@@ -218,7 +223,7 @@ export class BridgeCollaborationAdapter {
     targetAgentId: string;
     content: string;
     runId: string;
-  }): Promise<AgentIdentity & { content: string }> {
+  }): Promise<FeishuAgentIdentity & { content: string }> {
     return this.createDelegation('ask', input);
   }
 
@@ -255,11 +260,12 @@ export class BridgeCollaborationAdapter {
   private async createDelegation(
     type: 'reply' | 'handoff' | 'ask',
     input: { taskId: string; dispatchId: string; targetAgentId: string; content: string; runId: string },
-  ): Promise<AgentIdentity & { content: string }> {
+  ): Promise<FeishuAgentIdentity & { content: string }> {
     const identity = (await this.client.identities()).agents
       .find((agent) => agent.id === input.targetAgentId);
-    if (!identity) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
-    const content = stripTargetMentionPrefix(input.content, identity);
+    if (!identity?.openId) throw new Error(`target agent has not registered its Feishu identity: ${input.targetAgentId}`);
+    const feishuIdentity: FeishuAgentIdentity = { ...identity, openId: identity.openId };
+    const content = stripTargetMentionPrefix(input.content, feishuIdentity);
     await this.client.submit({
       type,
       idempotencyKey: `bridge-${type}:${this.agentId}:${input.runId}:${input.targetAgentId}`,
@@ -269,7 +275,7 @@ export class BridgeCollaborationAdapter {
       targetAgentId: input.targetAgentId,
       content,
     });
-    return { ...identity, content };
+    return { ...feishuIdentity, content };
   }
   async recordAttachments(taskId: string, attachments: readonly NormalizedAttachment[]): Promise<void> {
     if (!this.artifactRoot) return;

@@ -9,9 +9,11 @@ export function buildCollaborationContext(input: {
   artifacts?: SharedArtifact[];
   agents?: AgentIdentity[];
 }): string {
-  const scope = input.task.address.threadId
-    ? `${input.task.address.chatId}:${input.task.address.threadId}`
-    : input.task.address.chatId;
+  const scope = 'conversationId' in input.task.address
+    ? input.task.address.conversationId
+    : input.task.address.threadId
+      ? `${input.task.address.chatId}:${input.task.address.threadId}`
+      : input.task.address.chatId;
   return promptSection('collaboration_context', {
     contract: {
       taskId: input.task.id,
