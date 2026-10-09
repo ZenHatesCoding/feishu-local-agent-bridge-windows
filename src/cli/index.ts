@@ -32,6 +32,7 @@ import {
   runCollaborationAction,
   runCollaborationHub,
 } from './commands/hub';
+import { runLanCenter, runLanSim, runLanWorker } from './commands/lan';
 
 const program = new Command();
 
@@ -335,6 +336,34 @@ secrets
   .option('--profile <name>', 'profile name (defaults to active profile)')
   .action(async (opts: { appId: string; profile?: string }) => {
     await runSecretsRemove(opts.appId, { profile: opts.profile });
+  });
+
+const lan = program
+  .command('lan')
+  .description('Run the experimental LAN collaboration deployment (center, worker nodes, L0 simulation)');
+
+lan
+  .command('center')
+  .description('Run a LAN collaboration center in the foreground')
+  .requiredOption('-c, --config <path>', 'path to lan center config JSON')
+  .action(async (opts: { config: string }) => {
+    await runLanCenter(opts);
+  });
+
+lan
+  .command('worker')
+  .description('Run one LAN worker node in the foreground')
+  .requiredOption('-c, --config <path>', 'path to lan worker config JSON')
+  .action(async (opts: { config: string }) => {
+    await runLanWorker(opts);
+  });
+
+lan
+  .command('sim')
+  .description('Run the single-machine L0 topology (center + fake workers on loopback)')
+  .requiredOption('-c, --config <path>', 'path to lan sim config JSON')
+  .action(async (opts: { config: string }) => {
+    await runLanSim(opts);
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {
