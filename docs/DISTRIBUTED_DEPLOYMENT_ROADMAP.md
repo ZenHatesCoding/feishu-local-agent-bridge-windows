@@ -32,6 +32,7 @@ cross-node artifact retrieval and production-grade dispatch remain roadmap work.
 | Shared code workspace state | Registration implemented; retrieval planned | Git repository, commit and path locator |
 | Secure remote deployment | Planned P0/P2 | Private-network MVP followed by TLS, rotation, limits and audit |
 | Turnkey remote operations | P0 implemented | `hub`, `worker`, and backward-compatible `all` roles |
+| LAN collaboration workbench (independent of Feishu) | L0 single-machine automation green; L1 sandbox rehearsal and L2 real-LAN acceptance pending | Dedicated center + workers + browser workbench reusing the same Hub state machine, see [the LAN plan](./plans/LAN_COLLABORATION.md) |
 
 ## Foundation To Preserve
 

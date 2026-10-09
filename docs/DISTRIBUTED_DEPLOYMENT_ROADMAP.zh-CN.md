@@ -29,6 +29,7 @@ Hub、Pilot、鉴权、dispatch 等待和文件共享。**
 | 共享代码工作区状态 | 已实现登记；计划自动取得 | Artifact 引用 Git repository、commit 和 path |
 | 安全远程部署 | 计划 P0/P2 | 私网 MVP；TLS、轮换、限流和审计完成生产化 |
 | 开箱即用跨机启停 | 已实现 P0 | Pilot 支持 `hub`、`worker`、`all`，默认保持单机 `all` |
+| 局域网协作工作台（独立于飞书） | L0 单机自动化全绿；L1 沙箱演练与 L2 真机验收待做 | 专用中心 + Worker + 浏览器工作台，复用同一 Hub 状态机，见[局域网方案](./plans/LAN_COLLABORATION.zh-CN.md) |
 
 ## 当前设计中已经可复用的基础
 

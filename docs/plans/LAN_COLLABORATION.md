@@ -225,6 +225,67 @@ Acceptance covers explicit multi-target execution, no unmentioned runs, analysis
 
 Additional desktop acceptance covers IME/window resizing, Worker continuation after closing the page, reopening catch-up, unsent offline drafts and idempotent timeout recovery.
 
-## Selected plan
+## Implementation status (L0, automated validation only)
+
+Tracks 1-4 are implemented and green on the single-machine ladder; none of
+this constitutes real second-PC or real-LAN acceptance.
+
+**Shipped (branch `codex/lan-collaboration`)**
+
+- Channel-neutral collaboration core: `TaskAddress` covers both the Feishu
+  (`tenantKey/chatId/threadId`) and LAN (`deploymentId/conversationId`)
+  worlds with byte-compatible task ids; the Hub takes a
+  `CollaborationLedger` interface and lists task dispatches/identities.
+- LAN center (`src/lan/center.ts` + `src/lan/sqlite.ts`): the same
+  CollaborationHub state machine over SQLite (node:sqlite, WAL), user
+  sessions (scrypt password hashes, hashed session tokens), per-agent token
+  credentials, structured-mention message API, claim/heartbeat/release/
+  complete with fenced attempts and the uncertain timeout scan, requeue,
+  cancellation, SSE with dual-cursor catch-up, and content-addressed
+  authorized file delivery.
+- LAN worker (`src/lan/worker.ts`): poll/claim loop, prompt-context
+  assembly, fake/codex/claude agent adapters, batched run-event streaming,
+  marker-driven handoff/ask/reply/return submission, attempt finalization
+  and heartbeat-carried cancellation.
+- Simulation harness (`src/lan/sim.ts`): one-command multi-node L0 topology
+  with worker pause/resume for race-free protocol tests.
+- Browser workbench (`web/`): three-pane React SPA (conversations, timeline
+  with streaming run blocks, task panel with dispatch statuses and file
+  cards), login, structured mention composer, file upload, SSE reconnect
+  with dual cursors. The center serves the built bundle from `webDir`.
+- CLI: `lan center`, `lan worker`, `lan sim` (see below).
+
+**How to run (L0)**
+
+```
+# workbench (once): cd web && pnpm install && pnpm build
+node dist/cli.js lan sim -c <sim-config.json>   # loopback center + fake workers
+node dist/cli.js lan center -c <center-config.json>
+node dist/cli.js lan worker -c <worker-config.json>
+```
+
+The sim command prints the workbench URL and a generated owner password.
+
+**Automated L0 suites (all green)**
+
+`tests/integration/lan/` covers mention-only routing with visibility
+fencing, dual-instance claim races, structured handoff waking the new
+owner, idempotent submissions, center restart recovery, SSE catch-up, file
+delivery with digest verification and anonymous rejection, heartbeat
+timeout to uncertain with fencing and requeue recovery, full ask/return
+consultation cycles, task cancellation, run-progress streaming, and static
+workbench serving with traversal rejection. `web/` carries unit tests for
+the timeline merge logic plus a headless-browser E2E smoke that skips
+cleanly when no browser is installed.
+
+**Not done yet (next on the ladder)**
+
+- Fault-injection proxy (drop/delay/reorder) and crash injection at L0.
+- Windows Sandbox L1 rehearsal from the real runbook, including the
+  install/backup/recovery package and diagnostics/metrics.
+- Real-LAN (L2) acceptance on new nodes and instances.
+- Codex/Claude real runtimes on the worker track are wired but not yet
+  exercised end-to-end beyond the fake adapter at L0.
+
 
 Build a LAN Agent collaboration product with pluggable channels: a dedicated workspace, center-side transactional conversation/authority storage, the existing Hub rules and existing model execution bridges. Reuse, adapt or connect mature open-source capabilities as appropriate. Keep deployment independent of Feishu and keep external model access. Continue development on codex/lan-collaboration.

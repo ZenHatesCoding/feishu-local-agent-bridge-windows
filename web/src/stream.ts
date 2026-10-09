@@ -1,9 +1,9 @@
-import type { LanApiClient, LanRunEventRecord, LedgerRecord } from './api';
+import type { LanApiClient, LanRunEventRecord, LedgerRecord, TaskFrame } from './api';
 
 export interface StreamHandlers {
   onLedgerRecord?: (record: LedgerRecord) => void;
   onRunRecord?: (record: LanRunEventRecord) => void;
-  onTask?: (task: { id: string; status: string; participants: string[]; ownerAgentId?: string }) => void;
+  onTask?: (task: TaskFrame) => void;
   onStatusChange?: (status: StreamStatus) => void;
 }
 
@@ -54,7 +54,7 @@ export class ConversationStream {
       this.handlers.onRunRecord?.(JSON.parse((event as MessageEvent<string>).data) as LanRunEventRecord);
     });
     source.addEventListener('task', (event) => {
-      this.handlers.onTask?.(JSON.parse((event as MessageEvent<string>).data) as { id: string; status: string; participants: string[]; ownerAgentId?: string });
+      this.handlers.onTask?.(JSON.parse((event as MessageEvent<string>).data) as TaskFrame);
     });
     source.addEventListener('error', () => {
       source.close();

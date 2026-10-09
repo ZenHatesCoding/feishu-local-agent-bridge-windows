@@ -10,6 +10,7 @@ export interface LanConversationNotification {
   task?: {
     taskId: string;
     state: LanTaskState;
+    participants: string[];
     ownerAgentId?: string;
     dispatches?: Dispatch[];
   };

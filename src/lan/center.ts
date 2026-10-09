@@ -234,6 +234,10 @@ export class LanCenter {
   private publishTask(taskId: string): void {
     const conversationId = this.conversationIdForTask(taskId);
     if (!conversationId) return;
+    // Ack/dispatch records land in the ledger through claim/complete/release
+    // paths that do not go through the submit entry points, so fan the
+    // ledger out here too — publishLedger is idempotent (empty follow-ups).
+    this.publishLedger(taskId);
     const { state, ownerAgentId } = this.taskStateFor(taskId);
     this.bus.publish({
       conversationId,
@@ -241,6 +245,7 @@ export class LanCenter {
       task: {
         taskId,
         state,
+        participants: this.hub.listTaskAgentIdentities(taskId).map((agent) => agent.id),
         ...(ownerAgentId ? { ownerAgentId } : {}),
         dispatches: this.hub.listTaskDispatches(taskId),
       },

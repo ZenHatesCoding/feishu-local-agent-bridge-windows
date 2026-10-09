@@ -80,7 +80,7 @@ export function App(): JSX.Element {
     const state = new ConversationState();
     setConversation(state);
     void refreshFiles(activeId);
-    const apply = (): void => setConversation(new ConversationState());
+    const apply = (): void => setConversation(state.clone());
     const stream = new ConversationStream(client, activeId, () => state.cursor, {
       onLedgerRecord: (record) => {
         state.applyLedgerRecord(record);

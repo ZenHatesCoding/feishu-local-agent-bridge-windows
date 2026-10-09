@@ -53,6 +53,15 @@ export interface LedgerRecord {
   };
 }
 
+/** Shape of the SSE 'task' frame pushed by the center. */
+export interface TaskFrame {
+  taskId: string;
+  state: string;
+  participants: string[];
+  ownerAgentId?: string;
+  dispatches?: LanDispatchInfo[];
+}
+
 export type LanRunEventType =
   | 'RUN_STARTED'
   | 'RUN_STATUS'

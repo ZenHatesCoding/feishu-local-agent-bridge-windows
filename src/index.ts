@@ -47,3 +47,23 @@ export type {
   TaskAddress,
   TaskProjection,
 } from './collab/types';
+
+// LAN collaboration deployment (center, worker, single-machine simulation).
+export { LanCenter } from './lan/center';
+export { LanWorker, loadWorkerConfig } from './lan/worker';
+export { LanSimTopology } from './lan/sim';
+export { FakeAgentAdapter, parseFakeAgentScript } from './lan/fake-agent';
+export { SqliteLanStore } from './lan/sqlite';
+export { LanFileStore } from './lan/files';
+export { buildLanCollaborationContext } from './lan/context';
+export type {
+  LanCenterConfig,
+  LanWorkerConfig,
+  LanFakeAgentScript,
+  LanFakeAgentStep,
+  LanRunEvent,
+  LanRunEventRecord,
+  LanStore,
+  LanTaskState,
+  LanWorkerRuntime,
+} from './lan/types';

@@ -150,6 +150,14 @@ export function buildTimeline(ledger: LedgerRecord[], runs: LanRunEventRecord[])
   return items;
 }
 
+export interface TaskFrame {
+  taskId: string;
+  state: string;
+  participants: string[];
+  ownerAgentId?: string;
+  dispatches?: Array<{ id: string; targetAgentId: string; reason: string; status: string; objective: string }>;
+}
+
 /**
  * Live state accumulator for one conversation: appends catch-up batches and
  * stream frames while tracking the dual cursors and deduplicating by ids.
@@ -158,7 +166,7 @@ export class ConversationState {
   private ledger = new Map<number, LedgerRecord>();
   private runs = new Map<number, LanRunEventRecord>();
   cursor = { ledger: 0, runs: 0 };
-  task: { id: string; status: string; participants: string[]; ownerAgentId?: string } | undefined;
+  task: TaskFrame | undefined;
 
   applyCatchUp(batch: LanCatchUp): void {
     for (const record of batch.ledger) this.ledger.set(record.sequence, record);
@@ -178,8 +186,21 @@ export class ConversationState {
     this.cursor = { ...this.cursor, runs: record.streamId };
   }
 
-  applyTask(task: ConversationState['task']): void {
+  applyTask(task: TaskFrame): void {
     this.task = task;
+  }
+
+  /**
+   * Shallow copy sharing the inner maps, so React re-renders on a new
+   * reference while the closure-owned instance keeps accumulating records.
+   */
+  clone(): ConversationState {
+    const copy = new ConversationState();
+    copy.ledger = this.ledger;
+    copy.runs = this.runs;
+    copy.cursor = this.cursor;
+    copy.task = this.task;
+    return copy;
   }
 
   timeline(): TimelineItem[] {

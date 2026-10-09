@@ -282,6 +282,41 @@ Agent 输出结果与一个协作 marker；Bridge 在其有效运行身份下提
 - 新部署能完成启动、停止、备份与恢复；原飞书服务、本机机器人、凭据、配置和运行数据均不受影响。
 - 电脑输入法和窗口缩放正常；关闭页面后任务继续，重新打开补齐结果；断网草稿不自动发送，超时请求幂等恢复。
 
+## 实施状态（L0，仅自动化验证）
+
+轨道 1-4 已在单机验证阶梯上实现并全绿；以下内容均**不构成**第二台真机或真实局域网验收。
+
+**已交付（分支 `codex/lan-collaboration`）**
+
+- 通道中立协作内核：`TaskAddress` 同时覆盖飞书（`tenantKey/chatId/threadId`）与 LAN（`deploymentId/conversationId`）两种地址且任务 ID 字节兼容；Hub 改为接受 `CollaborationLedger` 接口，并提供任务级派发与身份查询。
+- LAN 中心（`src/lan/center.ts` + `src/lan/sqlite.ts`）：同一 CollaborationHub 状态机落在 SQLite（node:sqlite，WAL）之上；用户会话（scrypt 口令散列、会话令牌散列）、每 Agent 令牌凭据、结构化 @ 消息 API、claim/心跳/release/complete（含围栏 attempt 与 uncertain 超时扫描）、requeue、取消、双游标补齐的 SSE、按内容寻址的授权文件交付。
+- LAN Worker（`src/lan/worker.ts`）：轮询领取、prompt-context 组装、fake/codex/claude 三种 Agent 适配器、批量运行事件流、marker 驱动的 handoff/ask/reply/return 提交、attempt 终结与经心跳传播的取消。
+- 仿真骨架（`src/lan/sim.ts`）：一键多节点 L0 拓扑，支持 worker 暂停/恢复以进行无竞争协议测试。
+- 浏览器工作台（`web/`）：三栏 React SPA（会话、带流式运行块的时间线、含派发状态与文件卡片的任务面板）、登录、结构化 @ 输入、文件上传、断线双游标重连；中心从 `webDir` 服务构建产物。
+- CLI：`lan center`、`lan worker`、`lan sim`（见下）。
+
+**运行方式（L0）**
+
+```
+# 工作台（一次性）：cd web && pnpm install && pnpm build
+node dist/cli.js lan sim -c <sim-config.json>   # 回环中心 + 模拟 worker
+node dist/cli.js lan center -c <center-config.json>
+node dist/cli.js lan worker -c <worker-config.json>
+```
+
+`lan sim` 会打印工作台地址和生成的 owner 密码。
+
+**L0 自动化套件（全绿）**
+
+`tests/integration/lan/` 覆盖：仅 @ 的派发与可见性围栏、双实例 claim 竞争、结构化 handoff 唤醒新负责人、幂等提交、中心重启恢复、SSE 补齐、文件交付（摘要校验 + 匿名拒绝）、心跳超时进入 uncertain 并围栏后经 requeue 恢复、完整 ask/return 咨询循环、任务取消、运行进度流、工作台静态服务与路径穿越拒绝。`web/` 含时间线合并逻辑单测和无头浏览器 E2E 冒烟（未安装浏览器时干净跳过）。
+
+**尚未完成（阶梯上的下一批）**
+
+- L0 的故障注入代理（断连/延迟/乱序）与进程崩溃注入。
+- 按真机运行手册在 Windows 沙箱做 L1 演练，含安装/备份/恢复包与日志诊断、运行指标。
+- 新节点与实例的 L2 真机验收。
+- Worker 轨道的 Codex/Claude 真实运行时已接线，但 L0 只用 fake 适配器做过端到端验证。
+
 ## 十、最终方案
 
 建设一个可插拔通道的局域网 Agent 协作产品：专用工作台承载人和 Agent 的交流，中心统一持久化会话和授权，现有 Hub 提供协作规则，现有模型桥承担执行。开源聊天产品提供可借鉴、可拆取或可整体接入的能力，成熟组件提供基础设施。部署与既有飞书系统完全独立，模型继续使用外网，后续开发在 `codex/lan-collaboration` 分支推进。

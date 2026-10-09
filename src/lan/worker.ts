@@ -59,11 +59,25 @@ export class LanWorker {
 
   async start(): Promise<void> {
     if (!this.token) throw new Error('worker token is required (token or tokenFile)');
-    await this.api('POST', '/api/agent/identity', {
-      nodeId: this.config.nodeId,
-      instanceId: this.instanceId,
-      version: process.env.npm_package_version,
-    });
+    // Identity registration is idempotent; retry it so a flaky network at
+    // boot (proxied drops in L0 tests, Wi-Fi blips on a real LAN) does not
+    // kill the worker before it ever polls.
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        await this.api('POST', '/api/agent/identity', {
+          nodeId: this.config.nodeId,
+          instanceId: this.instanceId,
+          version: process.env.npm_package_version,
+        });
+        lastError = undefined;
+        break;
+      } catch (err) {
+        lastError = err;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+    if (lastError) throw lastError;
     this.pollTimer = setInterval(() => void this.poll(), this.config.pollIntervalMs ?? 1000);
     this.pollTimer.unref();
     await this.poll();
@@ -89,12 +103,20 @@ export class LanWorker {
         `/api/agent/dispatches?after=${this.dispatchCursor}`,
       );
       for (const dispatch of result.dispatches) {
-        this.dispatchCursor = Math.max(this.dispatchCursor, dispatch.sequence);
         // 'claimable' covers pending dispatches and accepted ones whose
         // attempt was released or timed out (uncertain) — both are safe to
         // claim; anything else (completed/failed or actively running) is not.
-        if (!dispatch.claimable || this.stopped) continue;
-        await this.runDispatch(dispatch);
+        if (!dispatch.claimable || this.stopped) {
+          this.dispatchCursor = Math.max(this.dispatchCursor, dispatch.sequence);
+          continue;
+        }
+        const finalized = await this.runDispatch(dispatch);
+        // Advance the cursor only when the attempt reached a terminal state.
+        // A claim or completion lost to the network must leave the dispatch
+        // below the cursor so the next poll re-offers it.
+        if (finalized) {
+          this.dispatchCursor = Math.max(this.dispatchCursor, dispatch.sequence);
+        }
         if (this.stopped) return;
       }
     } catch (err) {
@@ -106,7 +128,9 @@ export class LanWorker {
 
   private dispatchCursor = 0;
 
-  private async runDispatch(dispatch: PendingDispatch): Promise<void> {
+  /** Runs one dispatch to a terminal attempt state; false if it did not finalize. */
+  private async runDispatch(dispatch: PendingDispatch): Promise<boolean> {
+    let finalized = false;
     let claim: LanClaimResult;
     try {
       claim = await this.api<LanClaimResult>('POST', `/api/agent/dispatches/${dispatch.id}/claim`, {
@@ -114,7 +138,7 @@ export class LanWorker {
       });
     } catch (err) {
       console.error(`[lan-worker:${this.config.agent.id}] claim failed for ${dispatch.id}: ${(err as Error).message}`);
-      return;
+      return false;
     }
     const runId = `run_${randomUUID().slice(0, 12)}`;
     const run = { dispatch, attemptId: claim.attemptId, runId, cancelRequested: false };
@@ -174,9 +198,12 @@ export class LanWorker {
 
     try {
       emit({ type: 'RUN_STARTED', runId, taskId: dispatch.taskId, dispatchId: dispatch.id, agentId: this.config.agent.id, at: now() });
-      const context = await this.api<{ promptContext: string }>(
-        'GET',
-        `/api/agent/tasks/${dispatch.taskId}/prompt-context?dispatchId=${dispatch.id}`,
+      const context = await this.withRetry(
+        () => this.api<{ promptContext: string }>(
+          'GET',
+          `/api/agent/tasks/${dispatch.taskId}/prompt-context?dispatchId=${dispatch.id}`,
+        ),
+        `prompt-context ${dispatch.taskId}`,
       );
       const prompt = `${context.promptContext}\n\n# Task\n\n${dispatch.objective}`;
       emit({ type: 'RUN_STATUS', runId, message: 'context ready, starting the agent', at: now() });
@@ -221,18 +248,19 @@ export class LanWorker {
       }
       emit({ type: 'RUN_FINISHED', runId, status: termination, at: now() });
       await flush();
-      await this.completeAttempt(dispatch, claim.attemptId, runId, termination);
+      finalized = await this.completeAttempt(dispatch, claim.attemptId, runId, termination);
     } catch (err) {
       emit({ type: 'RUN_ERROR', runId, message: (err as Error).message, at: now() });
       emit({ type: 'RUN_FINISHED', runId, status: 'failed', at: now() });
       await flush();
-      await this.completeAttempt(dispatch, claim.attemptId, runId, 'failed');
+      finalized = await this.completeAttempt(dispatch, claim.attemptId, runId, 'failed');
     } finally {
       clearInterval(heartbeat);
       if (flushTimer) clearTimeout(flushTimer);
       await flush().catch(() => undefined);
       this.activeRun = undefined;
     }
+    return finalized;
   }
 
   private forwardAgentEvent(
@@ -295,7 +323,10 @@ export class LanWorker {
 
   private async submitAction(input: HubInput): Promise<void> {
     try {
-      await this.api('POST', '/api/agent/events', input);
+      await this.withRetry(
+        () => this.api('POST', '/api/agent/events', input),
+        `${input.type} submit`,
+      );
     } catch (err) {
       console.error(
         `[lan-worker:${this.config.agent.id}] ${input.type} submit failed: ${(err as Error).message}`,
@@ -308,31 +339,62 @@ export class LanWorker {
     attemptId: string,
     runId: string,
     status: 'completed' | 'failed',
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
-      await this.api('POST', `/api/agent/dispatches/${dispatch.id}/complete`, {
-        attemptId,
-        runId,
-        status,
-      });
+      await this.withRetry(
+        () => this.api('POST', `/api/agent/dispatches/${dispatch.id}/complete`, {
+          attemptId,
+          runId,
+          status,
+        }),
+        `complete ${dispatch.id}`,
+      );
+      return true;
     } catch (err) {
       // A fenced attempt rejects completion by design; nothing to redo here.
       console.error(
         `[lan-worker:${this.config.agent.id}] complete failed for ${dispatch.id}: ${(err as Error).message}`,
       );
+      return false;
     }
   }
 
   private async resolveConversationId(taskId: string): Promise<string | undefined> {
     try {
-      const context = await this.api<{ task: { address: { conversationId?: string } } }>(
-        'GET',
-        `/api/agent/tasks/${taskId}/context`,
+      const context = await this.withRetry(
+        () => this.api<{ task: { address: { conversationId?: string } } }>(
+          'GET',
+          `/api/agent/tasks/${taskId}/context`,
+        ),
+        `context resolve ${taskId}`,
       );
       return context.task.address.conversationId;
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * Retry transient failures (network resets, 5xx). Protocol answers (4xx)
+   * are final — e.g. a fenced attempt must not be retried — so they throw
+   * immediately. Every retried submission is idempotent (idempotency keys
+   * for actions, status comparison for completions).
+   */
+  private async withRetry<T>(operation: () => Promise<T>, label: string, retries = 5): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await operation();
+      } catch (err) {
+        lastError = err;
+        const status = (err as { status?: number }).status;
+        if (typeof status === 'number' && status >= 400 && status < 500) throw err;
+        if (attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        }
+      }
+    }
+    throw new Error(`${label} failed after ${retries + 1} attempts: ${(lastError as Error)?.message ?? lastError}`);
   }
 
   private runtimeCwd(): string | undefined {
@@ -356,7 +418,9 @@ export class LanWorker {
     const text = await response.text();
     const parsed = text ? JSON.parse(text) as { error?: string } & Record<string, unknown> : {};
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${parsed.error ?? response.statusText}`);
+      throw Object.assign(new Error(`HTTP ${response.status}: ${parsed.error ?? response.statusText}`), {
+        status: response.status,
+      });
     }
     return parsed as T;
   }

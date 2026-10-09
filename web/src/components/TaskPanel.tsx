@@ -8,7 +8,7 @@ const DISPATCH_LABEL: Record<string, string> = {
 };
 
 export function TaskPanel(props: {
-  task?: { id: string; status: string; participants: string[]; ownerAgentId?: string };
+  task?: { taskId: string; state: string; participants?: string[]; ownerAgentId?: string };
   dispatches: Array<{ id: string; targetAgentId: string; reason: string; status: string; objective: string }>;
   files: LanStoredFileInfo[];
   onFileDownload: (fileId: string) => void;
@@ -21,12 +21,12 @@ export function TaskPanel(props: {
           <dl className="task-meta">
             <dt>状态</dt>
             <dd>
-              <span className={`state state-${props.task.status}`}>{props.task.status}</span>
+              <span className={`state state-${props.task.state}`}>{props.task.state}</span>
             </dd>
             <dt>当前 Owner</dt>
             <dd>{props.task.ownerAgentId ?? '—'}</dd>
             <dt>参与者</dt>
-            <dd>{props.task.participants.join('、') || '—'}</dd>
+            <dd>{(props.task.participants ?? []).join('、') || '—'}</dd>
           </dl>
         ) : (
           <p className="hint">等待会话活动后生成任务</p>
