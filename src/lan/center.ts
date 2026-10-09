@@ -385,6 +385,10 @@ export class LanCenter {
         this.requireUser(principal);
         return json(res, 200, this.catchUp(conversationId, url));
       }
+      if (method === 'GET' && sub === 'files') {
+        this.requireUser(principal);
+        return json(res, 200, { files: this.store.listConversationFiles(conversationId) });
+      }
       if (method === 'POST' && sub === 'messages') {
         this.requireUser(principal);
         const result = await this.submitUserMessage(conversationId, principal.username, body as never);
