@@ -99,4 +99,17 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(ledger).toContain('legacyPath');
   });
 
+  it('generates hub credentials only with APIs Windows PowerShell 5.1 has', () => {
+    const common = readPilotScript('Pilot.Common.ps1');
+
+    // `[Convert]::ToHexString` is .NET 5+ and `RandomNumberGenerator::GetBytes(int)`
+    // is .NET Core 3.0+; both are missing in the 5.1 interpreter the scheduled
+    // tasks launch, where they used to abort hub-state initialization.
+    expect(common).toContain('function New-CollabHexSecret');
+    expect(common).toContain('[BitConverter]::ToString');
+    expect(common).not.toMatch(/\[Convert\]::ToHexString\(/);
+    expect(common).not.toMatch(/RandomNumberGenerator\]::GetBytes\(\d/);
+    expect(common.match(/New-CollabHexSecret/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+  });
+
 });

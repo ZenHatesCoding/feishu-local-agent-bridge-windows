@@ -51,9 +51,10 @@ Write-Output "Installed Windows startup task: $TaskName"
 
 if ($StartNow) {
   # Only stop what this task owns: a per-agent task must not take the whole pilot
-  # (or a sibling agent on the same box) down with it.
+  # (or a sibling agent on the same box) down with it. Both paths pass the same
+  # manifest the task is being registered for.
   if ($Agent) { & (Join-Path $PSScriptRoot 'Stop-CollabAgent.ps1') -Agent $Agent -Config $configPath }
-  else { & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1') }
+  else { & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1') -Config $configPath }
   Start-ScheduledTask -TaskName $TaskName
   Write-Output "Started Windows startup task: $TaskName"
 } elseif ($wasRunning) {

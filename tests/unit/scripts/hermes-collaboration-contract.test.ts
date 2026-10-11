@@ -27,4 +27,13 @@ describe('Hermes collaboration Hook contract', () => {
     expect(handler).toContain('"status": "failed"');
     expect(handler).toContain('"causedByDispatchId": dispatch_id');
   });
+
+  it('records observed topics where the local-context reader looks', () => {
+    // One root per agent, one file per topic. A bare
+    // <root>/local-topic-ledger.jsonl is never read by src/collab/local-topic-ledger.ts.
+    expect(handler).toContain('"collaboration", "topics"');
+    expect(handler).toContain('_safe_segment(chat_id)');
+    expect(handler).toContain('_safe_segment(thread_id)');
+    expect(handler).not.toContain('"local-topic-ledger.jsonl"');
+  });
 });

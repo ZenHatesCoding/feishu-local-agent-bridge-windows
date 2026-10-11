@@ -43,6 +43,11 @@ def _settings() -> tuple[str, str, str, str]:
     return url, token, tenant, agent
 
 
+def _safe_segment(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", value)
+    return safe or "_"
+
+
 def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> None:
     """Record only what this node's Hermes gateway actually observed."""
     root = os.environ.get("LARK_COLLAB_NODE_LEDGER_ROOT", "").strip()
@@ -63,8 +68,14 @@ def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> Non
         "content": content,
     }
     try:
-        os.makedirs(root, exist_ok=True)
-        with open(os.path.join(root, "local-topic-ledger.jsonl"), "a", encoding="utf-8") as handle:
+        # The bridge reads <root>/collaboration/topics/<chatId>/<threadId>.jsonl
+        # (one file per topic, one root per agent). A bare
+        # <root>/local-topic-ledger.jsonl is never read, which used to make every
+        # Hermes observation invisible to the local-context query.
+        topics_dir = os.path.join(root, "collaboration", "topics", _safe_segment(chat_id))
+        os.makedirs(topics_dir, exist_ok=True)
+        journal = os.path.join(topics_dir, f"{_safe_segment(thread_id)}.jsonl")
+        with open(journal, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
         pass

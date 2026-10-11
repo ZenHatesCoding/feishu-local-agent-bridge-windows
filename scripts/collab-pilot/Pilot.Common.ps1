@@ -135,12 +135,28 @@ function Invoke-CollabCommand([object]$Command, [string]$Description) {
   }
 }
 
+# Windows PowerShell 5.1 - the interpreter the scheduled tasks launch - has neither
+# [Security.Cryptography.RandomNumberGenerator]::GetBytes(int) (added in .NET Core 3.0)
+# nor [Convert]::ToHexString (added in .NET 5), so generating hub state with those two
+# APIs throws before hub-token.txt / agent-tokens.json / hub-config.json are written.
+# Stay on APIs that exist in both 5.1 and 7.
+function New-CollabHexSecret([int]$ByteCount = 32) {
+  $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $bytes = New-Object byte[] $ByteCount
+    $rng.GetBytes($bytes)
+    return [BitConverter]::ToString($bytes).Replace('-', '')
+  } finally {
+    if ($rng -is [IDisposable]) { $rng.Dispose() }
+  }
+}
+
 function Initialize-CollabRuntimeState {
   $pilot = Get-CollabPilotConfig
   New-Item -ItemType Directory -Force -Path $script:CollabStateDir, $script:CollabLogDir | Out-Null
   if (!(Test-CollabRunsHub)) { return }
   if (!(Test-Path -LiteralPath $script:CollabTokenFile)) {
-    [IO.File]::WriteAllText($script:CollabTokenFile, [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)))
+    [IO.File]::WriteAllText($script:CollabTokenFile, (New-CollabHexSecret))
   }
   if (!(Test-Path -LiteralPath $script:CollabTenantFile)) {
     $tenantKey = if ($pilot.hub.tenantKey) { [string]$pilot.hub.tenantKey } else { [guid]::NewGuid().ToString('N') }
@@ -157,7 +173,7 @@ function Initialize-CollabRuntimeState {
   }
   foreach ($agent in $hubAgents) {
     if (!$savedAgentTokens[$agent.id]) {
-      $savedAgentTokens[$agent.id] = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+      $savedAgentTokens[$agent.id] = New-CollabHexSecret
     }
   }
   [IO.File]::WriteAllText($script:CollabAgentTokenFile, ($savedAgentTokens | ConvertTo-Json))

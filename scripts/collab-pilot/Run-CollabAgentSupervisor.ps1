@@ -36,7 +36,11 @@ param(
   [ValidateRange(1, 300)]
   [int]$RestartSeconds = 5,
   [ValidateRange(1, 60)]
-  [int]$CredentialRetrySeconds = 60
+  [int]$CredentialRetrySeconds = 60,
+  # A detached Hermes gateway has no launcher PID to wait on, so its health can
+  # only be re-checked on a timer; every other engine stays fully event-driven.
+  [ValidateRange(10, 600)]
+  [int]$GatewayCheckSeconds = 60
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,10 +68,20 @@ function Import-CredentialFromUserScope {
   if ($userValue) { [Environment]::SetEnvironmentVariable($name, $userValue, 'Process') }
 }
 
+# All three credential sources count, not just the environment variable: the
+# inline `credential` and `.runtime\agent-tokens.json` are valid configurations
+# too, and a supervisor that only looked at credentialEnv would wait forever on a
+# correctly configured agent. Get-CollabAgentToken owns the precedence.
 function Test-CredentialReady {
-  if ([Environment]::GetEnvironmentVariable([string]$agentConfig.credentialEnv, 'Process')) { return $true }
-  if ($agentConfig.credential) { return $true }
-  return $false
+  try { $null = Get-CollabAgentToken $agentConfig; return $true } catch { return $false }
+}
+
+# A detached Hermes gateway is healthy even though its short-lived launcher has
+# exited and no launcher PID remains in the pid table; restarting it every few
+# seconds would fight the user's own service.
+function Test-DetachedHermesGateway {
+  if (!$agentConfig.hermesHook -or !$agentConfig.hermesHook.enabled) { return $false }
+  return (Test-CollabHermesGateway $agentConfig)
 }
 
 function Clear-AgentRuntime {
@@ -106,6 +120,11 @@ while ($true) {
 
   $launcherPid = (Read-CollabPidTable)[$Agent]
   if (!(Test-CollabPid $launcherPid)) {
+    if (Test-DetachedHermesGateway) {
+      Write-SupervisorLog "detached Hermes gateway is healthy; next check in ${GatewayCheckSeconds}s"
+      Start-Sleep -Seconds $GatewayCheckSeconds
+      continue
+    }
     Write-SupervisorLog "launcher for $Agent is not running; retry in ${RestartSeconds}s"
     Start-Sleep -Seconds $RestartSeconds
     continue

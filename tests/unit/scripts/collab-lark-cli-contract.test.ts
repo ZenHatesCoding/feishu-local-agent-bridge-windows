@@ -48,4 +48,29 @@ describe('collaboration pilot lark-cli identity contract', () => {
       expect(source).not.toContain("dirname(context.rootDir), 'bin'");
     }
   });
+
+  it.each(['lark-cli.cmd', 'lark-cli.ps1'])(
+    'keeps the repository-root %s shim identity-neutral and machine-independent',
+    (name) => {
+      const source = readFileSync(join(process.cwd(), 'bin', name), 'utf8');
+
+      expect(source).toContain('lark-cli.mjs');
+      // No absolute Windows path, and no identity of its own: HOME, USERPROFILE,
+      // LARK_CHANNEL_* and LARKSUITE_CLI_CONFIG_DIR belong to the caller.
+      expect(source).not.toMatch(/[A-Za-z]:\\/);
+      expect(source).not.toMatch(/LARK_CHANNEL_(?:HOME|PROFILE|CONFIG)\s*=/i);
+      expect(source).not.toMatch(/LARKSUITE_CLI_CONFIG_DIR\s*=/i);
+      expect(source).not.toMatch(/\bHOME\s*=/);
+      expect(source).not.toMatch(/\bUSERPROFILE\s*=/);
+    },
+  );
+
+  it('resolves the real lark-cli without assuming an install location', () => {
+    const resolver = readFileSync(join(process.cwd(), 'bin', 'lark-cli.mjs'), 'utf8');
+
+    expect(resolver).toContain('LARK_COLLAB_REAL_LARK_CLI_JS');
+    expect(resolver).toContain("'@larksuite/cli/scripts/run.js'");
+    expect(resolver).not.toMatch(/[A-Za-z]:\\/);
+    expect(resolver).not.toMatch(/antigravity-bridge|deepseek-bridge/i);
+  });
 });

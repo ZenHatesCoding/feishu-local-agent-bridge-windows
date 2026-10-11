@@ -1,5 +1,6 @@
 param(
   [string]$TaskName = 'Lark Collaboration Pilot',
+  [string]$Config,
   [switch]$KeepPilotRunning
 )
 
@@ -19,5 +20,10 @@ if ((Get-ScheduledTask -TaskName $TaskName).State -eq 'Running') {
   throw "Timed out stopping Windows startup task: $TaskName"
 }
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-if (!$KeepPilotRunning) { & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1') }
+if (!$KeepPilotRunning) {
+  # Forward the manifest the task was registered for; without it the stop would
+  # act on whatever LARK_COLLAB_PILOT_CONFIG / .runtime\pilot.local.json names.
+  if ($Config) { & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1') -Config $Config }
+  else { & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1') }
+}
 Write-Output "Uninstalled Windows startup task: $TaskName"
