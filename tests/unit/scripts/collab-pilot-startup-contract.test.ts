@@ -67,4 +67,36 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(status).toContain('hermes-gateway (detached)');
   });
 
+  it('supervises one agent per task without polling and clears both registrations', () => {
+    const source = readPilotScript('Run-CollabAgentSupervisor.ps1');
+
+    expect(source).toContain('[Parameter(Mandatory = $true)]');
+    expect(source).toContain("'Start-CollabAgent.ps1'");
+    expect(source).toContain('Wait-Process');
+    expect(source).toContain('Stop-CollabComponent $Agent');
+    expect(source).toContain('Stop-CollabRegisteredBridge $agentConfig');
+    expect(source).not.toContain('while ($true) {\n      Repair-CollabPilot');
+  });
+
+  it('registers a per-agent task against the per-agent supervisor', () => {
+    const source = readPilotScript('Install-CollabPilotStartup.ps1');
+
+    expect(source).toContain("'Run-CollabAgentSupervisor.ps1'");
+    expect(source).toContain('Lark Collaboration Agent $Agent');
+    expect(source).toContain('$argument += " -Agent');
+  });
+
+  it('keeps one journal per agent and one journal file per topic', () => {
+    const run = readPilotScript('run-agent.ps1');
+    const ledger = readFileSync(
+      join(process.cwd(), 'src', 'collab', 'local-topic-ledger.ts'),
+      'utf8',
+    );
+
+    expect(run).toContain('LARK_COLLAB_NODE_LEDGER_ROOT = Join-Path $script:CollabStateDir "local-topic-ledger\\$Agent"');
+    expect(ledger).toContain("'topics'");
+    expect(ledger).toContain("'_chat.jsonl'");
+    expect(ledger).toContain('legacyPath');
+  });
+
 });

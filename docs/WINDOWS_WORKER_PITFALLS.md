@@ -297,3 +297,192 @@ profile) or needs stored credentials — which leaks the user's password.
 **Don't.** If "开机自起" really means pre-logon, the correct fix is a
 dedicated service account with its own profile, not a tweak to the existing
 trigger.
+
+---
+
+## 13. One journal per **agent**, and one journal file per **topic**
+
+The local observed-topic journal used to be one JSONL file per machine and one
+file for everything. Both halves were wrong on a multi-agent box:
+
+- the shared file made every agent append its own copy of the same group
+  message, so the journal grew N-fold on an N-agent node, and
+- one ever-growing file mixed every topic together.
+
+Now:
+
+```
+<repo>\.runtime\local-topic-ledger\<agentId>\collaboration\topics\<chatId>\<threadId>.jsonl
+<repo>\.runtime\local-topic-ledger\<agentId>\collaboration\topics\<chatId>\_chat.jsonl
+```
+
+`run-agent.ps1` sets `LARK_COLLAB_NODE_LEDGER_ROOT` to
+`.runtime\local-topic-ledger\$Agent` (per agent, despite the historical env
+name). The old single-file path is still **read** so an in-place upgrade keeps
+its history; nothing is written there any more.
+
+Upgrading an existing node:
+
+```powershell
+# stop the agents (per-agent tasks) before touching the journals
+Stop-ScheduledTask -TaskName SunFeishuBridge
+Stop-ScheduledTask -TaskName MoonFeishuBridge
+# move the old single-file journal content into per-topic files, then archive it
+# (write a tiny Node script that groups records by `scope` and appends each group
+#  to <newRoot>\collaboration\topics\<chatId>\<threadId>.jsonl, de-duplicated by
+#  record id, for every agent root)
+```
+
+Rule of thumb: **if a record has no `scope`, it cannot be migrated** — every
+record carries the scope it was observed in, and scopes are `chatId` or
+`chatId:threadId`.
+
+---
+
+## 14. A native CLI's stderr is fatal while `$ErrorActionPreference = 'Stop'`
+
+Symptom: a supervisor dies with exit code 1 exactly one step after logging
+"releasing existing bridge registration …", while the same script run by hand
+survives. `start`-side and `stop`-side scripts both set
+`$ErrorActionPreference = 'Stop'`, and in Windows PowerShell 5.1 **redirecting a
+native command's stderr turns it into a terminating error**:
+
+```powershell
+# FATAL when the CLI writes its "not found" message to stderr:
+& node $cli kill $id *> $null
+
+# Safe: unredirected stderr is plain console text, and the exit code is readable
+& node $cli kill 1
+if ($LASTEXITCODE -ne 0) { Write-Warning "…not registered; falling back" }
+```
+
+`lark-channel-bridge kill <id>` writes `✗ 没找到匹配的 bot:<id>` to stderr and
+exits 1 whenever the id is not in the registry — a normal, expected outcome
+after a hard kill. Two rules follow:
+
+1. Never re-implement "clear the bridge registration"; call
+   `Pilot.Common.ps1::Stop-CollabRegisteredBridge`, which resolves the agent's
+   own `LARK_CHANNEL_HOME` first and treats a missing registration as a
+   warning.
+2. If you must run a native command under `$ErrorActionPreference = 'Stop'`,
+   do not redirect its stderr, or lower the preference around that one call.
+
+Related: `lark-channel-bridge kill` only releases the registration it can
+resolve. The registration lives under `LARK_CHANNEL_HOME` (default
+`~/.lark-channel`), **not** under the agent's own home, so an agent with its own
+home must export it before calling the CLI, or the CLI inspects a different
+agent's registry and reports "not found" for an id that is right there.
+
+---
+
+## 15. Feishu scope `im:message.group_msg` is what makes a bot *see* group traffic
+
+Two independent switches, easy to confuse:
+
+| Setting | Where | Effect |
+| --- | --- | --- |
+| `im:message.group_msg` scope | Feishu app (授权范围) | the bot **receives** every group message, @-mentioned or not |
+| `requireMentionInGroup: true` | bridge profile | the bot **answers** only messages that @-mention it |
+
+Without the scope, a non-@ group message never reaches the bridge at all, and
+`+chat-messages-list` fails with Feishu `230027` (insufficient permission) or
+`99991672`. Add it incrementally, without touching the app secret:
+
+```javascript
+// .runtime/grant-group-msg-scope.mjs — writes scope-grant.json + a QR PNG
+import { registerApp } from '@larksuite/channel';
+await registerApp({
+  source: 'incremental',
+  appId: '<cli_…>',
+  addons: { scopes: { tenant: ['im:message.group_msg'] } },
+});
+```
+
+Then have the app owner scan the QR. Deleting the app secret from the payload
+matters: passing `appSecret` makes the flow fail with "应用不存在".
+
+Keep `requireMentionInGroup: true` when you want "see everything, answer only
+when @-mentioned" — with the scope granted, non-@ messages are still journaled
+(the bridge records them before the mention policy is applied).
+
+---
+
+## 16. `intake/skip-not-allowed-user` with `reason: denied-chat` is misleading
+
+A `@bot` message in a group the bot is a member of can be dropped while the log
+reads like a *user* problem:
+
+```json
+{"event":"intake/skip-not-allowed-user","reason":"denied-chat","chatId":"oc_…"}
+```
+
+It means the **chat** is not in that profile's `access.allowedChats` (and the
+sender is neither the app owner nor an admin) — not that the human is
+unauthorized. Two sanctioned ways to open a group:
+
+1. In-group onboarding: the app owner or an admin @-mentions the bot with
+   `/invite group` (or `/invite all group`).
+2. Add the `chat_id` to `access.allowedChats` in that profile's `config.json`
+   and restart **that** agent.
+
+Never copy another agent's `allowedChats` wholesale — a chat that belongs to one
+agent (a Claude-only group, for instance) must stay out of the other's list.
+Add exactly the id you verified.
+
+---
+
+## 17. Hub-less worker families: nothing shared but the Hub
+
+When one machine hosts several agents, treat them as if they were on separate
+machines. Per agent, all of these must be separate:
+
+| Thing | Per agent value |
+| --- | --- |
+| Manifest | `.runtime\worker-<id>.local.json` |
+| Task | `Install-CollabPilotStartup.ps1 … -Agent <id> -TaskName <Name>` |
+| Supervisor | `Run-CollabAgentSupervisor.ps1 -Agent <id>` (event-driven, idle when healthy) |
+| Credential | User-level `LARK_COLLAB_<ID>_TOKEN` + `credentialEnv` pointer |
+| Profile root | `LARK_CHANNEL_HOME` when they do not share one |
+| Journal | `.runtime\local-topic-ledger\<id>\` |
+
+Only the Hub URL/tenant key is shared. Anything that stops, restarts or
+reconfigures a sibling agent must stay scoped to that agent: `-StartNow` on a
+per-agent task stops the agent, not the pilot, and an agent's crash-loop must
+never take its neighbour down. Verify per agent with
+`Status-CollabPilot.ps1 -Agent <id>` and `/v1/agents` (see #9).
+
+---
+
+## 18. `@deepseek-ai/dsh` from npm never runs when imported by the bridge
+
+The DeepSeek Harness engine entry (`node_modules/@deepseek-ai/dsh/lib/bin.js`)
+is ESM ending in:
+
+```javascript
+if (import.meta.main) await runCli();
+```
+
+`import.meta.main` is only true when *that file* is the process entry. The
+bridge adapter bootstraps engines with `await import(entry)`, so the import
+succeeds, returns immediately and the run exits 0 with no output — the bot
+silently answers nothing.
+
+Fix: point the profile at a shim that calls the exported CLI function:
+
+```javascript
+// ~/.lark-channel-<agent>/dsh-entry.mjs
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const mod = await import(pathToFileURL(join(dirname(process.execPath), 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')).href);
+await (mod.runCli ?? mod.default?.runCli)();
+```
+
+Then set `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` to that file in the agent's
+`launch.environment`, and sanity-check it:
+
+```powershell
+node C:\Users\<you>\.lark-channel-<agent>\dsh-entry.mjs --version   # must print a version
+```
+
+An engine that exits 0 with no output is this pitfall, not a Feishu problem.

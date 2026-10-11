@@ -279,3 +279,176 @@ console.log(JSON.stringify(out, null, 2));
 要么必须存凭据——这就**泄露了用户密码**。**别这么干**。如果
 "开机自起"真的要求登录前启动，正确做法是给 bot 单独开一个 service
 account 加自己的 profile，不要去改触发器类型。
+
+---
+
+## 13. 账本要 **每个 agent 一份**，还要 **每个话题一个文件**
+
+本地"观察到的群消息"账本以前是**每台机器一个文件**、而且所有话题挤在一个文件
+里。在一台跑多 agent 的机器上这两半都是错的：
+
+- 共用文件让每个 agent 都把同一条群消息各追加一份，N 个 agent 就长 N 倍；
+- 单个无限增长的文件把所有话题混在一起。
+
+现在是：
+
+```
+<repo>\.runtime\local-topic-ledger\<agentId>\collaboration\topics\<chatId>\<threadId>.jsonl
+<repo>\.runtime\local-topic-ledger\<agentId>\collaboration\topics\<chatId>\_chat.jsonl
+```
+
+`run-agent.ps1` 把 `LARK_COLLAB_NODE_LEDGER_ROOT` 指向
+`.runtime\local-topic-ledger\$Agent`（环境变量名是历史遗留，语义已经是 per
+agent）。旧的单文件路径仍然**会被读取**，所以原地升级不丢历史；新记录不再写进去。
+
+升级已有节点：
+
+```powershell
+# 先停掉 agent 的 task 再动账本
+Stop-ScheduledTask -TaskName SunFeishuBridge
+Stop-ScheduledTask -TaskName MoonFeishuBridge
+# 用一小段 Node 脚本按记录的 `scope` 分组，按 id 去重后分别写进
+# <新根目录>\collaboration\topics\<chatId>\<threadId>.jsonl，每个 agent 根目录各做一遍
+```
+
+判断标准：**没有 `scope` 的记录无法迁移**。每条记录都带自己被抓到的 scope，
+scope 就是 `chatId` 或 `chatId:threadId`。
+
+---
+
+## 14. `$ErrorActionPreference = 'Stop'` 下，原生 CLI 的 stderr 会直接杀死脚本
+
+症状：supervisor 退出码 1，日志停在 "releasing existing bridge registration …"
+这一行之后，而同一个脚本手工跑却没事。start / stop 两侧脚本都设了
+`$ErrorActionPreference = 'Stop'`，而 Windows PowerShell 5.1 里**把原生命令的
+stderr 重定向会把它变成 terminating error**：
+
+```powershell
+# CLI 把"没找到"写到 stderr 时，这行会致命：
+& node $cli kill $id *> $null
+
+# 安全：不重定向时 stderr 只是屏幕文本，退出码也读得到
+& node $cli kill 1
+if ($LASTEXITCODE -ne 0) { Write-Warning "…未登记，走后备路径" }
+```
+
+`lark-channel-bridge kill <id>` 在 registry 里找不到该 id 时会往 stderr 打
+`✗ 没找到匹配的 bot:<id>` 并退出 1 —— 硬杀过 bridge 之后这是**正常**结果。两条
+规则：
+
+1. 不要自己重写"清 bridge 登记"，直接调
+   `Pilot.Common.ps1::Stop-CollabRegisteredBridge`：它会先切到该 agent 自己的
+   `LARK_CHANNEL_HOME`，并且把"登记不存在"当 warning。
+2. 非要在 `$ErrorActionPreference = 'Stop'` 下跑原生命令，就不要重定向它的
+   stderr，或者单独把这一次调用的 preference 降下来。
+
+相关：`lark-channel-bridge kill` 只能清掉它解析得到的 registry。registry 在
+`LARK_CHANNEL_HOME`（默认 `~/.lark-channel`）下面，**不在** agent 自己的 home
+下；所以有独立 home 的 agent 必须先导出这个变量再调 CLI，否则 CLI 去看的是另一个
+agent 的 registry，然后对一个明明存在的 id 报 "not found"。
+
+---
+
+## 15. 飞书权限 `im:message.group_msg` 才决定 bot 能不能**看到**群消息
+
+两个独立开关，很容易混：
+
+| 开关 | 位置 | 作用 |
+| --- | --- | --- |
+| `im:message.group_msg` 权限 | 飞书应用（授权范围） | bot **收得到**所有群消息（不论是否 @它） |
+| `requireMentionInGroup: true` | bridge profile | bot **只回复** @了它的消息 |
+
+没有这个权限，非 @ 的群消息根本到不了 bridge，`+chat-messages-list` 也会报飞书
+`230027`（权限不足）或 `99991672`。用增量授权补，不用碰 app secret：
+
+```javascript
+// .runtime/grant-group-msg-scope.mjs —— 生成 scope-grant.json + 一张二维码 PNG
+import { registerApp } from '@larksuite/channel';
+await registerApp({
+  source: 'incremental',
+  appId: '<cli_…>',
+  addons: { scopes: { tenant: ['im:message.group_msg'] } },
+});
+```
+
+然后让应用 owner 扫码。**不要在 payload 里带 `appSecret`**：带了会失败并报
+"应用不存在"。
+
+想保持"全都看得到、只有 @ 才回复"，就保留 `requireMentionInGroup: true`——权限
+补齐后，非 @ 消息仍然会进账本（bridge 在 mention 策略之前就记录）。
+
+---
+
+## 16. `intake/skip-not-allowed-user` + `reason: denied-chat` 是误导性日志
+
+群里一条 @bot 的消息可能被丢掉，而日志看起来像**用户**的问题：
+
+```json
+{"event":"intake/skip-not-allowed-user","reason":"denied-chat","chatId":"oc_…"}
+```
+
+真实含义是：这个**群**不在该 profile 的 `access.allowedChats` 里（同时发送者既不是
+应用 owner 也不是管理员）——不是这个人没权限。两种正规开群方式：
+
+1. 群内自助：应用 owner 或管理员 @bot 发 `/invite group`（或 `/invite all group`）。
+2. 把 `chat_id` 加进该 profile `config.json` 的 `access.allowedChats`，然后重启
+   **那个** agent。
+
+不要整体拷贝另一个 agent 的 `allowedChats`——属于某个 agent 的群（比如只给 Claude
+的群）必须留在另一个 agent 的白名单之外。只加你验证过的那一个 id。
+
+---
+
+## 17. 无 hub 机器上的 worker 群：除了 Hub 什么都不共享
+
+一台机器跑多个 agent 时，把它们当成在不同机器上。每个 agent 的这些东西都必须
+独立：
+
+| 项目 | 每 agent 的值 |
+| --- | --- |
+| manifest | `.runtime\worker-<id>.local.json` |
+| task | `Install-CollabPilotStartup.ps1 … -Agent <id> -TaskName <Name>` |
+| supervisor | `Run-CollabAgentSupervisor.ps1 -Agent <id>`（事件驱动，健康时完全空闲） |
+| 凭据 | User 级 `LARK_COLLAB_<ID>_TOKEN` + manifest 里的 `credentialEnv` |
+| profile 根目录 | 不共用一个 profile 时各自的 `LARK_CHANNEL_HOME` |
+| 账本 | `.runtime\local-topic-ledger\<id>\` |
+
+只有 Hub 的 URL / tenant key 是共享的。任何"停掉/重启/改配置"都必须限定在自己
+这个 agent：per-agent task 的 `-StartNow` 停的是该 agent 而不是整个 pilot，一个
+agent 的崩溃循环绝不能把邻居带下水。逐个 agent 用
+`Status-CollabPilot.ps1 -Agent <id>` 和 `/v1/agents`（见 §9）核对。
+
+---
+
+## 18. npm 装的 `@deepseek-ai/dsh` 被 bridge import 时根本不会跑
+
+DeepSeek Harness 引擎入口（`node_modules/@deepseek-ai/dsh/lib/bin.js`）是 ESM，
+结尾是：
+
+```javascript
+if (import.meta.main) await runCli();
+```
+
+`import.meta.main` 只在**该文件本身**是进程入口时为真。bridge adapter 用
+`await import(entry)` 引导引擎，于是 import 成功、立刻返回、进程以 0 退出且没有
+任何输出——bot 就静默什么也不回。
+
+修法：profile 指向一个显式调用导出函数的 shim：
+
+```javascript
+// ~/.lark-channel-<agent>/dsh-entry.mjs
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const mod = await import(pathToFileURL(join(dirname(process.execPath), 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')).href);
+await (mod.runCli ?? mod.default?.runCli)();
+```
+
+然后在 agent 的 `launch.environment` 里把 `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY`
+指向这个文件，并验证：
+
+```powershell
+node C:\Users\<you>\.lark-channel-<agent>\dsh-entry.mjs --version   # 必须打印版本号
+```
+
+"引擎退出码 0 但没有任何输出"就是这个问题，不是飞书的问题。

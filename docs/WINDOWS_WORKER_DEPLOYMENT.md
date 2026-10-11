@@ -79,11 +79,12 @@ app-secret bind on this box.
 ## Phase 4 — Worker manifest
 
 Create `.runtime\worker-<AGENT_ID>.local.json`. The repo already ignores
-`.runtime/`, so this file is per-machine:
+`.runtime/`, so this file is **per agent** (one manifest per agent, never copied
+between machines):
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "role": "worker",
   "nodeId": "zpomenmax",
   "hub": {
@@ -226,6 +227,8 @@ If it does not reply, see
 
 ## Phase 8 — Auto-start at logon
 
+Whole-pilot task (single agent, or you want one task that repairs Hub + agents):
+
 ```powershell
 .\scripts\collab-pilot\Install-CollabPilotStartup.ps1 `
   -Config .\.runtime\worker-sun.local.json `
@@ -240,6 +243,29 @@ This registers the Task Scheduler entry `Lark Collaboration Pilot` with:
 - Settings: `StartWhenAvailable`, restart on failure ×3 / 1min, no battery
   stop.
 
+Per-agent task (recommended when one machine hosts several agents):
+
+```powershell
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 `
+  -Config .\.runtime\worker-sun.local.json `
+  -Agent sun -TaskName SunFeishuBridge `
+  -StartNow
+```
+
+Same triggers and settings, but the action becomes
+`Run-CollabAgentSupervisor.ps1 -Agent sun`, which:
+
+- is **event-driven**: it blocks in `Wait-Process` while the bridge is healthy
+  (no 15s wake-ups), and only runs to wait for the remote Hub, wait for a
+  missing credential, or restart the agent after its launcher exits;
+- clears **both** registrations for that agent before every start
+  (`Stop-CollabComponent` for the tracked launcher tree,
+  `Stop-CollabRegisteredBridge` for the bridge's own registry resolved under
+  that agent's `LARK_CHANNEL_HOME`), so a hard-killed bridge can never leave a
+  stale registration that blocks the next start;
+- touches only its own agent — `-StartNow` stops that agent, not the whole
+  pilot.
+
 It also starts it immediately via `-StartNow`. Verify:
 
 ```powershell
@@ -253,6 +279,27 @@ To uninstall:
 ```powershell
 .\scripts\collab-pilot\Uninstall-CollabPilotStartup.ps1
 ```
+
+---
+
+## Where the local journal lives
+
+Every bridge keeps an append-only journal of what *it* observed (group
+messages, downloaded attachments, its own bot results):
+
+```
+<repo>\.runtime\local-topic-ledger\<agentId>\collaboration\topics\<chatId>\<threadId>.jsonl
+<repo>\.runtime\local-topic-ledger\<agentId>\collaboration\topics\<chatId>\_chat.jsonl
+```
+
+- **one root per agent** — two agents on one machine behave exactly like two
+  machines; they never append to the same file;
+- **one file per topic** — a new topic starts a new file instead of growing a
+  single ever-longer ledger (a chat message outside any topic lands in
+  `_chat.jsonl`);
+- the pre-`topics/` layout (`<root>\collaboration\local-topic-ledger.jsonl`) is
+  still read, so an in-place upgrade keeps its history; new records are never
+  written there.
 
 ---
 
@@ -273,10 +320,21 @@ To uninstall:
 
 ## Multi-agent on one machine
 
-Each agent on the same machine gets its own `worker-<id>.local.json`. Run
-`Install-CollabPilotStartup.ps1` once per agent, **passing `-Config …`** to
-each call so each task names a different config. The scheduled task name
-defaults to `Lark Collaboration Pilot`; pass `-TaskName …` to disambiguate.
+Each agent on the same machine gets its own `worker-<id>.local.json`, its own
+scheduled task (`-Agent <id>`), its own User-level env var
+(`LARK_COLLAB_<id>_TOKEN`), its own `credentialEnv` pointer, its own
+`LARK_CHANNEL_HOME` (when they do not share a profile root) and its own journal
+root under `.runtime\local-topic-ledger\<id>\`.
 
-Each agent needs its own User-level env var (`LARK_COLLAB_<id>_TOKEN`) and
-its own `credentialEnv` pointer in the manifest.
+Treat the agents as if they were on separate machines: nothing about their
+runtime state is shared, only the Hub is. A sibling agent going down, being
+stopped, or being reconfigured must not affect this one.
+
+```powershell
+# per-agent tasks, each one independent
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -Config .\.runtime\worker-sun.local.json  -Agent sun  -TaskName SunFeishuBridge  -StartNow
+.\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -Config .\.runtime\worker-moon.local.json -Agent moon -TaskName MoonFeishuBridge -StartNow
+```
+
+`Install-CollabPilotStartup.ps1 -Agent …` names the task
+`Lark Collaboration Agent <id>` when you do not pass `-TaskName`.

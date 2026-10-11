@@ -1,6 +1,9 @@
 param(
   [string]$Config,
-  [string]$TaskName = 'Lark Collaboration Pilot',
+  [string]$TaskName,
+  # One task per agent: -Agent switches the action from the whole-pilot polling
+  # supervisor to the per-agent event-driven one (see Run-CollabAgentSupervisor.ps1).
+  [string]$Agent,
   [switch]$StartNow
 )
 
@@ -8,8 +11,15 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $configPath = if ($Config) { [IO.Path]::GetFullPath($Config) } else { Join-Path $repoRoot '.runtime\pilot.local.json' }
 if (!(Test-Path -LiteralPath $configPath)) { throw "Pilot config not found: $configPath" }
+if (!$TaskName) {
+  $TaskName = if ($Agent) { "Lark Collaboration Agent $Agent" } else { 'Lark Collaboration Pilot' }
+}
 
-$supervisor = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Run-CollabPilotSupervisor.ps1'))
+$supervisor = if ($Agent) {
+  [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Run-CollabAgentSupervisor.ps1'))
+} else {
+  [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Run-CollabPilotSupervisor.ps1'))
+}
 $existingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 $wasRunning = $existingTask -and $existingTask.State -eq 'Running'
 if ($wasRunning) {
@@ -23,6 +33,7 @@ if ($wasRunning) {
   }
 }
 $argument = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$supervisor`" -Config `"$configPath`""
+if ($Agent) { $argument += " -Agent `"$Agent`"" }
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argument -WorkingDirectory $repoRoot
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
@@ -39,7 +50,10 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Pr
 Write-Output "Installed Windows startup task: $TaskName"
 
 if ($StartNow) {
-  & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1')
+  # Only stop what this task owns: a per-agent task must not take the whole pilot
+  # (or a sibling agent on the same box) down with it.
+  if ($Agent) { & (Join-Path $PSScriptRoot 'Stop-CollabAgent.ps1') -Agent $Agent -Config $configPath }
+  else { & (Join-Path $PSScriptRoot 'Stop-CollabPilot.ps1') }
   Start-ScheduledTask -TaskName $TaskName
   Write-Output "Started Windows startup task: $TaskName"
 } elseif ($wasRunning) {
