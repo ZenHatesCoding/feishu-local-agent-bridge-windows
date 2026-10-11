@@ -15,7 +15,11 @@ $env:LARK_COLLAB_NODE_ID = if ($pilot.nodeId) { [string]$pilot.nodeId } else { [
 $env:LARK_COLLAB_INSTANCE_ID = "$($env:LARK_COLLAB_NODE_ID):$Agent"
 $env:LARK_COLLAB_EVENT_SOURCE = 'distributed'
 $env:LARK_COLLAB_ARTIFACT_ROOT = Join-Path $script:CollabStateDir 'artifacts'
-$env:LARK_COLLAB_NODE_LEDGER_ROOT = Join-Path $script:CollabStateDir 'local-topic-ledger'
+# One journal per AGENT, not per machine: each worker is an independent unit
+# (two agents on the same box must behave exactly like two separate machines).
+# Sharing one file made every agent append its own copy of the same group
+# message, so the journal grew N-fold on an N-worker node.
+$env:LARK_COLLAB_NODE_LEDGER_ROOT = Join-Path $script:CollabStateDir "local-topic-ledger\$Agent"
 $env:LARK_COLLAB_COMMAND_DIR = $commandDir
 Export-CollabRealLarkCliJs -Pilot $pilot -LaunchFilePath $agentConfig.launch.filePath
 

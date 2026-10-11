@@ -198,8 +198,8 @@ World 先向 Hub 提交 handoff
 
 - **磁盘**：JSONL 账本和 artifact 快照目前没有自动归档或保留期限；
 - **Hub 内存**：启动时会重放全部账本，运行时也保留任务、dispatch 和幂等索引；
-- **Bot token**：Hub 提示词只带当前 dispatch，不带话题全文。Bot 需要时才查询本机
-  `chatId:threadId` 账本，且结果数量有上限。
+- **Bot token**：Hub 提示词只带当前 dispatch，不带话题全文。Bot 需要时才查询**自己
+  agent 的**账本（每个 `chatId:threadId` scope 一个文件），且结果数量有上限。
 
 标准 bridge 的群聊/话题轮次会启动新的模型工作，因此不会隐式恢复不断增长的 provider
 session。Hermes 仍自行管理原生 session；它的 provider 侧保留与 Hub 和本机账本相互独立。

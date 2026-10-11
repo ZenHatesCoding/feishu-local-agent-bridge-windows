@@ -116,11 +116,16 @@ that run, so Codex, Claude, Antigravity, DeepSeek Harness and
 Hermes cannot produce duplicate owner wake-ups merely because their prompting
 or model behavior differs.
 
-Each computer keeps an append-only local topic ledger containing only messages,
-downloaded attachments and Bot results that its own bridges actually observed.
-Bots on that computer can query it on demand. It is never copied to another
-computer and local paths are never treated as portable. Hub prompts carry the
-current dispatch and a local query command instead of a growing transcript.
+Each agent keeps its own append-only local journal of what its own bridge
+actually observed: messages, downloaded attachments and Bot results, **one file
+per topic** (`<agentRoot>/collaboration/topics/<chatId>/<threadId>.jsonl`, or
+`_chat.jsonl` for a chat message outside any topic). The agent can query it on
+demand. Two agents on the same computer keep separate journals and never append
+to a shared file, so N agents on one node behave exactly like N machines; a new
+topic starts a new file instead of growing one ever-longer ledger. The journal is
+never copied to another computer and local paths are never treated as portable.
+Hub prompts carry the current dispatch and a local query command instead of a
+growing transcript.
 
 A collaboration marker is executable only when its opening and closing tags
 are both present. For a terminal unclosed marker, the Hub records one
@@ -158,7 +163,7 @@ Before the original user message, an authorized bridge injects:
 ```text
 collaboration_context
   contract: taskId, currentOwner, yourDispatch, rules
-  localJournal: this node's topic scope and the local-context query command
+  localJournal: this agent's topic scope and the local-context query command
 
 bridge_context
   chatId, threadId, sender, mentions, message IDs
@@ -172,13 +177,15 @@ steps, not private reasoning. Its final visible response is recorded both as a
 Hub task event and in the local node journal.
 
 The Hub ledger remains the complete append-only control-plane fact source, but
-it is no longer replayed into Bot prompts. Each node writes a separate JSONL
-journal under its own runtime directory. Its key is `chatId:threadId` for a
-Feishu topic, so two topics in one group cannot read one another's records.
-An ordinary non-topic group has the group ID as its scope because Feishu gives
-it no finer visible boundary. The journal contains only messages that node
-received, files that node downloaded, and that node's Bot results. It is never
-synced to another node; a local path is never a cross-node Artifact locator.
+it is no longer replayed into Bot prompts. Each agent writes a separate JSONL
+journal under its own runtime directory, one file per topic. Its key is
+`chatId:threadId` for a Feishu topic, so two topics in one group cannot read one
+another's records. An ordinary non-topic group has the group ID as its scope
+because Feishu gives it no finer visible boundary. The journal contains only
+messages that agent received, files that agent downloaded, and that agent's Bot
+results. It is never synced to another computer; a local path is never a
+cross-machine Artifact locator. Agents sharing one computer keep separate
+journals, exactly as if they ran on separate computers.
 
 On demand, a Bot uses `lark-channel-bridge local-context read` or `search`
 with its current scope. Queries are scope-filtered and return at most 50

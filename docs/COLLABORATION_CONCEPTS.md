@@ -175,8 +175,8 @@ The current implementation grows in three different ways:
 - **disk:** JSONL and artifact snapshots have no automatic retention yet;
 - **Hub memory:** startup replays the whole ledger and hot indexes remain loaded;
 - **Bot tokens:** Hub prompts contain the current dispatch rather than a topic
-  transcript. A Bot can query only this node's `chatId:threadId` journal when
-  needed, with a bounded result count.
+  transcript. A Bot can query only its own agent journal (one file per
+  `chatId:threadId` scope) when needed, with a bounded result count.
 
 Standard group/topic bridges start fresh model work, so they do not implicitly
 resume an ever-growing provider session. Hermes retains ownership of its native

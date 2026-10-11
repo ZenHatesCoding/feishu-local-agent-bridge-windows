@@ -156,8 +156,12 @@ Bot 只返回自己的结论和 Artifact。Hub 原子记录该 `return` 后，�
 会在这次咨询中忽略它。这样 Codex、Claude、Antigravity、DeepSeek
 Harness 和 Hermes 不会因为提示词或模型习惯不同而重复回唤负责人。
 
-每台电脑维护一份追加式本地话题账本，只记录本机 bridge 实际收到的消息、已下载附件和
-Bot 结果，供本机 Bot 按需查询。它不会复制到另一台电脑，也不会把本机路径当成可跨机
+每个 agent 维护自己的追加式本地账本，只记录**它自己的** bridge 实际收到的消息、已下载
+附件和 Bot 结果，并且**每个话题一个文件**
+（`<agentRoot>/collaboration/topics/<chatId>/<threadId>.jsonl`；不在话题里的聊天消息进
+`_chat.jsonl`），供本 agent 按需查询。同一台电脑上的多个 agent 各写各的账本，绝不追加到
+同一个文件——所以一台机器上 N 个 agent 的表现和 N 台机器完全一致；新话题开新文件，
+而不是往一个越来越长的账本里追加。账本不会复制到另一台电脑，也不会把本机路径当成可跨机
 位置。Hub 提示词只带当前 dispatch 和本地查询命令，不再自动塞入不断增长的历史。
 
 协作标记只有开始和结束标签都存在时才可执行。若最终回答中出现未闭合标记，Hub 会
@@ -236,7 +240,7 @@ collaboration_context
     currentOwner
     yourDispatch: reason, objective, hop（当前因果链深度）, status
     rules
-  localJournal: 本机话题 scope 与 local-context 查询命令
+  localJournal: 本 agent 的话题 scope 与 local-context 查询命令
 
 bridge_context
   chatId, threadId, sender, mentions, messageIds...
@@ -249,18 +253,18 @@ bridge_context
 - `taskId` 告诉 Agent 正在处理哪个持续任务；
 - `currentOwner` 消除“现在到底谁负责”的歧义；
 - `yourDispatch` 是本轮唯一目标，不让历史淹没当前指令；
-- `localJournal` 只提供当前话题的本机按需查询入口，不自动注入历史；
+- `localJournal` 只提供当前话题的本 agent 按需查询入口，不自动注入历史；
 - `rules` 要求先做结构化动作，再真实 `@`，并禁止泄露思维链和秘密；
 - 用户原话保持原样放在最后，模型仍能理解自然语言意图。
 
 Agent 被要求输出结论、证据、产物路径和下一步，而不是输出私有推理过程。最终可见答复
 会同时记录为 Hub 任务事件和本机节点账本记录，供后续按需使用。
 
-Hub 账本仍是完整、追加式的控制面事实来源，但不再被逐轮重放到 Bot 提示词。每台电脑
-在自己的运行目录写独立 JSONL 账本：飞书话题以 `chatId:threadId` 为键，因此同一个群的
-两个话题不能互相读取。普通非话题群只能以群 ID 为键，因为飞书没有提供更细的可见边界。
-账本只含该机实际收到的消息、该机已经下载的附件和该机 Bot 的结果；它不会同步给另一台
-电脑，本机路径也绝不是跨机器 Artifact locator。
+Hub 账本仍是完整、追加式的控制面事实来源，但不再被逐轮重放到 Bot 提示词。每个 agent
+在自己的运行目录写独立 JSONL 账本（每个话题一个文件）：飞书话题以 `chatId:threadId` 为
+键，因此同一个群的两个话题不能互相读取。普通非话题群只能以群 ID 为键，因为飞书没有提供
+更细的可见边界。账本只含该 agent 实际收到的消息、它已经下载的附件和它自己的 Bot 结果；
+它不会同步给另一台电脑，本机路径也绝不是跨机器 Artifact locator。
 
 Bot 需要旧信息时，使用当前 scope 执行 `lark-channel-bridge local-context read` 或
 `search`；查询会先按 scope 过滤，最多返回 50 条。标准 bridge 的普通群和话题轮次会
