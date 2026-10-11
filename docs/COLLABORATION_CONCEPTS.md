@@ -4,10 +4,9 @@
 [Design](./DESIGN.md) | [Distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) |
 [Windows operations](./WINDOWS_OPERATIONS.md) | [Networking](./NETWORKING.md)
 
-This document explains Bot, Agent, Bridge, Hub, Pilot, dispatch, ledger,
-context and artifact in plain language. See [Design](./DESIGN.md) for protocol
-invariants and [Windows operations](./WINDOWS_OPERATIONS.md) for commands that
-work today.
+Bot, Agent, Bridge, Hub, Pilot, dispatch, ledger, context and artifact, explained
+in plain language. Protocol invariants are in [Design](./DESIGN.md); the commands
+that work today are in [Windows operations](./WINDOWS_OPERATIONS.md).
 
 ## Think Of The System As A Company
 
@@ -21,7 +20,7 @@ work today.
 | Pilot scripts | The operations manager | Starts/stops processes, injects config and keeps PIDs/logs |
 | Ledger | The project journal | Records messages, ownership, work orders, results and files in order |
 | Dispatch | A formal work order | Authorizes one Agent to perform one objective |
-| Context | A handoff packet | Current objective, accepted conclusions and visible history |
+| Context | A handoff packet | Current objective, dispatch contract, rules and a local query entry point |
 | Artifact | A deliverable registration card | What it is, task ownership, location, integrity and retrieval |
 
 ## The Hub Is Not An LLM
@@ -31,18 +30,25 @@ It is a small TypeScript server with three parts:
 
 1. HTTP APIs used by Bridges to submit events, receive work and read context;
 2. deterministic rules and state machines that check ownership and visibility;
-3. an append-only journal at `.runtime\collaboration.jsonl`.
+3. an append-only JSONL ledger, stored at the `ledgerPath` the Hub config names
+   (the example config uses `../data/collaboration.jsonl` relative to the config
+   file, and the generated single-machine Pilot config keeps
+   `.runtime\collaboration.jsonl`).
 
 For `@World analyze this project`, the Hub does not understand “analyze.” It
-only sees a human message targeting World, assigns ownership and creates a
+only sees a human message targeting World, writes an owner lease and creates a
 dispatch. The model behind World performs the reasoning.
 
-Implementation entry points:
+Code entry points:
 
 - HTTP routes: [`src/collab/server.ts`](../src/collab/server.ts)
 - task rules and projections: [`src/collab/hub.ts`](../src/collab/hub.ts)
 - JSONL ledger: [`src/collab/ledger.ts`](../src/collab/ledger.ts)
 - context envelope: [`src/collab/context.ts`](../src/collab/context.ts)
+- local observed-topic journal:
+  [`src/collab/local-topic-ledger.ts`](../src/collab/local-topic-ledger.ts)
+- content-addressed artifact snapshot:
+  [`src/collab/artifact-store.ts`](../src/collab/artifact-store.ts)
 
 ## Dispatch Is A Formal Work Order
 
@@ -62,24 +68,34 @@ pending -> accepted -> completed
                     \-> failed
 ```
 
-Ordinary code checks that the dispatch belongs to the Agent, its causal parent
-is active and the current owner may transfer work.
+A dispatch has one reason: `mention` or `fanout` for a human assignment,
+`reply`, `handoff`, `ask` or `return` for an agent action. `reply` is the
+lightest: it wakes another participant for a single group turn and does not
+transfer ownership. Ordinary code checks that the dispatch belongs to the Agent,
+its causal parent is active and the current owner may transfer work.
 
 ## Ledger Is History; Context Is The Handoff Packet
 
 The ledger preserves ordered facts. Context is not an unfiltered copy. The Hub
 filters by task participation and visibility, then the Bridge builds a
-`collaboration_context` containing the current objective, accepted decisions,
-risks and artifacts. It excludes private reasoning, secrets and unrelated
-tasks. One Feishu topic maps to one task, so another topic is not automatically
-included in the prompt.
+`collaboration_context` containing the current objective, the dispatch contract,
+the agent roster, the fixed rules and a local-journal query entry point. It
+excludes private reasoning, secrets, the conversation transcript, the artifact
+catalog and unrelated tasks. One Feishu topic maps to one task, so another topic
+is not automatically included in the prompt.
 
-The current packet is bounded: the original requirement, up to eight recent
-semantic events and a compact catalog of up to twenty artifacts. Mechanical
-events are omitted. Catalog rows do not expose file paths or locators; full
-Artifact records are selected only when the current request refers to the file.
-An Agent resolves another exact item on demand with `collab-artifact.cmd
-resolve`, instead of opening every historical deliverable.
+The packet carries no running history. The model that takes over reads the
+current objective and the current triggering message, and asks for older local
+records explicitly with `lark-channel-bridge local-context read` or `search`
+when it needs them. An Agent resolves a specific deliverable on demand with
+`collab-artifact.cmd resolve` instead of opening every historical deliverable.
+
+Two stores, split by plane. The Hub ledger is the control-plane source of truth
+(tasks, ownership, dispatches, causality and idempotency, replayed when the Hub
+starts). The local journal is a data-plane observation log: each agent keeps its
+own, one file per topic, holding only the messages it received, the attachments
+it downloaded and its own results. The journal is never sent to the Hub, never
+copied to another computer, and cannot answer who owns a task.
 
 ## Artifact Is A Registration Card, Not A Required File Server
 
@@ -89,7 +105,7 @@ different providers:
 
 | Content | Preferred provider | Example locator |
 | --- | --- | --- |
-| Source, Markdown and configuration | GitHub / Git | repository + branch + commit + path |
+| Source, Markdown and configuration | GitHub / Git | repository + commit + optional path |
 | PPT, Word, Excel, PDF and images | Feishu message or Drive | messageId + fileKey, or Drive token |
 | Large generated data or archives | Optional object storage | bucket + objectKey |
 | Current single-machine runtime | Local snapshot | localPath + SHA-256 |
@@ -107,11 +123,13 @@ The current single-machine Pilot snapshots files under:
 ```
 
 The Hub records name, type, local cache path, size, SHA-256, and a provider
-locator. Feishu attachments use `messageId + fileKey`; committed code and
-Markdown can be registered with `collab-artifact.cmd register-git` using a
-repository, commit, and path. A `C:\...` path from computer A is meaningless on
-computer B, so locator is shared truth and local path is only a node cache.
-Automatic receiver-side retrieval remains roadmap work. See the
+locator. The Artifact ID is `artifact_` plus the first 24 hex characters of the
+SHA-256, so identical content is one record in one task. Feishu attachments use
+`messageId + fileKey`; committed code and Markdown can be registered with
+`collab-artifact.cmd register-git` using a repository, commit, and path. A
+`C:\...` path from computer A is meaningless on computer B, so locator is shared
+truth and local path is only a node cache. Automatic receiver-side retrieval is
+still roadmap work. See the
 [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 
 ## Pilot Is Operations, Not Reasoning
@@ -133,10 +151,10 @@ and an execution node while other computers are added later.
 
 ## Why A Logically Central Hub Still Exists
 
-Feishu is excellent for visible conversation, real mentions and ordinary file
-transport. GitHub is excellent for code versions. The system still needs one
-deterministic answer for current owner, valid dispatch, idempotency and context
-visibility. That is the Hub's role.
+Feishu handles visible conversation, real mentions and ordinary file transport.
+GitHub handles code versions. The system still needs one deterministic answer
+for current owner, valid dispatch, idempotency and context visibility, and that
+is the Hub's role.
 
 If every Bot derives those facts independently from its event stream, delivery
 order and retries can produce conflicting answers. The Hub makes them an
@@ -170,16 +188,20 @@ Only the LLM work step uses a model. Hub, Pilot and ledger are ordinary code.
 
 ## Growth Of Ledger, Memory And Tokens
 
-The current implementation grows in three different ways:
+On disk, the Hub JSONL ledger and the artifact snapshots have no automatic
+retention yet, and each agent's local journal also grows by topic. Hub memory
+grows as well: startup replays the whole ledger and hot indexes stay loaded. Bot
+tokens stay bounded, because Hub prompts contain the current dispatch and the
+fixed rules rather than a topic transcript. A Bot can query only its own journal
+(one file per topic under `<agentRoot>/collaboration/topics/<chatId>/`) when it
+needs older local records, with a bounded result count.
 
-- **disk:** JSONL and artifact snapshots have no automatic retention yet;
-- **Hub memory:** startup replays the whole ledger and hot indexes remain loaded;
-- **Bot tokens:** Hub prompts contain the current dispatch rather than a topic
-  transcript. A Bot can query only its own agent journal (one file per
-  `chatId:threadId` scope) when needed, with a bounded result count.
-
-Standard group/topic bridges start fresh model work, so they do not implicitly
-resume an ever-growing provider session. Hermes retains ownership of its native
-session; its provider-side retention remains independent of the Hub and local
-journal. Retention, native-session compaction and archival of cold completed
-tasks remain roadmap capabilities.
+The Hub ledger and the local journals grow independently: two agents on one
+computer keep two journals and never append to a shared file, so adding an agent
+does not multiply another agent's records. Neither store is copied to another
+computer. Standard group/topic bridges start fresh model work, so they do not
+implicitly resume an ever-growing provider session. Hermes retains ownership of
+its native session; its provider-side retention remains independent of the Hub
+and local journal. Retention, native-session compaction and archival of cold
+completed tasks remain roadmap work; the phases and their acceptance criteria
+are in the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
