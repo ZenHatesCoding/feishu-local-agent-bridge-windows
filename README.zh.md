@@ -68,6 +68,7 @@ Agent 获得经过授权的结论和持久共享文件，不会获得前一个 A
 | 每个 Agent 的 bridge 怎么配置？ | [Agent 桥接](./docs/AGENT_BRIDGES.zh-CN.md) | [Agent bridges](./docs/AGENT_BRIDGES.md) |
 | 项目必须守住什么用户体验？ | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) | [Product vision](./docs/PRODUCT_VISION.md) |
 | 上下文、路由、文件怎么工作？ | [设计原理](./docs/DESIGN.zh-CN.md) | [Design](./docs/DESIGN.md) |
+| 每个 Worker 如何保持有界话题记忆？ | [Worker 话题记忆](./docs/WORKER_MEMORY.zh-CN.md) | [Worker memory](./docs/WORKER_MEMORY.md) |
 | 协作群如何部署和运维？ | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) | [Windows operations](./docs/WINDOWS_OPERATIONS.md) |
 | 不同电脑怎么安全联网，Tailscale 是什么？ | [多电脑联网](./docs/NETWORKING.zh-CN.md) | [Networking](./docs/NETWORKING.md) |
 | 两个 Bot 能否运行在不同电脑？ | [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) |

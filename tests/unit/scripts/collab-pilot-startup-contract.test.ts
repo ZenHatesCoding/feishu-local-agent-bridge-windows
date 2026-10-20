@@ -68,6 +68,8 @@ describe('Collaboration Pilot Windows startup contract', () => {
     const status = readPilotScript('Status-CollabPilot.ps1');
 
     expect(common).toContain('function Test-CollabHermesGateway');
+    expect(common).toContain("'gateway_state.json'");
+    expect(common).toContain('$gatewayProcess.CommandLine');
     expect(start).toContain('started as a detached Hermes gateway');
     expect(start.indexOf('already running as a detached Hermes gateway')).toBeLessThan(
       start.indexOf('Stop-OriginalAgent $agentConfig'),

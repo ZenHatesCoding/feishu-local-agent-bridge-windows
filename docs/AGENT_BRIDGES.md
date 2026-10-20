@@ -203,3 +203,5 @@ DeepSeek example:
 
 Validate with `Test-CollabPilotConfig.ps1`; then start the group. See
 [Windows operations](./WINDOWS_OPERATIONS.md) for every field and rollback.
+
+Worker-local memory and host-specific skills: [operations](./WORKER_MEMORY.md).

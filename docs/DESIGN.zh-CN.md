@@ -257,18 +257,15 @@ bridge_context
 Agent 被要求输出结论、证据、产物路径和下一步，而不是输出私有推理过程。最终可见答复
 会同时记录为 Hub 任务事件和本机节点账本记录，供后续按需使用。
 
-Hub 账本仍是完整、追加式的控制面事实来源，但不再被逐轮重放到 Bot 提示词。每台电脑
-在自己的运行目录写独立 JSONL 账本：飞书话题以 `chatId:threadId` 为键，因此同一个群的
-两个话题不能互相读取。普通非话题群只能以群 ID 为键，因为飞书没有提供更细的可见边界。
-账本只含该机实际收到的消息、该机已经下载的附件和该机 Bot 的结果；它不会同步给另一台
-电脑，本机路径也绝不是跨机器 Artifact locator。
+Hub 账本仍是追加式控制面事实来源。每个 Worker 独立维护观察账本和长度受控的话题记忆。
+话题以 chatId:threadId 为边界，普通群以 chatId 为边界；只记录该 Worker 实际收到的消息、
+已下载附件和可见结果。记忆不会跨 Worker 同步，本机路径不是跨机器 Artifact locator。
 
-Bot 需要旧信息时，使用当前 scope 执行 `lark-channel-bridge local-context read` 或
-`search`；查询会先按 scope 过滤，最多返回 50 条。标准 bridge 的普通群和话题轮次会
-启动新的模型工作，而不是恢复先前 provider session，所以账本不会变成隐式、无限增长的
-提示词。Hermes 保留对自己原生 session 的控制；Hook 同样不会收到 Hub 历史重放，但模型
-提供方一侧的 session 保留不由本项目控制。账本保留策略、Hub 冷存储和 Hermes 原生 session
-压缩仍是路线图工作。
+Pilot 默认启用 SQLite 记忆。Worker 自动注入带来源的当前状态、摘要卡片和近期原文，
+进一步检索受累计预算限制。自动归纳保留来源；维护失败时阻止静默丢失历史。
+绑定命令校验实例、话题和运行边界，详见[Worker 记忆运维](./WORKER_MEMORY.zh-CN.md)。
+标准 bridge 每轮启动新的原生运行；Hermes 保留原生 session 的控制。Hub 冷存储和
+Hermes 原生 session 压缩仍是独立工作。
 
 ## 转发层级是因果链，不是话题寿命
 
@@ -375,3 +372,7 @@ Pilot 默认继续以 `all` 角色在同一台 Windows 电脑运行 Hub 和全�
 使用 provider locator 表达跨节点位置，Coordinator 等待窗口覆盖普通跨网乱序。
 接收端自动下载、原子 claim 和生产安全加固的状态见
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+
+Worker 现独立维护有界话题状态、带来源的摘要和完整本地记录。
+启用、预算、整理、来源回查与迁移见 [Worker 话题记忆](./WORKER_MEMORY.zh-CN.md)，
+部署验收合同见[详细设计](./plans/WORKER_TOPIC_MEMORY.zh-CN.md)。

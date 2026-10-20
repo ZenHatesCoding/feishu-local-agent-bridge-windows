@@ -67,14 +67,14 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
 
   run(opts: AgentRunOptions): AgentRun {
     if (!opts.cwd) throw new Error('cwd is required for DeepSeekHarnessAdapter.run');
-    const prompt = prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
+    const prompt = opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
     const child = spawnProcess(this.opts.binary, ['-e', STDIN_BOOTSTRAP, this.opts.entry], {
       cwd: opts.cwd,
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.opts.larkChannel),
         ...opts.env,
         LARK_CHANNEL_ANTIGRAVITY_BRIDGE: undefined,
-        LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: '1',
+        LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: opts.memoryMode ? undefined : '1',
         DSH_CWD: opts.cwd,
         PATH: harnessPath(process.env.PATH),
         HERMES_HOME: undefined,

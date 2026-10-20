@@ -218,3 +218,5 @@ DeepSeek 协作进程示例：
 
 配置完成后执行 `Test-CollabPilotConfig.ps1`，再启动整组。完整字段和回退命令见
 [Windows 部署与运维](./WINDOWS_OPERATIONS.zh-CN.md)。
+
+Worker 本地记忆和各宿主独立 Skill：[运维说明](./WORKER_MEMORY.zh-CN.md)。

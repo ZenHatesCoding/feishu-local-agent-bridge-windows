@@ -179,42 +179,15 @@ Artifact 是交付件登记协议，不是新的文件服务器。推荐默认�
 
 ## 上下文、内存和 Token 的扩展计划
 
-当前 JSONL 会持续追加，Hub 启动时重放全部记录，并把热记录、任务、dispatch 和
-幂等索引保留在内存。当前提示投影已经只保留原始需求、最近 8 条语义事件和 20 项
-Artifact 精简目录，完整 Artifact 记录按本轮引用选择。Agent 原生 session 仍可能
-独立保留更早对话。
+Hub 保留追加式协调账本和协议热索引。每个 Worker 独立拥有 SQLite 观察账本，
+每个话题自动生成长度受控的任务状态、分层摘要、近期原文和按预算检索的上下文。
+新观察到达、提示投影超限前和空闲期都会触发归纳。原始观察可以沿来源展开；
+维护失败会保留原文并报告记忆欠账，不会静默跳过历史。
 
-目标不是删除事实，而是把事实来源和提示投影分开：
-
-```text
-完整追加式原始账本
-  -> 带来源序号的阶段摘要检查点
-  -> 最近若干原始事件
-  -> 本次 dispatch 和活跃 Artifact
-  -> Agent prompt
-```
-
-建议增加：
-
-```json
-{
-  "context": {
-    "recentEventLimit": 20,
-    "maxPromptTokens": 30000,
-    "checkpointEveryEvents": 50
-  },
-  "retention": {
-    "archiveCompletedAfterDays": 30,
-    "retainArchivedDays": 90
-  }
-}
-```
-
-最近事件窗口和机械事件省略已经实现，但不会删除原始账本。下一步增加任务游标、
-token 指标、摘要检查点来源、原生 session 压缩和冷任务归档。语义摘要若由 Agent
-生成，必须记录生成者、覆盖序号和来源，允许按游标回读原事件。
-完成很久的任务可以从热内存卸载到归档；单 Hub MVP 可继续使用 JSONL，之后再迁移
-到 SQLite 或 PostgreSQL，用事务和唯一约束保护 dispatch 与幂等性。
+详见[Worker 记忆运维](./WORKER_MEMORY.zh-CN.md)和
+[设计合同](./plans/WORKER_TOPIC_MEMORY.zh-CN.md)。标准 bridge 每轮启动新的原生运行；
+Hermes 的原生 session 压缩仍由宿主管理。Hub 冷任务归档和数据库迁移仍属于独立路线图，
+Worker 使用 SQLite 不代表 Hub 已迁移。本机宿主验证不等于第二台电脑的记忆验收。
 
 ## 分阶段实施
 
