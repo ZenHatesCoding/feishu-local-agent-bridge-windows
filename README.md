@@ -74,6 +74,7 @@ Read [collaboration design](./docs/DESIGN.md) and the
 | How do I configure each agent bridge? | [Agent bridges](./docs/AGENT_BRIDGES.md) | [Agent 桥接](./docs/AGENT_BRIDGES.zh-CN.md) |
 | What experience must the project preserve? | [Product vision](./docs/PRODUCT_VISION.md) | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) |
 | How do context, routing and files work? | [Design](./docs/DESIGN.md) | [设计原理](./docs/DESIGN.zh-CN.md) |
+| How does each Worker retain bounded topic memory? | [Worker memory](./docs/WORKER_MEMORY.md) | [Worker 话题记忆](./docs/WORKER_MEMORY.zh-CN.md) |
 | How do I deploy and operate the group? | [Windows operations](./docs/WINDOWS_OPERATIONS.md) | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) |
 | How do computers connect securely, and what is Tailscale? | [Networking](./docs/NETWORKING.md) | [多电脑联网](./docs/NETWORKING.zh-CN.md) |
 | Can Bots run on different computers? | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) | [跨电脑路线图](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) |

@@ -175,23 +175,20 @@ it. The model is asked for conclusions, evidence, artifact paths and next
 steps, not private reasoning. Its final visible response is recorded both as a
 Hub task event and in the local node journal.
 
-The Hub ledger remains the complete append-only control-plane fact source, but
-it is no longer replayed into Bot prompts. Each node writes a separate JSONL
-journal under its own runtime directory. Its key is `chatId:threadId` for a
-Feishu topic, so two topics in one group cannot read one another's records.
-An ordinary non-topic group has the group ID as its scope because Feishu gives
-it no finer visible boundary. The journal contains only messages that node
-received, files that node downloaded, and that node's Bot results. It is never
-synced to another node; a local path is never a cross-node Artifact locator.
+The Hub ledger remains the append-only control-plane fact source. Each Worker
+owns a separate observation ledger and bounded topic-memory projection.
+Topics use chatId:threadId; ordinary groups use chatId. Only messages, downloaded
+attachments and visible results actually observed by that Worker are recorded.
+Memory is not synchronized between Workers, and local paths are not cross-node
+Artifact locators.
 
-On demand, a Bot uses `lark-channel-bridge local-context read` or `search`
-with its current scope. Queries are scope-filtered and return at most 50
-records. Normal group and topic runs in the standard bridges start fresh model
-work instead of resuming a previous provider session, so the journal is not an
-implicit ever-growing prompt. Hermes keeps ownership of its native session;
-the Hook also receives no Hub-history replay, but provider-side session
-retention is outside this project's control. Journal retention, Hub-ledger cold
-storage and Hermes-native session compaction remain roadmap work.
+Pilot enables SQLite memory by default. The Worker injects sourced current state,
+summary cards and recent originals, with cumulative limits for further retrieval.
+Automatic consolidation preserves sources and blocks silent history loss when
+maintenance fails. Bound commands enforce instance, topic and run fences.
+See [Worker memory operations](./WORKER_MEMORY.md).
+Standard bridges start fresh native work; Hermes retains ownership of native
+sessions. Hub cold storage and Hermes-native session compaction remain separate.
 
 ## Causal Depth, Not Topic Age
 
@@ -309,3 +306,8 @@ Per-Agent credentials constrain caller identity, Artifact provider locators
 express portable locations, and bounded backoff covers ordinary event-order
 jitter. See the [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for
 automatic materialization, atomic claiming, and production hardening status.
+
+Each Worker now maintains its own bounded topic state, source-linked summaries
+and complete local records. See [Worker memory](./WORKER_MEMORY.md) for enablement,
+budgets, maintenance, source recall and migration; the
+[design contract](./plans/WORKER_TOPIC_MEMORY.md) defines deployment acceptance.

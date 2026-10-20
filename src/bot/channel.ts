@@ -79,6 +79,7 @@ import {
 } from '../collab/bridge-adapter';
 import { stripRawFeishuMentionTokens } from '../collab/mentions';
 import { LocalTopicLedger } from '../collab/local-topic-ledger';
+import { createMemorySynthesizer } from '../memory/runtime';
 
 const DEBOUNCE_MS = 600;
 const STREAM_TERMINAL_GRACE_MS = 3000;
@@ -202,8 +203,16 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       ?? deps.appPaths?.rootDir
       ?? process.env.LARK_CHANNEL_HOME
       ?? join(process.cwd(), '.lark-channel'),
+    process.env.LARK_MEMORY_ENABLED === '1' ? {
+      memoryRoot: process.env.LARK_MEMORY_ROOT ?? join(deps.appPaths?.rootDir ?? process.env.LARK_CHANNEL_HOME ?? join(process.cwd(), '.lark-channel'), 'profiles', controls.profile, 'memory'),
+      owner: process.env.LARK_COLLAB_AGENT_ID ?? controls.profile,
+      tenant: process.env.LARK_COLLAB_TENANT_KEY ?? controls.profileConfig.accounts.app.id,
+      host: agent.id,
+      synthesize: createMemorySynthesizer(agent),
+    } : undefined,
   );
   await localTopicLedger.load();
+  localTopicLedger.memory?.startIdle(() => activeRuns.snapshot().length === 0);
   const collaborationRuns = new Map<string, {
     promptContext: string;
     taskId: string;
@@ -494,6 +503,7 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
       ownerRefresh.stop();
       knownChatsRefresh.stop();
       keepalive.stop();
+      await localTopicLedger.memory?.close();
       pending.cancelAll();
       const [disconnectResult, stopAllResult, ...flushResults] = await Promise.allSettled([
         channel.disconnect(),
@@ -820,7 +830,18 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   if (collaboration && collaborationRun && attachments.length > 0) {
     await collaboration.recordAttachments(collaborationRun.taskId, attachments);
   }
-  const prompt = buildPrompt(
+  let memoryPrepared: Awaited<ReturnType<NonNullable<LocalTopicLedger['memory']>['prepare']>> | undefined;
+  if (localTopicLedger.memory) {
+    try {
+      memoryPrepared = await localTopicLedger.memory.prepare(scope, { excludeOrigins: batch.map(message => `message:${message.messageId}`) });
+    } catch (error) {
+      log.warn('memory', 'prepare-blocked', { error: error instanceof Error ? error.message : 'unavailable' });
+      if (collaboration && collaborationRun?.dispatchId) await collaboration.finishRun(collaborationRun.taskId, '', `memory-blocked:${lastMsg.messageId}`, collaborationRun.dispatchId, false).catch(() => {});
+      await channel.send(chatId, { markdown: '本话题的历史记忆尚未整理完成，暂未开始依赖历史的执行。原始记录仍保留，后台会重试；可通过本机 memory status 检查整理状态。' }, { replyTo: lastMsg.messageId, ...(threadId ? { replyInThread: true } : {}) });
+      return;
+    }
+  }
+  const prompt = (memoryPrepared ? `${memoryPrepared.prompt}\n\n` : '') + buildPrompt(
     batch,
     attachments,
     quotes,
@@ -880,12 +901,15 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     now: Date.now(),
     stopGraceMs: getAgentStopGraceMs(controls.cfg),
     freshContext: firstMsg.chatType !== 'p2p',
-    env: collaborationRun ? {
+    env: collaborationRun || memoryPrepared ? {
+      ...memoryPrepared?.env,
+      ...(collaborationRun ? {
       LARK_COLLAB_TASK_ID: collaborationRun.taskId,
       ...(collaborationRun.dispatchId ? { LARK_COLLAB_DISPATCH_ID: collaborationRun.dispatchId } : {}),
       LARK_COLLAB_CHAT_ID: chatId,
       ...(threadId ? { LARK_COLLAB_THREAD_ID: threadId } : {}),
       LARK_COLLAB_REPLY_TO: lastMsg.messageId,
+      } : {}),
     } : undefined,
     observability: {
       profile: controls.profile,
@@ -1383,6 +1407,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
           extractCollaborationHandoff(renderText(finalAnswerOnlyState(collaborationFinalState))).visibleContent,
         ),
       );
+      if (process.env.LARK_MEMORY_BACKGROUND !== '0') void localTopicLedger.memory?.maintain().catch(() => {});
       ownerMention = (await recordCollaborationResult(collaborationFinalState))?.ownerMention;
     }
     if (replyMode === 'text' && collaborationFinalState) {

@@ -68,7 +68,7 @@ export class ClaudeAdapter implements AgentAdapter {
     // stream-json response. Pass the prompt via stdin and the appended system
     // prompt via a temp file (the same approach the Codex adapter uses) so no
     // special characters ever reach the shell.
-    const systemPromptFile = writeSystemPromptFile(buildBridgeSystemPrompt(this.botIdentity));
+    const systemPromptFile = writeSystemPromptFile(opts.memoryMode ? 'Return the requested memory JSON only. Do not use tools.' : buildBridgeSystemPrompt(this.botIdentity));
 
     const args = [
       '-p',
@@ -80,7 +80,8 @@ export class ClaudeAdapter implements AgentAdapter {
       '--append-system-prompt-file',
       systemPromptFile.path,
     ];
-    if (opts.sessionId) args.push('--resume', opts.sessionId);
+    if (opts.memoryMode) args.push('--tools', '', '--no-session-persistence');
+    if (opts.sessionId && !opts.memoryMode) args.push('--resume', opts.sessionId);
     if (opts.model) args.push('--model', opts.model);
 
     const child = spawnProcess(this.binary, args, {

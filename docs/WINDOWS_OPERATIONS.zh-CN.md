@@ -342,3 +342,5 @@ Git 交付件可用 `collab-artifact.cmd register-git` 登记 commit locator；�
 ```
 
 该命令只使用清单中明确配置的恢复命令。没有配置 `original.start` 的 Agent 会保持停止，需由使用者按自己的原方式启动。
+
+每个 Worker 的记忆、迁移和重启步骤见[Worker 记忆](./WORKER_MEMORY.zh-CN.md)。Restart-CollabAgent.ps1 也会让独立 Hermes gateway 重新加载 Hook。

@@ -43,3 +43,5 @@ Antigravity 使用 `agy.exe` 时，启动器会自动读取 Windows 当前用户
 .\scripts\collab-pilot\Uninstall-CollabPilotStartup.ps1
 .\scripts\collab-pilot\Stop-CollabPilot.ps1 -RestoreOriginals
 ```
+
+Worker 记忆见[运维说明](../../docs/WORKER_MEMORY.zh-CN.md)。使用 Restart-CollabAgent.ps1 -Agent <id> 重启单个 Bot。

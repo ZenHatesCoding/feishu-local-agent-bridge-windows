@@ -304,3 +304,5 @@ workspace: an exact “lark-channel not bound” result triggers one `bot-only`
 rebind and one delivery retry. It never falls back to another profile or user
 identity. A repeated failure is reported with the exact command error and local
 file path for diagnosis.
+
+For per-Worker memory, migration and restart procedures, see [Worker memory](./WORKER_MEMORY.md). Restart-CollabAgent.ps1 also reloads a detached Hermes gateway.

@@ -1,6 +1,6 @@
 {
   "name": "lark-channel-bridge",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Bridge Feishu/Lark messenger with local CLI coding agents",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -27,6 +27,8 @@
   },
   "files": [
     "dist",
+    "adapters/memory",
+    "adapters/hermes/memory_synthesize.py",
     "bin",
     "README.md",
     "README.zh.md",
@@ -69,6 +71,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "better-sqlite3",
       "esbuild",
       "protobufjs"
     ]
@@ -83,5 +86,8 @@
     "channel",
     "bridge"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "optionalDependencies": {
+    "better-sqlite3": "11.10.0"
+  }
 }

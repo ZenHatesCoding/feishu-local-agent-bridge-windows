@@ -25,6 +25,7 @@ import {
 } from './commands/service';
 import { runStart } from './commands/start';
 import { runLocalContext } from './commands/local-context';
+import { runMemoryCommand, type MemoryCommandOptions } from './commands/memory';
 import {
   runArtifactPublish,
   runArtifactRegisterGit,
@@ -44,6 +45,25 @@ program
 const localContext = program
   .command('local-context')
   .description('Read this computer\'s observed topic ledger; never queries the Hub');
+
+const memory = program.command('memory').description('Worker-local bounded topic memory, sources and recovery');
+for (const mode of ['status','doctor','read','search','inspect','expand','checkpoint','prepare','maintain','observe','migrate','export','backup','rollback']) {
+  memory.command(mode)
+    .option('--root <directory>', 'unbound local administration only: instance memory root')
+    .option('--owner <id>', 'unbound local administration: instance owner')
+    .option('--tenant <id>', 'unbound local administration: tenant')
+    .option('--scope <topic>', 'unbound local administration: topic scope')
+    .option('--binding <path>', 'host-provided run binding (Hermes); cannot override an ambient binding')
+    .option('--query <text>', 'search keywords')
+    .option('--id <id>', 'event or summary ID')
+    .option('--file <path>', 'candidate input or export/backup destination')
+    .option('--after <sequence>', 'ledger cursor')
+    .option('--limit <count>', 'bounded page size')
+    .option('--offset <characters>', 'source expansion cursor')
+    .option('--revision <number>', 'revision to restore as a new revision')
+    .option('--confirmed-owner', 'explicitly confirm ownership/visibility of a legacy ledger')
+    .action((opts: MemoryCommandOptions) => runMemoryCommand(mode, opts));
+}
 
 for (const mode of ['read', 'search'] as const) {
   localContext

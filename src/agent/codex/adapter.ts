@@ -95,8 +95,8 @@ export class CodexAdapter implements AgentAdapter {
 
     const args = buildCodexArgs({
       cwd: opts.cwd,
-      sandbox: opts.sandbox ?? this.sandbox,
-      threadId: opts.threadId,
+      sandbox: opts.memoryMode ? 'read-only' : opts.sandbox ?? this.sandbox,
+      threadId: opts.memoryMode ? undefined : opts.threadId,
       images: opts.images,
       ignoreUserConfig: this.ignoreUserConfig,
       ignoreRules: this.ignoreRules,
@@ -154,7 +154,7 @@ export class CodexAdapter implements AgentAdapter {
     child.stdin.on('error', (err) => {
       log.warn('agent', 'stdin-error', { message: err.message });
     });
-    child.stdin.end(prefixBridgeSystemPrompt(opts.prompt, this.botIdentity), 'utf8');
+    child.stdin.end(opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.botIdentity), 'utf8');
 
     const stopGraceMs = opts.stopGraceMs ?? this.defaultStopGraceMs;
 

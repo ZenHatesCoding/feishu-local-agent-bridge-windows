@@ -129,28 +129,19 @@ path may be a node cache path, never shared truth.
 
 ## Context, Memory And Token Scaling
 
-JSONL currently grows indefinitely, startup replays it and hot task/dispatch/
-idempotency indexes stay in memory. Topics are isolated. The implemented prompt
-projection keeps the original requirement, eight recent semantic events and a
-twenty-item Artifact catalog; complete Artifact records are selected on demand.
-A resumed native Agent session may still retain earlier turns independently.
+The Hub retains its append-only coordination ledger and in-memory protocol indexes.
+Each Worker now owns a separate SQLite observation ledger and bounded topic-memory
+projection: sourced task state, hierarchical summaries, recent originals and
+budgeted retrieval. Consolidation runs automatically on new observations, before
+an oversized projection and during idle periods. Original observations remain
+available through source references; failed maintenance retains them and reports
+memory debt instead of silently omitting history.
 
-The target projection is:
-
-```text
-complete append-only source ledger
-  -> source-sequenced summary checkpoint
-  -> recent original events
-  -> current dispatch and active artifacts
-  -> Agent prompt
-```
-
-The bounded recent-event window and mechanical-event omission are implemented.
-Add task cursors, token metrics, summary checkpoint provenance, native-session
-compaction and cold-task archival. The source ledger is never deleted by prompt
-projection. Semantic summaries record producer, covered
-sequence range and source cursor. JSONL remains sufficient for a single-Hub
-MVP; SQLite or PostgreSQL later provides transactions and uniqueness constraints.
+See [Worker memory operations](./WORKER_MEMORY.md) and the
+[design contract](./plans/WORKER_TOPIC_MEMORY.md). Standard bridges start fresh
+native runs. Hermes native-session compaction remains host-owned. Hub cold-task
+archival and database migration remain separate roadmap work; Worker SQLite does
+not migrate the Hub. Local host verification is not second-PC memory acceptance.
 
 ## Delivery Phases
 
