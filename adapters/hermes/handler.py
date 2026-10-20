@@ -111,10 +111,13 @@ def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> Non
     except OSError:
         pass
     if os.environ.get("LARK_MEMORY_ENABLED") == "1":
-        _memory_command("observe", scope, {
-            "origin": identity, "kind": kind, "content": content,
-            "actor": "agent" if kind == "bot-result" or context.get("is_bot") else "human",
-        })
+        try:
+            _memory_command("observe", scope, {
+                "origin": identity, "kind": kind, "content": content,
+                "actor": "agent" if kind == "bot-result" or context.get("is_bot") else "human",
+            })
+        except Exception:
+            pass  # The JSONL record above stays authoritative and can be re-imported.
 
 
 def _request(path: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]:

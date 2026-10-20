@@ -36,4 +36,16 @@ describe('Hermes collaboration Hook contract', () => {
     expect(handler).toContain('_safe_segment(thread_id)');
     expect(handler).not.toContain('"local-topic-ledger.jsonl"');
   });
+
+  it('never lets a memory failure suppress the Hub result report', () => {
+    const observe = handler.indexOf('_memory_command("observe"');
+    expect(observe).toBeGreaterThan(-1);
+    // The observe call must be guarded inside _record_local_topic, because _on_end
+    // reports the model result to the Hub only after this returns.
+    const recorder = handler.indexOf('def _record_local_topic');
+    expect(recorder).toBeGreaterThan(-1);
+    expect(recorder).toBeLessThan(observe);
+    expect(handler.lastIndexOf('try:', observe)).toBeGreaterThan(recorder);
+    expect(handler.slice(observe, handler.indexOf('def _request(', observe))).toContain('except Exception');
+  });
 });
