@@ -209,7 +209,7 @@ expired authentication.
 
 For durable operation, install the current-user Windows logon task. It runs a
 long-lived supervisor independently of the PowerShell, Codex, or ChatGPT window
-that installed it. Every 15 seconds the supervisor checks the Hub and local Bot
+that installed it. Every 5 minutes the supervisor checks the Hub and local Bot
 launcher processes and starts any exited component again:
 
 ```powershell
@@ -278,7 +278,11 @@ manually deleting lock files.
 ```
 
 Supervisor repair events are written to `.runtime\logs\supervisor.log`. The
-Windows task stores only absolute paths to the supervisor and Git-ignored local
+repair command runs in a separate PowerShell process so its exits cannot stop
+the supervisor. Fatal supervisor errors include a stack trace and return a
+failure code for Task Scheduler retries. An already-running detached Hermes
+gateway is preserved during each check rather than stopped and restarted.
+The Windows task stores only absolute paths to the supervisor and Git-ignored local
 manifest; it does not embed tokens, App Secrets, or manifest contents.
 
 A single-PC manifest can bind only to `127.0.0.1`. For workers, bind on the VPN

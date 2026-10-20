@@ -1,7 +1,7 @@
 param(
   [string]$Config,
   [ValidateRange(5, 300)]
-  [int]$PollSeconds = 15
+  [int]$PollSeconds = 300
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,7 +27,12 @@ function Write-SupervisorLog([string]$Message) {
 }
 
 function Repair-CollabPilot {
-  & (Join-Path $PSScriptRoot 'Start-CollabPilot.ps1') -Config $script:CollabManifestFile | Out-Null
+  # Isolate native commands and script exits from the long-lived supervisor.
+  $repairScript = Join-Path $PSScriptRoot 'Start-CollabPilot.ps1'
+  $repairOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $repairScript -Config $script:CollabManifestFile 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    throw "repair process exited with code ${LASTEXITCODE}: $($repairOutput -join ' | ')"
+  }
 }
 
 try {
@@ -40,6 +45,10 @@ try {
     }
     Start-Sleep -Seconds $PollSeconds
   }
+} catch {
+  Write-SupervisorLog "supervisor fatal: $($_.Exception.Message) at $($_.ScriptStackTrace)"
+  # Task Scheduler retries failures, not successful exits.
+  exit 1
 } finally {
   Write-SupervisorLog "supervisor stopped pid=$PID"
   $mutex.ReleaseMutex()

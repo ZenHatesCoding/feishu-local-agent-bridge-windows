@@ -12,6 +12,10 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(source).toContain('while ($true)');
     expect(source).toContain("'Start-CollabPilot.ps1'");
     expect(source).toContain('Start-Sleep -Seconds $PollSeconds');
+    expect(source).toContain('[int]$PollSeconds = 300');
+    expect(source).toContain('& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $repairScript');
+    expect(source).toContain('supervisor fatal:');
+    expect(source).toContain('exit 1');
   });
 
   it('loads the HTTP client assembly in a clean Windows PowerShell process', () => {
@@ -65,6 +69,9 @@ describe('Collaboration Pilot Windows startup contract', () => {
 
     expect(common).toContain('function Test-CollabHermesGateway');
     expect(start).toContain('started as a detached Hermes gateway');
+    expect(start.indexOf('already running as a detached Hermes gateway')).toBeLessThan(
+      start.indexOf('Stop-OriginalAgent $agentConfig'),
+    );
     expect(status).toContain('hermes-gateway (detached)');
   });
 
