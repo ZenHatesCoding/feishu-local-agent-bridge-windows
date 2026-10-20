@@ -24,6 +24,12 @@ if (Test-CollabPid $table[$Agent]) {
   return
 }
 
+if ($agentConfig.hermesHook -and $agentConfig.hermesHook.enabled -and (Test-CollabHermesGateway $agentConfig)) {
+  Install-CollabAgentHook $agentConfig
+  Write-Output "$Agent is already running as a detached Hermes gateway."
+  return
+}
+
 Stop-OriginalAgent $agentConfig
 Install-CollabAgentHook $agentConfig
 

@@ -237,7 +237,7 @@ Hub health、bridge 是否连接、Agent CLI 是否可执行、代理端口和�
 
 正式常驻使用 Windows 登录启动任务。它属于当前用户，不要求把 GitHub、Agent 或飞书
 认证改成机器级凭据；登录后会运行长期监督进程，独立于启动它的 PowerShell、Codex 或
-ChatGPT 窗口，并每 15 秒检查一次 Hub 和本机 Bot，发现进程退出就重新拉起：
+ChatGPT 窗口，并每 5 分钟检查一次 Hub 和本机 Bot，发现进程退出就重新拉起：
 
 ```powershell
 .\scripts\collab-pilot\Install-CollabPilotStartup.ps1 -StartNow
@@ -312,7 +312,10 @@ ChatGPT 窗口，并每 15 秒检查一次 Hub 和本机 Bot，发现进程退�
 .runtime\pids.json              后台启动器 PID
 ```
 
-监督进程的修复记录写入 `.runtime\logs\supervisor.log`；Windows 任务本身不包含 token、
+监督进程的修复记录写入 `.runtime\logs\supervisor.log`。修复命令在独立 PowerShell
+进程中执行，避免子脚本退出影响监督进程；监督进程致命错误会记录调用栈并返回失败码，
+供 Windows 任务重试。已独立运行的 Hermes 网关在检查时保留，不会每轮重启。
+Windows 任务本身不包含 token、
 App Secret 或本机清单内容，只保存监督脚本与 Git 忽略配置文件的绝对路径。
 
 单机清单可以让 Hub 只监听 `127.0.0.1`；需要额外 worker 时使用 VPN 私网地址和
