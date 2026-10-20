@@ -22,7 +22,7 @@ const STDIN_BOOTSTRAP = [
   "let s=''",
   "process.stdin.setEncoding('utf8')",
   "process.stdin.on('data',c=>s+=c)",
-  "process.stdin.on('end',async()=>{const e=process.argv[1];process.argv=[process.execPath,e,'--profile','headless',s];await import(pathToFileURL(e).href)})",
+  "process.stdin.on('end',async()=>{try{const e=process.argv[1];process.argv=[process.execPath,e,'--profile','headless',s];const m=await import(pathToFileURL(e).href);if(typeof m.runCli==='function')await m.runCli()}catch(e){console.error(e);process.exitCode=1}})",
 ].join(';');
 
 export class DeepSeekHarnessAdapter implements AgentAdapter {
@@ -156,8 +156,8 @@ async function* harnessEvents(
     yield { type: 'error', message: `DeepSeek Harness runtime error: ${runtimeError.message}`, terminationReason: 'failed' };
     return;
   }
-  if (!text.trim() && stderr) {
-    yield { type: 'error', message: `DeepSeek Harness produced no reply. stderr: ${stderr.slice(0, 1000)}`, terminationReason: 'failed' };
+  if (!text.trim()) {
+    yield { type: 'error', message: `DeepSeek Harness produced no reply.${stderr ? ` stderr: ${stderr.slice(0, 1000)}` : ''}`, terminationReason: 'failed' };
     return;
   }
   yield { type: 'done', terminationReason: 'normal' };
