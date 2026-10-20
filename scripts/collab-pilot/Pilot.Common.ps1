@@ -271,12 +271,25 @@ function Test-CollabPid([object]$ProcessId) {
 function Test-CollabHermesGateway([object]$Agent) {
   if (!$Agent.hermesHook -or !$Agent.hermesHook.enabled) { return $false }
 
+  # `gateway status` exits successfully even when stopped, and may wait on the
+  # Windows service manager. Prefer the native runtime PID record when present.
+  $runtimeState = Join-Path (Expand-CollabValue $Agent.hermesHook.home) 'gateway_state.json'
+  if (Test-Path -LiteralPath $runtimeState) {
+    try {
+      $gatewayState = Get-Content -LiteralPath $runtimeState -Raw -Encoding UTF8 | ConvertFrom-Json
+      $gatewayPid = 0
+      if (![int]::TryParse([string]$gatewayState.pid, [ref]$gatewayPid) -or $gatewayPid -le 0) { return $false }
+      $gatewayProcess = Get-CimInstance Win32_Process -Filter "ProcessId=$gatewayPid" -ErrorAction SilentlyContinue
+      return [bool]($gatewayProcess -and $gatewayProcess.CommandLine -match 'hermes' -and $gatewayProcess.CommandLine -match 'gateway')
+    } catch { return $false }
+  }
+
   $python = Expand-CollabValue $Agent.original.start.filePath
   $previousHermesHome = $env:HERMES_HOME
   try {
     $env:HERMES_HOME = Expand-CollabValue $Agent.hermesHook.home
-    & $python -c "import sys; from hermes_cli.main import main; sys.argv=['hermes','gateway','status']; main()" *> $null
-    return ($LASTEXITCODE -eq 0)
+    $statusOutput = & $python -c "import sys; from hermes_cli.main import main; sys.argv=['hermes','gateway','status']; main()" 2>$null
+    return ($LASTEXITCODE -eq 0 -and ($statusOutput -join "`n") -match 'Gateway is running')
   } catch {
     return $false
   } finally {
@@ -321,6 +334,7 @@ function Install-CollabAgentHook([object]$Agent) {
   New-Item -ItemType Directory -Force -Path $target | Out-Null
   Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\HOOK.yaml') -Destination $target -Force
   Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\handler.py') -Destination $target -Force
+  Copy-Item -LiteralPath (Join-Path $script:CollabRepoRoot 'adapters\hermes\memory_synthesize.py') -Destination $target -Force
 }
 
 function Remove-CollabAgentHook([object]$Agent) {

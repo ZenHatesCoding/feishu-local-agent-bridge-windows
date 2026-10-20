@@ -9,10 +9,12 @@ const pairs: Array<readonly [string, string]> = [
   ['docs/DESIGN.md', 'docs/DESIGN.zh-CN.md'],
   ['docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md', 'docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md'],
   ['docs/NETWORKING.md', 'docs/NETWORKING.zh-CN.md'],
+  ['docs/plans/WORKER_TOPIC_MEMORY.md', 'docs/plans/WORKER_TOPIC_MEMORY.zh-CN.md'],
   ['docs/PRODUCT_VISION.md', 'docs/PRODUCT_VISION.zh-CN.md'],
   ['docs/WINDOWS_OPERATIONS.md', 'docs/WINDOWS_OPERATIONS.zh-CN.md'],
   ['docs/WINDOWS_WORKER_DEPLOYMENT.md', 'docs/WINDOWS_WORKER_DEPLOYMENT.zh-CN.md'],
   ['docs/WINDOWS_WORKER_PITFALLS.md', 'docs/WINDOWS_WORKER_PITFALLS.zh-CN.md'],
+  ['docs/WORKER_MEMORY.md', 'docs/WORKER_MEMORY.zh-CN.md'],
   ['scripts/collab-pilot/README.md', 'scripts/collab-pilot/README.zh-CN.md'],
 ];
 
@@ -42,7 +44,7 @@ describe('documentation navigation', () => {
     for (const name of [
       'README.md', 'PRODUCT_VISION', 'COLLABORATION_CONCEPTS', 'DESIGN',
       'AGENT_BRIDGES', 'WINDOWS_OPERATIONS', 'NETWORKING',
-      'DISTRIBUTED_DEPLOYMENT_ROADMAP', 'scripts/collab-pilot/README',
+      'DISTRIBUTED_DEPLOYMENT_ROADMAP', 'WORKER_TOPIC_MEMORY', 'scripts/collab-pilot/README',
     ]) {
       expect(guide).toContain(name);
     }

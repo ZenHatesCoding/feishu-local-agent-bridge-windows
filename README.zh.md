@@ -68,6 +68,7 @@ profile 和对应 Agent 登录。Hermes 保留原安装，通过可移除的项�
 | 每个 Agent 的 bridge 怎么配置？ | [Agent 桥接](./docs/AGENT_BRIDGES.zh-CN.md) | [Agent bridges](./docs/AGENT_BRIDGES.md) |
 | 项目必须守住什么用户体验？ | [产品目标](./docs/PRODUCT_VISION.zh-CN.md) | [Product vision](./docs/PRODUCT_VISION.md) |
 | 上下文、路由、文件怎么工作？ | [设计原理](./docs/DESIGN.zh-CN.md) | [Design](./docs/DESIGN.md) |
+| 每个 Worker 如何保持有界话题记忆？ | [Worker 话题记忆](./docs/WORKER_MEMORY.zh-CN.md) | [Worker memory](./docs/WORKER_MEMORY.md) |
 | 协作群如何部署和运维？ | [Windows 运维](./docs/WINDOWS_OPERATIONS.zh-CN.md) | [Windows operations](./docs/WINDOWS_OPERATIONS.md) |
 | 怎么加一台不跑 Hub 的 worker 机器？ | [Windows Worker 部署](./docs/WINDOWS_WORKER_DEPLOYMENT.zh-CN.md) | [Windows worker deployment](./docs/WINDOWS_WORKER_DEPLOYMENT.md) |
 | Windows 上已经踩过哪些坑？ | [Worker 实战坑](./docs/WINDOWS_WORKER_PITFALLS.zh-CN.md) | [Worker pitfalls](./docs/WINDOWS_WORKER_PITFALLS.md) |

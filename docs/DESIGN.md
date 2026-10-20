@@ -353,6 +353,16 @@ retention is outside this project's control. Journal retention, Hub-ledger cold
 storage and Hermes-native session compaction remain roadmap work; see the
 [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md).
 
+Pilot enables SQLite worker memory by default. On top of that journal each
+Worker maintains a separate observation ledger and a bounded topic-memory
+projection: the bridge injects sourced current state, summary cards and recent
+originals under cumulative budgets, and further retrieval uses bound commands
+that enforce instance, topic and run fences. Automatic consolidation preserves
+sources and blocks silent history loss when maintenance fails; memory is never
+synchronized between Workers, and a local path stays local. See
+[Worker memory operations](./WORKER_MEMORY.md) and the
+[design contract](./plans/WORKER_TOPIC_MEMORY.md).
+
 ## Causal Depth, Not Topic Age
 
 `hop` is the depth of the current delegation chain. Every new human assignment
@@ -476,3 +486,8 @@ express portable locations, and the coordinator-source wait window covers
 ordinary cross-network reordering. See the
 [distributed roadmap](./DISTRIBUTED_DEPLOYMENT_ROADMAP.md) for automatic
 materialization, atomic claiming, and production hardening status.
+
+Each Worker now maintains its own bounded topic state, source-linked summaries
+and complete local records. See [Worker memory](./WORKER_MEMORY.md) for enablement,
+budgets, maintenance, source recall and migration; the
+[design contract](./plans/WORKER_TOPIC_MEMORY.md) defines deployment acceptance.

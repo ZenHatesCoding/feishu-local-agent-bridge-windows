@@ -316,23 +316,22 @@ if (import.meta.main) await runCli();
 ```
 
 派发的模块在被 import 时什么都不会做，因为只有该文件本身是进程入口模块时
-`import.meta.main` 才为真。在 bridge 下进程入口是 `-e` 的 bootstrap。官方
-`@deepseek-ai/dsh` 包的 `lib/bin.js` 结尾恰好就是这种写法，所以把 `entryPath`
-指向它会得到“退出码 0、没有任何输出”的运行，bridge 只会报告一次空的成功运行，
-而不是错误。
+`import.meta.main` 才为真。bridge 下的进程入口是 `-e` 的 bootstrap，它会在 import
+之后显式调用导出的 `runCli`。官方 `@deepseek-ai/dsh` 的 `lib/bin.js` 结尾恰好是这种
+写法并且导出了 `runCli`，所以现在可以直接使用。既不导出 `runCli`、也不会在 import
+时执行的入口仍然没有任何输出，但 bridge 现在会把它按失败报告，而不是当成一次空的
+成功运行。
 
-因此 `deepseekHarness.entryPath` 必须指向一个在 import 之后显式调用导出 CLI 的
-shim：
+无法导出 `runCli` 的入口仍可用 shim：
 
 ```js
 const mod = await import('<resolved>/node_modules/@deepseek-ai/dsh/lib/bin.js');
 await mod.runCli();
 ```
 
-`checkAvailability` 还会以主模块方式运行 `node <entry> --version`，所以 shim 也
-必须能回答 `--version`；带守卫的裸 `lib/bin.js` 能通过这项检查，却依然无法服务
-一次运行。请让 `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY`（或 profile 的 `entryPath`）
-始终指向你的 shim。
+`checkAvailability` 还会以主模块方式运行 `node <entry> --version`，所以任何 shim 也
+必须能回答 `--version`。请让 `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY`（或 profile 的
+`entryPath`）始终指向你实际验证过的入口。
 
 输出解析就是纯 print：stdout 的每一行变成一个文本片段，没有 JSON、工具事件或用量。
 该引擎无状态，不会续接，且完全不传沙箱或权限参数。
@@ -405,7 +404,7 @@ DeepSeek 协作进程示例：
 }
 ```
 
-`LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` 要指向上文说的“被 import 就会执行”的入口
-模块，而不是带 `import.meta.main` 守卫的包内文件。用 `Test-CollabPilotConfig.ps1`
-校验，然后启动整组。完整字段和回退命令见
+`LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` 要指向上文说的入口：它要么导出 `runCli`，
+要么被 import 就会执行；两者都不满足的带守卫包内文件仍然只会空跑。用
+`Test-CollabPilotConfig.ps1` 校验，然后启动整组。完整字段和回退命令见
 [Windows 部署与运维](./WINDOWS_OPERATIONS.zh-CN.md)。

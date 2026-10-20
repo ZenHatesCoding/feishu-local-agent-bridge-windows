@@ -331,6 +331,13 @@ Bot 需要旧信息时，使用当前 scope 执行 `lark-channel-bridge local-co
 不由本项目控制。账本保留策略、Hub 冷存储和 Hermes 原生 session 压缩仍是路线图工作，
 阶段状态见[跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
 
+Pilot 默认启用 SQLite 的 Worker 记忆。在上述账本之上，每个 Worker 还独立维护观察账本
+和长度受控的话题记忆投影：bridge 在累计预算内注入带来源的当前状态、摘要卡片和近期
+原文，进一步检索使用校验实例、话题与运行边界的绑定命令。自动归纳保留来源；维护失败
+时阻止静默丢失历史。记忆不会跨 Worker 同步，本机路径仍然只在本机有效。详见
+[Worker 记忆运维](./WORKER_MEMORY.zh-CN.md)和
+[设计合同](./plans/WORKER_TOPIC_MEMORY.zh-CN.md)。
+
 ## 转发层级是因果链，不是话题寿命
 
 `hop` 只表示当前这条委派因果链的深度。用户每次在话题中重新指定 Agent，都会
@@ -457,3 +464,7 @@ Pilot 默认继续以 `all` 角色在同一台 Windows 电脑运行 Hub 和全�
 使用 provider locator 表达跨节点位置，Coordinator 等待窗口覆盖普通跨网乱序。
 接收端自动下载、原子 claim 和生产安全加固的状态见
 [跨电脑路线图](./DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md)。
+
+Worker 现独立维护有界话题状态、带来源的摘要和完整本地记录。
+启用、预算、整理、来源回查与迁移见 [Worker 话题记忆](./WORKER_MEMORY.zh-CN.md)，
+部署验收合同见[详细设计](./plans/WORKER_TOPIC_MEMORY.zh-CN.md)。

@@ -2,6 +2,8 @@ import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { NormalizedMessage } from '@larksuite/channel';
 import type { NormalizedAttachment } from '../media/attachment';
+import { WorkerMemoryRuntime, type MemorySynthesizer } from '../memory/runtime';
+import type { MemoryLimits } from '../memory/types';
 
 export interface LocalTopicRecord {
   id: string;
@@ -40,12 +42,14 @@ export interface LocalTopicRecord {
 export class LocalTopicLedger {
   readonly rootDir: string;
   readonly legacyPath: string;
+  readonly memory?: WorkerMemoryRuntime;
   private readonly seenByScope = new Map<string, Set<string>>();
   private readonly tailByScope = new Map<string, Promise<void>>();
 
-  constructor(rootDir: string) {
+  constructor(rootDir: string, options?: { memoryRoot: string; owner: string; tenant: string; host?: string; synthesize?: MemorySynthesizer; limits?: Partial<MemoryLimits> }) {
     this.rootDir = rootDir;
     this.legacyPath = join(rootDir, 'collaboration', 'local-topic-ledger.jsonl');
+    if (options) this.memory = new WorkerMemoryRuntime(options.memoryRoot, options.owner, options.tenant, options.synthesize, options.limits, options.host);
   }
 
   /** Journal file that holds one scope (`chatId` or `chatId:threadId`). */
@@ -67,6 +71,8 @@ export class LocalTopicLedger {
   async load(): Promise<void> {}
 
   recordMessage(scope: string, msg: NormalizedMessage): Promise<void> {
+    const senderType = (msg.raw as { sender?: { sender_type?: string } } | undefined)?.sender?.sender_type;
+    this.memory?.store.ingest(scope, { origin: `message:${msg.messageId}`, kind: 'message', content: msg.content, actor: senderType === 'app' || senderType === 'bot' ? 'agent' : senderType === 'user' ? 'human' : 'unknown' });
     return this.append({
       id: `message:${msg.messageId}`,
       scope,
@@ -80,6 +86,7 @@ export class LocalTopicLedger {
   }
 
   recordAttachments(scope: string, attachments: readonly NormalizedAttachment[]): Promise<void> {
+    for (const attachment of attachments) this.memory?.store.ingest(scope, { origin: `attachment:${attachment.sourceMessageId}:${attachment.hash}`, kind: 'attachment', content: JSON.stringify({ name: attachment.originalName, hash: attachment.hash, path: attachment.absPath, decision: attachment.decision }), actor: 'tool' });
     return Promise.all(attachments.map((attachment) => this.append({
       id: `attachment:${attachment.sourceMessageId}:${attachment.hash}`,
       scope,
@@ -99,6 +106,7 @@ export class LocalTopicLedger {
   }
 
   recordBotResult(scope: string, runId: string, content: string): Promise<void> {
+    this.memory?.store.ingest(scope, { origin: `bot-result:${runId}`, kind: 'bot-result', content, actor: 'agent' });
     return this.append({
       id: `bot-result:${runId}`,
       scope,
@@ -109,6 +117,13 @@ export class LocalTopicLedger {
   }
 
   async query(scope: string, query?: string, limit = 12): Promise<LocalTopicRecord[]> {
+    if (this.memory) {
+      const topic = this.memory.store.topic(scope);
+      const records = query
+        ? this.memory.store.search(topic.id, query, limit).map(hit => this.memory!.store.inspect(topic.id, (hit as { id: string }).id)).filter(hit => 'seq' in (hit as object))
+        : this.memory.store.tail(topic.id, limit);
+      return records.map(value => { const event = value as import('../memory/types').MemoryEvent; return { id: event.id, scope, recordedAt: event.at, kind: event.kind as LocalTopicRecord['kind'], content: event.content }; });
+    }
     const boundedLimit = Math.min(Math.max(limit, 1), 50);
     const terms = (query ?? '').toLocaleLowerCase().split(/\s+/).filter(Boolean);
     const records: LocalTopicRecord[] = [];
@@ -167,6 +182,7 @@ export class LocalTopicLedger {
   }
 
   private append(record: LocalTopicRecord): Promise<void> {
+    if (this.memory) Object.assign(record, { authorAgentId: this.memory.store.owner });
     const previous = this.tailByScope.get(record.scope) ?? Promise.resolve();
     const operation = previous.then(async () => {
       const seen = await this.ensureScope(record.scope);

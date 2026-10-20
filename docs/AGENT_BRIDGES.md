@@ -346,7 +346,10 @@ node -e <bootstrap> <entryPath>
 
 where the bootstrap buffers stdin, rewrites `process.argv` to
 `[node, <entryPath>, '--profile', 'headless', <prompt>]` and only then
-`await import(<entryPath>)`. The prompt therefore enters the harness as the
+`await import(<entryPath>)`. For entries exporting `runCli`, the bootstrap calls
+it explicitly after the import; older self-starting entries remain supported. An
+empty response is a failed run even when the process exits with code zero. The
+prompt therefore enters the harness as the
 positional argument of a headless one-shot run rather than through stdin, and
 Harness produces its answer as a final batch rather than a dependable
 incremental stream. The bridge posts that completed answer once as a normal
@@ -362,13 +365,13 @@ if (import.meta.main) await runCli();
 
 does nothing when it is imported, because `import.meta.main` is true only when
 that same file is the process entry module. Under the bridge the process entry
-is the `-e` bootstrap. The official `@deepseek-ai/dsh` package ends its
-`lib/bin.js` in exactly that shape, so pointing `entryPath` at it produces a run
-that exits `0` with no output, which the bridge reports as an empty successful
-run rather than as an error.
+is the `-e` bootstrap, which calls an exported `runCli` after the import. The
+official `@deepseek-ai/dsh` package ends its `lib/bin.js` in exactly that shape
+and exports `runCli`, so it is now usable directly. An entry that neither
+exports `runCli` nor runs on import still produces no output, and the bridge now
+reports that as a failed run instead of an empty success.
 
-`deepseekHarness.entryPath` must therefore point at an entry module that
-explicitly invokes the exported CLI after importing it:
+A shim remains a valid choice for an entry that cannot export `runCli`:
 
 ```js
 const mod = await import('<resolved>/node_modules/@deepseek-ai/dsh/lib/bin.js');
@@ -376,10 +379,9 @@ await mod.runCli();
 ```
 
 `checkAvailability` also runs `node <entry> --version` with the entry as a main
-module, so the shim must answer `--version` too. A bare guarded `lib/bin.js`
-passes that check while still being unable to serve a run. Keep
+module, so any shim must answer `--version` too. Keep
 `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` (or the profile's `entryPath`) pointed at
-your shim.
+the entry you actually verified.
 
 Output parsing is plain print: every stdout line becomes one text delta, with no
 JSON, tool events or usage. The engine is stateless, so it never resumes, and no
@@ -458,8 +460,10 @@ DeepSeek example:
 }
 ```
 
-Point `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` at an entry module that runs when it
-is imported, as described above, and not at a package file guarded by
-`import.meta.main`. Validate with `Test-CollabPilotConfig.ps1`, then start the
-group. See [Windows operations](./WINDOWS_OPERATIONS.md) for every field and
-rollback.
+Point `LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY` at an entry that either exports
+`runCli` or runs when it is imported, as described above; a guarded package entry
+that does neither still runs empty. Validate with `Test-CollabPilotConfig.ps1`,
+then start the group. See [Windows operations](./WINDOWS_OPERATIONS.md) for every
+field and rollback.
+
+Worker-local memory and host-specific skills: [operations](./WORKER_MEMORY.md).

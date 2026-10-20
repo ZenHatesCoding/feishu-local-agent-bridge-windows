@@ -5,6 +5,14 @@ if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
 $pilot = Get-CollabPilotConfig
 $errors = [Collections.Generic.List[string]]::new()
+foreach ($memoryOwner in @($pilot) + @(Get-CollabLocalAgents)) {
+  if ($memoryOwner.memory -and $null -ne $memoryOwner.memory.maxMemoryTokens) {
+    $memoryBudget = 0
+    if (![int]::TryParse([string]$memoryOwner.memory.maxMemoryTokens, [ref]$memoryBudget) -or $memoryBudget -lt 4000 -or $memoryBudget -gt 128000) {
+      $errors.Add('memory.maxMemoryTokens must be an integer between 4000 and 128000.')
+    }
+  }
+}
 $agents = @(Get-CollabAgents)
 if ($agents.Count -eq 0) { $errors.Add('No enabled agents are configured.') }
 if ((Test-CollabRunsHub) -and !(Test-Path -LiteralPath (Join-Path $script:CollabRepoRoot 'dist\cli.js'))) { $errors.Add('dist\cli.js is missing; run pnpm build.') }

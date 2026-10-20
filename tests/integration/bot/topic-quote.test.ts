@@ -7,6 +7,7 @@ import { SessionStore } from '../../../src/session/store.js';
 import { WorkspaceStore } from '../../../src/workspace/store.js';
 import { FakeAgentAdapter } from '../../helpers/fake-agent.js';
 import { createTmpProfile, type TmpProfile } from '../../helpers/tmp-profile.js';
+import { MemoryStore } from '../../../src/memory/store';
 
 const sdkMock = vi.hoisted(() => ({
   channel: undefined as FakeLarkChannel | undefined,
@@ -63,10 +64,40 @@ afterEach(async () => {
   vi.useRealTimers();
   sdkMock.channel = undefined;
   sdkMock.createLarkChannel.mockClear();
-  await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  vi.unstubAllEnvs();
 });
 
 describe('topic message quote handling', () => {
+  it('automatically injects the Worker topic ledger into a fresh second run without duplicating the new message', async () => {
+    const h = await createHarness();
+    const memoryRoot = join(h.tmp.root, 'memory');
+    vi.stubEnv('LARK_MEMORY_ENABLED', '1');
+    vi.stubEnv('LARK_MEMORY_ROOT', memoryRoot);
+    vi.stubEnv('LARK_MEMORY_BACKGROUND', '0');
+    for (const name of ['LARK_COLLAB_AGENT_ID','LARK_COLLAB_TENANT_KEY','LARK_COLLAB_HUB_URL','LARK_COLLAB_HUB_TOKEN']) vi.stubEnv(name, undefined);
+    vi.stubEnv('LARK_COLLAB_NODE_LEDGER_ROOT', join(h.tmp.root, 'journal'));
+    h.agent.setEvents([
+      [{ type: 'text', delta: '第一轮已经完成分析。' }, { type: 'done', terminationReason: 'normal' }],
+      [{ type: 'text', delta: '接着处理。' }, { type: 'done', terminationReason: 'normal' }],
+    ]);
+    await startTestBridge(h);
+    await h.channel.handlers.message?.(message({ messageId: 'om_mem_1', rootId: 'root', parentId: 'root', threadId: 'memory-topic', content: '先分析设计' }));
+    await waitFor(() => h.agent.runOptions.length === 1);
+    await waitFor(() => h.channel.streams.length === 1);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    await h.channel.handlers.message?.(message({ messageId: 'om_mem_2', rootId: 'root', parentId: 'root', threadId: 'memory-topic', content: '独特的本轮新要求' }));
+    await waitFor(() => h.agent.runOptions.length === 2);
+    const second = h.agent.runOptions[1]!;
+    expect(second.prompt).toContain('<worker_topic_memory>');
+    expect(second.prompt).toContain('第一轮已经完成分析');
+    expect(second.prompt.match(/独特的本轮新要求/g)).toHaveLength(1);
+    expect(second.env?.LARK_MEMORY_BINDING).toContain(memoryRoot);
+    expect(second.sessionId).toBeUndefined();
+    const db = new MemoryStore(memoryRoot, 'test', 'cli_test');
+    try { expect(db.events(db.topic('oc_topic_chat:memory-topic').id).length).toBeGreaterThanOrEqual(3); }
+    finally { db.close(); }
+  });
   it('does not quote the topic root when a user directly mentions the bot inside the topic', async () => {
     const h = await createHarness();
 

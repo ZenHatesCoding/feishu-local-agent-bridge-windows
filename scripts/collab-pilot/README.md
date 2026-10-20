@@ -101,3 +101,5 @@ proxy and passes it only to Antigravity. The Feishu connection remains direct
 through `LARK_CHANNEL_DISABLE_PROXY=1`. If Feishu reports `Authentication
 required` while the desktop client is already logged in, verify that the
 Windows proxy is running and restart only that agent.
+
+Worker memory: [operations](../../docs/WORKER_MEMORY.md). Restart one bot with Restart-CollabAgent.ps1 -Agent <id>.

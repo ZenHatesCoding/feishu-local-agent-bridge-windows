@@ -335,6 +335,18 @@ cursor. Long-finished tasks can be offloaded from hot memory into an archive.
 JSONL remains sufficient for a single-Hub MVP; SQLite or PostgreSQL later
 provides transactions and uniqueness constraints.
 
+Worker topic memory now lands part of that projection: each Worker owns a separate
+SQLite observation ledger and a bounded topic-memory projection — sourced task
+state, hierarchical summaries, recent originals and budgeted retrieval.
+Consolidation runs automatically on new observations, before an oversized
+projection and during idle periods. Original observations remain available
+through source references; failed maintenance retains them and reports memory
+debt instead of silently omitting history. See
+[Worker memory operations](./WORKER_MEMORY.md) and the
+[design contract](./plans/WORKER_TOPIC_MEMORY.md). Hub cold-task archival and
+database migration remain separate roadmap work; Worker SQLite does not migrate
+the Hub, and local host verification is not second-PC memory acceptance.
+
 ## Delivery Phases
 
 ### P0: Text-Only Remote MVP (implemented in code; second-PC acceptance pending)

@@ -13,6 +13,11 @@ import os
 import datetime
 import re
 import shutil
+import subprocess
+import tempfile
+import threading
+import asyncio
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,6 +25,31 @@ from typing import Any
 
 
 _RUN_BY_SESSION: dict[str, tuple[str, str]] = {}
+_MEMORY_BY_SESSION: dict[str, str] = {}
+
+
+def _memory_command(mode: str, scope: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    node = os.environ.get("LARK_MEMORY_NODE_BIN", "node")
+    cli = os.environ.get("LARK_MEMORY_CLI", "")
+    if not cli:
+        raise RuntimeError("Worker memory CLI is not configured")
+    arguments = [node, cli, "memory", mode, "--scope", scope]
+    temporary = None
+    try:
+        if payload is not None:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", delete=False) as handle:
+                json.dump(payload, handle, ensure_ascii=False)
+                temporary = handle.name
+            arguments.extend(["--file", temporary])
+        env = dict(os.environ)
+        env.pop("LARK_MEMORY_BINDING", None)
+        result = subprocess.run(arguments, env=env, capture_output=True, text=True, encoding="utf-8", timeout=150, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if result.returncode:
+            raise RuntimeError("Worker topic memory command failed: " + mode)
+        return json.loads(result.stdout)
+    finally:
+        if temporary:
+            os.unlink(temporary)
 
 _FILE_PATTERNS = (
     re.compile(r"MEDIA:\s*([^\r\n]+)", re.IGNORECASE),
@@ -66,6 +96,7 @@ def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> Non
         "messageId": message_id or None,
         "senderId": str(context.get("user_id") or "") or None,
         "content": content,
+        "authorAgentId": os.environ.get("LARK_COLLAB_AGENT_ID", ""),
     }
     try:
         # The bridge reads <root>/collaboration/topics/<chatId>/<threadId>.jsonl
@@ -79,6 +110,11 @@ def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> Non
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
         pass
+    if os.environ.get("LARK_MEMORY_ENABLED") == "1":
+        _memory_command("observe", scope, {
+            "origin": identity, "kind": kind, "content": content,
+            "actor": "agent" if kind == "bot-result" or context.get("is_bot") else "human",
+        })
 
 
 def _request(path: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -262,6 +298,16 @@ def _on_start(context: dict[str, Any]) -> None:
         f"{prompt_context}\n\n"
         f"{message}"
     )
+    if os.environ.get("LARK_MEMORY_ENABLED") == "1":
+        scope = f"{context.get('chat_id')}:{context.get('thread_id')}"
+        try:
+            prepared = _memory_command("prepare", scope)
+        except Exception:
+            context["cancel"] = True
+            raise
+        binding_file = str(prepared["bindingFile"])
+        context["message_full"] = str(prepared["prompt"]) + "\nFor this Hermes turn, every memory tool command must include --binding " + json.dumps(binding_file) + "\n\n" + context["message_full"]
+        _MEMORY_BY_SESSION[str(context.get("session_id") or "")] = binding_file
     session_id = str(context.get("session_id") or "")
     if session_id:
         _RUN_BY_SESSION[session_id] = (task_id, dispatch_id)
@@ -288,6 +334,14 @@ def _on_end(context: dict[str, Any]) -> None:
         })
         return
     _record_local_topic(context, "bot-result", response)
+    if _MEMORY_BY_SESSION.pop(session_id, None) and os.environ.get("LARK_MEMORY_BACKGROUND") != "0":
+        scope = f"{context.get('chat_id')}:{context.get('thread_id')}"
+        def maintain_memory() -> None:
+            try:
+                _memory_command("maintain", scope)
+            except Exception:
+                pass  # Persisted originals remain; next prepare retries maintenance.
+        threading.Thread(target=maintain_memory, daemon=True).start()
     _register_artifacts(task_id, agent_id, response, "outbound")
     digest = hashlib.sha256(response.encode("utf-8")).hexdigest()[:24]
     _request("/v1/events", body={
@@ -307,6 +361,6 @@ def _on_end(context: dict[str, Any]) -> None:
 
 async def handle(event_type: str, context: dict[str, Any]) -> None:
     if event_type == "agent:start":
-        _on_start(context)
+        await asyncio.to_thread(_on_start, context)
     elif event_type == "agent:end":
-        _on_end(context)
+        await asyncio.to_thread(_on_end, context)

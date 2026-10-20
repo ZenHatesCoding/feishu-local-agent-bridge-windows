@@ -28,6 +28,8 @@ export type AgentEvent =
 export const CLAUDE_DEFAULT_PERMISSION_MODE: ClaudePermissionMode = 'bypassPermissions';
 
 export interface AgentRunOptions {
+  /** Internal synthesis only: no Feishu prompt, session resume or collaboration output. */
+  memoryMode?: boolean;
   runId: string;
   prompt: string;
   cwd?: string;

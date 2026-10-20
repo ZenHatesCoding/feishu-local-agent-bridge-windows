@@ -1,6 +1,8 @@
 import type { Readable, Writable } from 'node:stream';
 import { createInterface } from 'node:readline';
 import { delimiter } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { mergeProcessEnv, spawnProcess, type SpawnedProcessByStdio } from '../../platform/spawn';
 import { SpawnFailed } from '../../runtime/errors';
 import { prefixBridgeSystemPrompt } from '../bridge-system-prompt';
@@ -89,7 +91,7 @@ export class AntigravityAdapter implements AgentAdapter {
       throw new Error('cwd is required for AntigravityAdapter.run');
     }
 
-    const prompt = prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
+    const prompt = opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
     const args = [
       '--input-format',
       'stream-json',
@@ -97,10 +99,12 @@ export class AntigravityAdapter implements AgentAdapter {
       'stream-json',
       '--print-timeout',
       this.printTimeout,
-      ...(this.project ? ['--project', this.project] : []),
+      ...(this.project && !opts.memoryMode ? ['--project', this.project] : []),
       ...(opts.model ?? this.model ? ['--model', opts.model ?? this.model!] : []),
-      ...(this.dangerouslySkipPermissions ? ['--dangerously-skip-permissions'] : []),
+      ...(this.dangerouslySkipPermissions && !opts.memoryMode ? ['--dangerously-skip-permissions'] : []),
       ...(this.sandbox ? ['--sandbox'] : []),
+      ...(opts.memoryMode ? ['--disable-slash-commands', '--sandbox'] : []),
+      ...(opts.memoryMode ? ['--json-schema', JSON.stringify({ type: 'object', required: ['items', 'summary'], properties: { items: { type: 'array', items: { type: 'object' } }, summary: { type: 'string' } } })] : []),
       '--add-dir',
       opts.cwd,
     ];
@@ -110,7 +114,7 @@ export class AntigravityAdapter implements AgentAdapter {
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.larkChannel),
         ...opts.env,
-        LARK_CHANNEL_ANTIGRAVITY_BRIDGE: '1',
+        LARK_CHANNEL_ANTIGRAVITY_BRIDGE: opts.memoryMode ? undefined : '1',
         LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: undefined,
         DSH_CWD: undefined,
         PATH: antigravityPath(process.env.PATH),
@@ -138,7 +142,7 @@ export class AntigravityAdapter implements AgentAdapter {
 
     return {
       runId: opts.runId,
-      events: createEventStream(child, stderrChunks, () => runtimeError),
+      events: createEventStream(child, stderrChunks, () => runtimeError, opts.memoryMode ? opts.cwd : undefined),
       async stop() {
         if (child.exitCode !== null || child.signalCode !== null) return;
         child.kill('SIGTERM');
@@ -180,6 +184,7 @@ async function* createEventStream(
   child: AntigravityChild,
   stderrChunks: Buffer[],
   getError: () => Error | null,
+  memoryDirectory?: string,
 ): AsyncGenerator<AgentEvent> {
   if (!child.pid) {
     const err = getError();
@@ -196,8 +201,17 @@ async function* createEventStream(
   let resultError: string | undefined;
   try {
     for await (const line of rl) {
-      const parsed = parseStreamJsonLine(line);
+      const parsed = parseStreamJsonLine(line, Boolean(memoryDirectory));
+      if (memoryDirectory) {
+        try {
+          const terminal = JSON.parse(line) as { event?: string; result?: { status?: string; error?: string; response?: string; structured_output?: unknown } };
+          if (terminal.event === 'result') {
+            writeFileSync(join(memoryDirectory, 'host-result.json'), JSON.stringify(terminal.result), { mode: 0o600 });
+          }
+        } catch { /* Diagnostics must not change execution semantics. */ }
+      }
       if (parsed?.error) resultError ??= parsed.error;
+      if (parsed?.finalText && !text) { text = parsed.finalText; yield { type: 'text', delta: parsed.finalText }; }
       const delta = parsed?.delta ?? '';
       if (!delta) continue;
       text += delta;
@@ -231,10 +245,10 @@ async function* createEventStream(
     };
     return;
   }
-  if (text.trim().length === 0 && stderr.length > 0) {
+  if (text.trim().length === 0) {
     yield {
       type: 'error',
-      message: `Antigravity CLI produced no reply. stderr: ${truncateForReply(stderr)}`,
+      message: `Antigravity CLI produced no reply.${stderr ? ` stderr: ${truncateForReply(stderr)}` : ''}`,
       terminationReason: 'failed',
     };
     return;
@@ -242,14 +256,18 @@ async function* createEventStream(
   yield { type: 'done', terminationReason: 'normal' };
 }
 
-function parseStreamJsonLine(line: string): { delta?: string; error?: string } | undefined {
+function parseStreamJsonLine(
+  line: string,
+  finalOnly = false,
+): { delta?: string; error?: string; finalText?: string } | undefined {
   try {
     const value = JSON.parse(line) as {
       event?: string;
       step_update?: { step_type?: string; text_delta?: string };
-      result?: { status?: string; error?: string; response?: string };
+      result?: { status?: string; error?: string; response?: string; structured_output?: unknown };
     };
     if (value.event === 'step_update' && value.step_update?.step_type === 'agent_response') {
+      if (finalOnly) return {}; // Structured mode may stream multiple drafts.
       return value.step_update.text_delta ? { delta: value.step_update.text_delta } : {};
     }
     if (value.event === 'step_update' && value.step_update?.step_type === 'error_message') {
@@ -259,6 +277,10 @@ function parseStreamJsonLine(line: string): { delta?: string; error?: string } |
       return {
         error: value.result.error || value.result.response || `Antigravity CLI returned ${value.result.status}`,
       };
+    }
+    if (value.event === 'result') {
+      if (finalOnly && value.result?.structured_output) return { finalText: JSON.stringify(value.result.structured_output) };
+      return value.result?.response ? { finalText: value.result.response } : {};
     }
     return {};
   } catch {

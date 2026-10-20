@@ -90,3 +90,5 @@ Antigravity 用 `agy.exe` 时，启动器会读取 Windows 当前用户代理，
 Antigravity 进程，飞书连接仍由 `LARK_CHANNEL_DISABLE_PROXY=1` 保持直连。如果飞书
 回复 `Authentication required` 而本地客户端已登录，先确认 Windows 代理在运行，
 再单独重启该 Agent。
+
+Worker 记忆见[运维说明](../../docs/WORKER_MEMORY.zh-CN.md)。使用 Restart-CollabAgent.ps1 -Agent <id> 重启单个 Bot。
