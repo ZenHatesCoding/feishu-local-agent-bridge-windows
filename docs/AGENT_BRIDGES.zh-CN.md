@@ -144,7 +144,9 @@ $env:LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY = `
 ```
 
 独立适配器使用 Node 启动 Harness 的 headless profile，并通过 stdin 传递
-prompt，长话题不再受 Windows 命令行长度限制。Justice/Antigravity 与
+prompt，长话题不再受 Windows 命令行长度限制。入口导出 `runCli` 时，启动器会在
+导入后显式调用它；仍兼容旧版导入即启动的入口。即使进程退出码为零，空回复也会
+按失败报告，不再误记为完成。Justice/Antigravity 与
 Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。Harness 的答案是最终
 批量输出，不是可靠的增量流。因此 bridge 不维持空白 markdown stream，也不发送
 固定的入站确认；任务完成后用普通话题回复一次性交付最终答案。长任务仍使用统一的

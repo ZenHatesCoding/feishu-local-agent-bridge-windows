@@ -134,7 +134,10 @@ $env:DEEPSEEK_HARNESS_ROOT = 'D:\src\deepseek-harness'
 
 The adapter runs Node with the built `apps\cli\lib\bin.js` entry and the
 headless profile. Prompts are carried over stdin so long topics never depend on
-the Windows command-line limit. Harness produces its answer as a final batch
+the Windows command-line limit. For entries exporting `runCli`, the bootstrap
+calls it explicitly after import; older self-starting entries remain supported.
+An empty response is a failed run even when the process exits with code zero.
+Harness produces its answer as a final batch
 rather than a dependable incremental stream. The bridge posts that completed
 answer once as a normal topic reply and does not open an empty markdown stream
 or post a synthetic intake acknowledgement. A long run still uses the common
