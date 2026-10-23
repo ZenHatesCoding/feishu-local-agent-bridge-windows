@@ -39,7 +39,7 @@ Exact setup for each agent: [Agent bridge guide](./docs/AGENT_BRIDGES.md).
 | --- | --- | --- |
 | Claude Code | Native `claude` adapter | Installed and logged-in `claude` CLI |
 | Codex | Native `codex` adapter | Installed and logged-in Codex CLI |
-| Google Antigravity | `antigravity` adapter in `agy` mode | Interactive `agy` login |
+| Google Antigravity | `antigravity`: App Sidecar or agy CLI | Signed-in App project or interactive `agy` login |
 | DeepSeek Harness | Independent `deepseek-harness` adapter | Node.js 22+ and an importable Harness entry |
 | Hermes | Isolated collaboration Hook | Existing Hermes installation; never reinstalled |
 

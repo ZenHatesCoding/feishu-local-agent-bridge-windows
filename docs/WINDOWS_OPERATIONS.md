@@ -462,3 +462,5 @@ identity. A repeated failure is reported with the exact command error and local
 file path for diagnosis.
 
 For per-Worker memory, migration and restart procedures, see [Worker memory](./WORKER_MEMORY.md). Restart-CollabAgent.ps1 also reloads a detached Hermes gateway.
+
+For an existing signed-in Antigravity App, see [desktop Worker operations](./ANTIGRAVITY_DESKTOP.md). Its Sidecar is managed by the App; Pilot manages the Feishu bridge and does not launch or kill the App.

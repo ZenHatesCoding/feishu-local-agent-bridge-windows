@@ -414,3 +414,5 @@ App Secret、profile 目录、导出的 worker 清单或
 身份。重试仍失败时才保留准确命令错误和本机文件路径用于诊断。
 
 每个 Worker 的记忆、迁移和重启步骤见[Worker 记忆](./WORKER_MEMORY.zh-CN.md)。Restart-CollabAgent.ps1 也会让独立 Hermes gateway 重新加载 Hook。
+
+使用已登录的 Antigravity 客户端时，见[客户端 Worker 运维](./ANTIGRAVITY_DESKTOP.zh-CN.md)。Sidecar 由客户端管理，Pilot 只管理飞书 bridge，不启动或终止客户端。

@@ -92,3 +92,5 @@ Antigravity 进程，飞书连接仍由 `LARK_CHANNEL_DISABLE_PROXY=1` 保持直
 再单独重启该 Agent。
 
 Worker 记忆见[运维说明](../../docs/WORKER_MEMORY.zh-CN.md)。使用 Restart-CollabAgent.ps1 -Agent <id> 重启单个 Bot。
+
+Antigravity 客户端执行见 [Sidecar 安装、生命周期与回退](../../docs/ANTIGRAVITY_DESKTOP.zh-CN.md)。Pilot 的客户端部署必须显式设置 transport 和运行根目录环境字段；启动失败不会恢复 CLI。

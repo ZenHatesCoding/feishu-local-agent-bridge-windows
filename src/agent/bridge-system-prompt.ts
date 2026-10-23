@@ -2,7 +2,7 @@ import type { AgentBotIdentity } from './types';
 
 export const BRIDGE_SYSTEM_PROMPT = `# lark-channel-bridge 运行约定
 
-你正在 lark-channel-bridge 里跑：把飞书/Lark 用户消息桥到本地 agent CLI。
+你正在 lark-channel-bridge 里跑：把飞书/Lark 用户消息桥到本地 agent 运行环境。
 
 ## 无人值守运行
 

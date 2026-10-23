@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const root = process.cwd();
 const pairs: Array<readonly [string, string]> = [
   ['docs/AGENT_BRIDGES.md', 'docs/AGENT_BRIDGES.zh-CN.md'],
+  ['docs/ANTIGRAVITY_DESKTOP.md', 'docs/ANTIGRAVITY_DESKTOP.zh-CN.md'],
   ['docs/COLLABORATION_CONCEPTS.md', 'docs/COLLABORATION_CONCEPTS.zh-CN.md'],
   ['docs/DESIGN.md', 'docs/DESIGN.zh-CN.md'],
   ['docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md', 'docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md'],

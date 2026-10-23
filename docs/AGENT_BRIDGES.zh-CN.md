@@ -190,6 +190,10 @@ thread 列表。
 
 ## Google Antigravity
 
+支持显式选择 agy CLI 或客户端 Sidecar。
+需要在已登录的桌面项目中执行时，见[客户端 Worker 指南](./ANTIGRAVITY_DESKTOP.zh-CN.md)。
+客户端模式不会静默回退 CLI。下面的章节说明 CLI 模式。
+
 先在可见的交互 PowerShell 里完成 `agy` 登录，后台 bridge 没法替你回答 Google 的
 登录提示。`test-agy-print.ps1` 会跑一次 `agy --print`，是验证登录的快捷方式：
 
@@ -208,7 +212,7 @@ node .\dist\cli.js run --profile antigravity --agent antigravity --workspace C:\
 出的路径存为 `antigravity.binaryPath`。探测没有 `%LOCALAPPDATA%` 兜底，所以依赖
 默认路径时请设置该变量，或显式传 `--agent`。
 
-`antigravity` 适配器始终只用 `agy` 协议，不会因为环境变量换成别的 Agent 实现。
+CLI 入口使用 `agy` 协议，不会替换成其他 Agent。
 每次运行拼出的命令是：
 
 ```text
@@ -225,8 +229,8 @@ prompt 是 stdin 上的一个 `stream-json` 信封。`agy --print` 的等待上�
 后一次性发送最终回复。入站时它也不发“已收到/正在处理”这类合成消息；飞书原生消息
 状态和 bridge 的公共运行状态机制对所有 Bot 一视同仁。
 
-Antigravity 是无状态的：没有会话或 thread 身份，无法续接，`/resume` 会说明
-`agy --print` 模式没有历史。运行参数里带着解析后的权限值，但适配器不读，也不会据此
+CLI bridge 每轮启动新工作，不暴露提供方会话或 thread 身份，也未实现 /resume；
+原生 agy 可以保留自己的历史。运行参数里带着解析后的权限值，但适配器不读，也不会据此
 传任何权限参数；权限行为只来自 profile 的 `antigravity.dangerouslySkipPermissions`
 和 `antigravity.sandbox`，且创建 profile 时会把 `dangerouslySkipPermissions` 写成
 `true`。

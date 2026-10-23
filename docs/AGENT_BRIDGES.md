@@ -217,6 +217,10 @@ threads of the same working directory.
 
 ## Google Antigravity
 
+Two explicit transports are supported: agy CLI and the App Sidecar.
+For execution in a signed-in desktop project, see the [App Worker guide](./ANTIGRAVITY_DESKTOP.md).
+Desktop mode never falls back to CLI. The following section describes CLI mode.
+
 Complete the `agy` login in a visible interactive PowerShell first; a background
 bridge cannot answer a Google sign-in prompt. `test-agy-print.ps1` is the quick
 check that the login works, since it runs a one-shot `agy --print` request:
@@ -238,8 +242,7 @@ when `LOCALAPPDATA` is set, and `agy` otherwise; the resolved path is stored as
 you rely on the default path either set the variable or pass an explicit
 `--agent`.
 
-The Antigravity adapter always uses the `agy` protocol. It never selects another
-agent implementation from environment variables. Per run it builds:
+The CLI transport uses the `agy` protocol without substituting another Agent. Per run it builds:
 
 ```text
 agy --input-format stream-json --output-format stream-json \
@@ -258,8 +261,8 @@ instead of opening a markdown stream. It does not post a synthetic
 “received/working” message at intake; Feishu's native message state and the
 bridge's common run-state mechanism apply equally to all Bots.
 
-Antigravity is stateless: it has no session or thread identity, cannot resume,
-and `/resume` reports that `agy --print` mode has no history. The run options
+The CLI bridge starts fresh work and does not expose provider session/thread
+identity or implement /resume. Native agy can retain its own history. The run options
 carry the resolved `permissions` values, but the adapter ignores them and passes
 no permission flag derived from them. Permission behaviour comes from the
 profile's `antigravity.dangerouslySkipPermissions` and `antigravity.sandbox`

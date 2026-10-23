@@ -1643,6 +1643,8 @@ async function processAgentStream(
       }
       armOrPauseIdle();
 
+      if (evt.type === 'activity') continue;
+
       if (evt.type === 'system') {
         recordSession(evt);
         continue;

@@ -34,6 +34,7 @@ Start with the README, then open only the documents the change touches:
 | Protocol invariants, visibility, routing, context and Artifact design | [Design](./docs/DESIGN.md) / [中文](./docs/DESIGN.zh-CN.md) |
 | Worker-local topic memory, budgets, consolidation and recovery | [Worker memory](./docs/WORKER_MEMORY.md) / [中文](./docs/WORKER_MEMORY.zh-CN.md); [design contract](./docs/plans/WORKER_TOPIC_MEMORY.md) |
 | Agent-specific bridge and profile integration | [Agent bridges](./docs/AGENT_BRIDGES.md) / [中文](./docs/AGENT_BRIDGES.zh-CN.md) |
+| Antigravity App Sidecar execution, cancellation and rollback | [App Worker](./docs/ANTIGRAVITY_DESKTOP.md) / [中文](./docs/ANTIGRAVITY_DESKTOP.zh-CN.md) |
 | Windows manifests, roles, startup, logs, rollback and worker export | [Windows operations](./docs/WINDOWS_OPERATIONS.md) / [中文](./docs/WINDOWS_OPERATIONS.zh-CN.md) |
 | Step-by-step bring-up of a new Windows worker box | [Worker deployment recipe](./docs/WINDOWS_WORKER_DEPLOYMENT.md) / [中文](./docs/WINDOWS_WORKER_DEPLOYMENT.zh-CN.md) |
 | Failures hit on real Windows worker installs, and how the pilot scripts were hardened | [Windows worker pitfalls](./docs/WINDOWS_WORKER_PITFALLS.md) / [中文](./docs/WINDOWS_WORKER_PITFALLS.zh-CN.md) |
