@@ -41,6 +41,8 @@ For standalone launches, alternatively set antigravity.transport to desktop and 
 in the bridge profile. The agentKind remains antigravity. Wait for a fresh
 DesktopRoot/heartbeat.json, build the bridge, then restart only this Worker.
 The App selects the model; per-run CLI model overrides are rejected explicitly.
+Memory synthesis alone uses the agentapi flash_lite tier by default to avoid inheriting
+a slow business-model setting. The installer accepts MemoryModel=flash_lite/flash/pro.
 CLI project, print timeout and skip-permission flags do not control App execution.
 
 ## Execution and boundaries

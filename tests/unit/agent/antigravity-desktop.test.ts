@@ -38,6 +38,11 @@ describe('Antigravity App transport', () => {
   });
 });
 describe('App named hooks', () => {
+  it('uses a bounded maintenance tier without overriding the App model for business tasks', () => {
+    expect(core.submissionArgs({ runId: 'test', memoryMode: true }, 'data')).toContain('--model=flash_lite');
+    expect(core.submissionArgs({ runId: 'test', memoryMode: false }, 'task').some((arg: string) => arg.startsWith('--model='))).toBe(false);
+    expect(() => core.submissionArgs({ runId: 'test', memoryMode: true }, 'data', 'invalid')).toThrow();
+  });
   it('does not export App authentication or another ambient bot identity to tools', () => {
     expect(core.toolEnvironment({ PATH: 'system-path', ANTIGRAVITY_CSRF_TOKEN: 'app-private', LARK_COLLAB_HUB_TOKEN: 'other-bot' }, { LARK_COLLAB_HUB_TOKEN: 'this-bot' })).toEqual({ PATH: 'system-path', LARK_COLLAB_HUB_TOKEN: 'this-bot' });
   });
