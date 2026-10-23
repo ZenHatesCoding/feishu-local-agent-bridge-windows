@@ -1,5 +1,5 @@
 const fs = require('node:fs'), path = require('node:path'), cp = require('node:child_process');
-const { json, save, jobPath, cancelled } = require('./core.cjs');
+const { json, save, jobPath, cancelled, submissionArgs } = require('./core.cjs');
 const root = process.env.LARK_ANTIGRAVITY_DESKTOP_ROOT;
 if (!root || !process.env.ANTIGRAVITY_LS_ADDRESS) throw Error('Desktop Sidecar environment is required');
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -46,7 +46,7 @@ async function start(id) {
     save(path.join(dir, 'claimed.json'), { at: Date.now() });
     const marker = `FEISHU_DESKTOP_RUN:${id}:${request.nonce}`;
     const prompt = `${marker}\nThis is an authorized, unattended Feishu bridge run. Work in ${request.cwd}. Do not repeat the binding marker in your reply. Never wait for App questions or approval dialogs; explain required information or approval in a final answer instead.\n${request.prompt}`;
-    const result = await api(['new-conversation', '--title=Feishu worker ' + id.slice(0, 8), prompt]);
+    const result = await api(submissionArgs(request, prompt, process.env.LARK_ANTIGRAVITY_MEMORY_MODEL || 'flash_lite'));
     const conversationId = result.response?.newConversation?.conversationId;
     if (!/^[a-f0-9-]{36}$/i.test(conversationId || '')) throw Error('Missing desktop conversation ID');
     save(path.join(root, 'conversations', conversationId + '.json'), { runId: id, nonce: request.nonce });

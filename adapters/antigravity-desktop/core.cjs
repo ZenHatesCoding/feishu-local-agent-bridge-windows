@@ -108,7 +108,11 @@ function toolEnvironment(parent, bound) {
   for (const key of Object.keys(env)) if (/^ANTIGRAVITY_|^LARK_|^LARKSUITE_/i.test(key)) delete env[key];
   return { ...env, ...bound };
 }
-module.exports = { json, save, jobPath, emit, cancelled, resolveJob, finalResponse, hook, toolEnvironment };
+function submissionArgs(request, prompt, memoryModel = 'flash_lite') {
+  if (!['flash_lite', 'flash', 'pro'].includes(memoryModel)) throw Error('Unsupported App memory model tier');
+  return ['new-conversation', ...(request.memoryMode ? ['--model=' + memoryModel] : []), '--title=Feishu worker ' + request.runId.slice(0, 8), prompt];
+}
+module.exports = { json, save, jobPath, emit, cancelled, resolveJob, finalResponse, hook, toolEnvironment, submissionArgs };
 if (require.main === module) {
   const [mode, root, arg, encoded] = process.argv.slice(2);
   if (mode === 'exec') execute(root, arg, encoded).catch(error => { console.error(error.message); process.exitCode = 1; });

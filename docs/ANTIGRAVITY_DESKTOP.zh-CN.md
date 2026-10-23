@@ -37,6 +37,8 @@ agentapi 和生命周期 Hook。业务执行和话题记忆整理都不会启动
 独立启动时，也可以在 bridge profile 中设置 antigravity.transport=desktop 和 antigravity.desktopRoot。
 agentKind 仍为 antigravity。等待 DesktopRoot/heartbeat.json 持续更新，构建 bridge，
 再只重启这个 Worker。模型由客户端选择；每轮 CLI 模型覆盖会明确拒绝。
+只有记忆整理默认使用 agentapi 的 flash_lite 档位，避免继承耗时较长的业务模型配置；
+安装器可用 MemoryModel=flash_lite/flash/pro 调整。
 CLI 的 project、printTimeout 和跳过权限参数不控制客户端执行。
 
 ## 执行与边界

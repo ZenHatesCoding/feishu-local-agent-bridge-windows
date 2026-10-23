@@ -2,7 +2,8 @@ param(
   [Parameter(Mandatory=$true)][string]$DesktopRoot,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$ProjectId,
   [Parameter(Mandatory=$true)][string]$WorkspaceRoot,
-  [Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$SidecarId
+  [Parameter(Mandatory=$true)][ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$SidecarId,
+  [ValidateSet('flash_lite','flash','pro')][string]$MemoryModel = 'flash_lite'
 )
 $ErrorActionPreference = 'Stop'
 $DesktopRoot = [IO.Path]::GetFullPath($DesktopRoot)
@@ -40,7 +41,7 @@ if (!$config.sidecars) { $config | Add-Member -NotePropertyName sidecars -NotePr
 $config.sidecars | Add-Member -NotePropertyName $SidecarId -NotePropertyValue ([pscustomobject]@{enabled=$true;projectId=$ProjectId}) -Force
 $sidecarDir = Join-Path $customization ('sidecars/' + $SidecarId)
 New-Item -ItemType Directory -Path $sidecarDir -Force | Out-Null
-$sidecar = @{command=$nodePath;args=@((Join-Path $target 'sidecar.cjs'));env=@{LARK_ANTIGRAVITY_DESKTOP_ROOT=$DesktopRoot;LARK_ANTIGRAVITY_WORKSPACE_ROOT=$WorkspaceRoot};restart_policy='on-failure';display_name='Feishu Worker desktop bridge';description='Runs authorized Feishu tasks in this App project'}
+$sidecar = @{command=$nodePath;args=@((Join-Path $target 'sidecar.cjs'));env=@{LARK_ANTIGRAVITY_DESKTOP_ROOT=$DesktopRoot;LARK_ANTIGRAVITY_WORKSPACE_ROOT=$WorkspaceRoot;LARK_ANTIGRAVITY_MEMORY_MODEL=$MemoryModel};restart_policy='on-failure';display_name='Feishu Worker desktop bridge';description='Runs authorized Feishu tasks in this App project'}
 [IO.File]::WriteAllText((Join-Path $sidecarDir 'sidecar.json'),($sidecar|ConvertTo-Json -Depth 10),$utf8)
 $hooks = if (Test-Path -LiteralPath $hooksPath) { Get-Content -LiteralPath $hooksPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { [pscustomobject]@{} }
 $definition = [ordered]@{enabled=$true}
