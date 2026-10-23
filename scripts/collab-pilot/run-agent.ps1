@@ -37,6 +37,8 @@ foreach ($name in @(
   'LARK_CHANNEL_CODEX_BIN',
   'LARK_CHANNEL_NODE_BIN',
   'LARK_CHANNEL_ANTIGRAVITY_BIN',
+  'LARK_CHANNEL_ANTIGRAVITY_TRANSPORT',
+  'LARK_ANTIGRAVITY_DESKTOP_ROOT',
   'LARK_CHANNEL_DEEPSEEK_HARNESS_ENTRY',
   'LARK_CHANNEL_ANTIGRAVITY_BRIDGE',
   'LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE',
@@ -49,12 +51,12 @@ foreach ($name in @($pilot.unsetEnvironment)) {
 }
 Set-CollabEnvironment $pilot.commonEnvironment
 Set-CollabEnvironment $agentConfig.launch.environment
-if ([System.IO.Path]::GetFileName([string]$env:LARK_CHANNEL_ANTIGRAVITY_BIN) -ieq 'agy.exe') {
-  . (Join-Path $script:CollabRepoRoot 'scripts\antigravity-proxy-env.ps1')
-  Initialize-AntigravityProxyEnvironment
-}
 foreach ($name in @($agentConfig.launch.unsetEnvironment)) {
   if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
+}
+if ($env:LARK_CHANNEL_ANTIGRAVITY_TRANSPORT -ne 'desktop' -and [System.IO.Path]::GetFileName([string]$env:LARK_CHANNEL_ANTIGRAVITY_BIN) -ieq 'agy.exe') {
+  . (Join-Path $script:CollabRepoRoot 'scripts\antigravity-proxy-env.ps1')
+  Initialize-AntigravityProxyEnvironment
 }
 # Tool runtimes such as DeepSeek Harness intentionally scrub ambient variables
 # whose names look like credentials before starting a model shell.  Publish and

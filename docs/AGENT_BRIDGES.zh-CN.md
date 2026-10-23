@@ -87,6 +87,10 @@ node .\dist\cli.js run `
 
 ## Google Antigravity
 
+支持显式选择现有 agy CLI 或客户端 Sidecar 两个入口。
+需要在已登录的桌面项目中执行时，使用[客户端 Worker 指南](./ANTIGRAVITY_DESKTOP.zh-CN.md)。
+客户端模式不会静默回退 CLI。下面的命令说明 CLI 模式。
+
 先在可见的交互 PowerShell 中完成 `agy` 登录，确认它能直接输出结果。后台进程无法
 替你处理 Google 登录提示。
 
@@ -99,7 +103,7 @@ node .\dist\cli.js run `
   --workspace C:\workspaces\antigravity
 ```
 
-`antigravity` 适配器始终只使用 `agy` 协议，不再由环境变量切换成其他 Agent。
+CLI 入口使用 `agy` 协议，不会替换成其他 Agent。
 `agy --print` 的等待上限默认是 60 分钟；这是防止遗留进程的安全上限，不是普通任务
 时限。Antigravity 在研究、找图和文档制作期间通常没有可靠的增量文本，因此 bridge
 不会开启空白 markdown 流，而是在完成后一次性发送最终回复。入站时不会额外发送

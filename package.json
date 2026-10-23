@@ -28,6 +28,7 @@
   "files": [
     "dist",
     "adapters/memory",
+    "adapters/antigravity-desktop",
     "adapters/hermes/memory_synthesize.py",
     "bin",
     "README.md",

@@ -51,3 +51,5 @@ required` while the desktop client is already logged in, verify that the
 Windows proxy is running and restart only that agent.
 
 Worker memory: [operations](../../docs/WORKER_MEMORY.md). Restart one bot with Restart-CollabAgent.ps1 -Agent <id>.
+
+Antigravity App execution: [Sidecar installation, lifecycle and rollback](../../docs/ANTIGRAVITY_DESKTOP.md). Pilot desktop deployments must set the explicit transport and runtime-root environment fields; startup failure does not restore the CLI.

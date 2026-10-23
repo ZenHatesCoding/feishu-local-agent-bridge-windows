@@ -3,6 +3,7 @@ import os from 'node:os';
 import { createInterface } from 'node:readline';
 import pkg from '../../../package.json';
 import { AntigravityAdapter } from '../../agent/antigravity/adapter';
+import { AntigravityDesktopAdapter } from '../../agent/antigravity/desktop';
 import { DeepSeekHarnessAdapter } from '../../agent/deepseek-harness/adapter';
 import { ClaudeAdapter } from '../../agent/claude/adapter';
 import { CodexAdapter } from '../../agent/codex/adapter';
@@ -445,6 +446,11 @@ export function createRuntimeAgent(
   }
   if (profileConfig.agentKind === 'antigravity') {
     const antigravity = profileConfig.antigravity;
+    if (process.env.LARK_CHANNEL_ANTIGRAVITY_TRANSPORT === 'desktop' || antigravity?.transport === 'desktop') {
+      const root = process.env.LARK_ANTIGRAVITY_DESKTOP_ROOT ?? antigravity?.desktopRoot;
+      if (!root) throw new Error('Desktop transport requires antigravity.desktopRoot or LARK_ANTIGRAVITY_DESKTOP_ROOT');
+      return new AntigravityDesktopAdapter(root, larkChannel);
+    }
     if (!antigravity?.binaryPath) {
       throw new Error('antigravity profile requires antigravity.binaryPath');
     }

@@ -55,7 +55,11 @@ try {
 } catch {
   Stop-CollabComponent $Agent
   Remove-CollabAgentHook $agentConfig
-  Start-OriginalAgent $agentConfig
+  if ($agentConfig.launch.environment.LARK_CHANNEL_ANTIGRAVITY_TRANSPORT -eq 'desktop') {
+    Write-Warning 'Desktop transport failed to start. CLI fallback is disabled; keep the Antigravity App and its Sidecar running.'
+  } else {
+    Start-OriginalAgent $agentConfig
+  }
   throw
 }
 

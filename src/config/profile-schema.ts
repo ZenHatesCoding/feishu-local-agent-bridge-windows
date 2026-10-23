@@ -45,7 +45,9 @@ export interface CodexConfig {
 }
 
 export interface AntigravityConfig {
-  binaryPath: string;
+  binaryPath?: string;
+  transport?: 'cli' | 'desktop';
+  desktopRoot?: string;
   realpath?: string;
   version?: string;
   project?: string;
@@ -325,6 +327,8 @@ function normalizeCodex(input: CodexConfig & { flags?: unknown }): CodexConfig {
 function normalizeAntigravity(input: AntigravityConfig): AntigravityConfig {
   return {
     binaryPath: input.binaryPath,
+    ...(input.transport === 'desktop' ? { transport: 'desktop' as const } : {}),
+    ...(typeof input.desktopRoot === 'string' && input.desktopRoot.trim() ? { desktopRoot: input.desktopRoot.trim() } : {}),
     ...(typeof input.realpath === 'string' ? { realpath: input.realpath } : {}),
     ...(typeof input.version === 'string' ? { version: input.version } : {}),
     ...(typeof input.project === 'string' && input.project.trim()

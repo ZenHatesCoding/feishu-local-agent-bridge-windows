@@ -344,3 +344,5 @@ Git 交付件可用 `collab-artifact.cmd register-git` 登记 commit locator；�
 该命令只使用清单中明确配置的恢复命令。没有配置 `original.start` 的 Agent 会保持停止，需由使用者按自己的原方式启动。
 
 每个 Worker 的记忆、迁移和重启步骤见[Worker 记忆](./WORKER_MEMORY.zh-CN.md)。Restart-CollabAgent.ps1 也会让独立 Hermes gateway 重新加载 Hook。
+
+使用已登录的 Antigravity 客户端时，见[客户端 Worker 运维](./ANTIGRAVITY_DESKTOP.zh-CN.md)。Sidecar 由客户端管理，Pilot 只管理飞书 bridge，不启动或终止客户端。

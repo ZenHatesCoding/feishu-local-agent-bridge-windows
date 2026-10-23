@@ -45,3 +45,5 @@ Antigravity 使用 `agy.exe` 时，启动器会自动读取 Windows 当前用户
 ```
 
 Worker 记忆见[运维说明](../../docs/WORKER_MEMORY.zh-CN.md)。使用 Restart-CollabAgent.ps1 -Agent <id> 重启单个 Bot。
+
+Antigravity 客户端执行见 [Sidecar 安装、生命周期与回退](../../docs/ANTIGRAVITY_DESKTOP.zh-CN.md)。Pilot 的客户端部署必须显式设置 transport 和运行根目录环境字段；启动失败不会恢复 CLI。

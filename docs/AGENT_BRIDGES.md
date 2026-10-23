@@ -87,6 +87,11 @@ node .\dist\cli.js run --profile codex --agent codex --workspace C:\workspaces\c
 
 ## Google Antigravity
 
+Two explicit transports are supported: the existing agy CLI and the App Sidecar.
+For execution in an already signed-in desktop project, use the
+[App Worker guide](./ANTIGRAVITY_DESKTOP.md). Desktop mode never falls back to CLI.
+The following commands describe CLI mode.
+
 Complete the `agy` login in a visible interactive PowerShell first.
 
 ```powershell
@@ -95,8 +100,7 @@ $env:LARK_CHANNEL_ANTIGRAVITY_BIN = "$env:LOCALAPPDATA\agy\bin\agy.exe"
 node .\dist\cli.js run --profile antigravity --agent antigravity --workspace C:\workspaces\antigravity
 ```
 
-The Antigravity adapter always uses the `agy` protocol. It never selects another
-agent implementation from environment variables.
+The CLI transport uses the `agy` protocol; it never substitutes another Agent.
 The default `agy --print` wait ceiling is 60 minutes. It is a leaked-process
 safety limit rather than a normal task duration, and can be overridden through
 `antigravity.printTimeout`. Because Antigravity does not provide dependable

@@ -28,6 +28,7 @@ Start with the README, then open only the documents relevant to the change:
 | Protocol invariants, visibility, routing, context and Artifact design | [Design](./docs/DESIGN.md) / [中文](./docs/DESIGN.zh-CN.md) |
 | Worker-local topic memory, budgets, consolidation and recovery | [Worker memory](./docs/WORKER_MEMORY.md) / [中文](./docs/WORKER_MEMORY.zh-CN.md); [design contract](./docs/plans/WORKER_TOPIC_MEMORY.md) |
 | Agent-specific bridge and profile integration | [Agent bridges](./docs/AGENT_BRIDGES.md) / [中文](./docs/AGENT_BRIDGES.zh-CN.md) |
+| Antigravity App Sidecar execution, cancellation and rollback | [App Worker](./docs/ANTIGRAVITY_DESKTOP.md) / [中文](./docs/ANTIGRAVITY_DESKTOP.zh-CN.md) |
 | Windows manifests, roles, startup, logs, rollback and worker export | [Windows operations](./docs/WINDOWS_OPERATIONS.md) / [中文](./docs/WINDOWS_OPERATIONS.zh-CN.md) |
 | Tailscale, VPN reachability and network security boundary | [Networking](./docs/NETWORKING.md) / [中文](./docs/NETWORKING.zh-CN.md) |
 | Implemented distributed capabilities and remaining phases | [Distributed roadmap](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.md) / [中文](./docs/DISTRIBUTED_DEPLOYMENT_ROADMAP.zh-CN.md) |

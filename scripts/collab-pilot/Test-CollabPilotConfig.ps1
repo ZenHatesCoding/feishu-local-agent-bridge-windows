@@ -28,6 +28,9 @@ if ($pilot.hub.coordinator -and $pilot.hub.coordinator.enabled) {
 }
 $launchAgents = @(Get-CollabLocalAgents)
 foreach ($agent in $launchAgents) {
+  if ($agent.launch.environment.LARK_CHANNEL_ANTIGRAVITY_TRANSPORT -eq 'desktop') {
+    if (!$agent.launch.environment.LARK_ANTIGRAVITY_DESKTOP_ROOT) { $errors.Add("$($agent.id): desktop transport requires LARK_ANTIGRAVITY_DESKTOP_ROOT.") }
+  }
   if (!$agent.id -or !$agent.displayName) { $errors.Add('Every enabled agent needs id and displayName.'); continue }
   if (!$agent.launch.filePath) { $errors.Add("$($agent.id): launch.filePath is required."); continue }
   $file = Expand-CollabValue $agent.launch.filePath

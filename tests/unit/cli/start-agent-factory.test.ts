@@ -10,6 +10,13 @@ import { createDefaultProfileConfig } from '../../../src/config/profile-schema.j
 import { createRuntimeProfileConfig } from '../../../src/runtime/profile-runtime.js';
 
 describe('start runtime agent factory', () => {
+  it('creates an App transport without requiring an agy installation', () => {
+    const profile = createDefaultProfileConfig({ agentKind: 'antigravity', accounts: appAccount(), antigravity: { transport: 'desktop', desktopRoot: '/private/worker/desktop' } });
+    const agent = createRuntimeAgent(profile, { profileDir: tmpdir() });
+    expect(profile.antigravity?.transport).toBe('desktop');
+    expect(agent.id).toBe('antigravity');
+    expect(agent.displayName).toBe('Antigravity App');
+  });
   it('keeps Claude as the default runtime agent', () => {
     const agent = createRuntimeAgent(
       createDefaultProfileConfig({
