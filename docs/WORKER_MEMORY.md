@@ -53,7 +53,20 @@ optional summaries may be omitted. Effective critical constraints are not trunca
 Background-disabled instances skip idle/post-result synthesis; foreground may
 still consolidate to cover history. Maintenance uses the existing model/login,
 defaults to eight persisted model calls/hour and one structural repair per job,
-and backs off five minutes on failure without losing originals.
+and starts failure backoff at five minutes without losing originals. Repeated
+failures for identical coverage/revision back off exponentially up to six hours.
+Maintenance uses small, whole source batches; it never truncates a source to
+pretend coverage. Unchanged pinned state is retained by code; a model may omit
+it. Changes still require new human evidence and pass the strict checkpoint
+validator. Harness maintenance reads only the final JSON result, not reasoning
+or tool events; provider reasoning is excluded from maintenance errors.
+Harness workers can set `LARK_MEMORY_HARNESS_PATCH` to their own local Cordis
+patch file. It is passed through the host's official `--patch` option only for
+maintenance, so a deployment can select a fast, non-thinking configuration
+without changing business sessions. Configure the provider's supported thinking
+wire format and model capabilities together; an `off` label alone may only
+omit a parameter and leave provider-default thinking enabled. Keep local
+endpoints and credential references in ignored deployment files.
 
 ## Agent tools
 

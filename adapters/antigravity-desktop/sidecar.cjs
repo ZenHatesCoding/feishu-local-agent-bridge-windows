@@ -55,8 +55,12 @@ async function start(id) {
   finally { active.delete(id); }
 }
 setInterval(() => {
-  save(path.join(root, 'heartbeat.json'), { at: Date.now(), pid: process.pid, transport: 'antigravity-app', projectId: process.env.ANTIGRAVITY_PROJECT_ID, workspaceRoot: process.env.LARK_ANTIGRAVITY_WORKSPACE_ROOT });
-  for (const id of fs.readdirSync(path.join(root, 'runs'))) {
+  let jobs;
+  try {
+    save(path.join(root, 'heartbeat.json'), { at: Date.now(), pid: process.pid, transport: 'antigravity-app', projectId: process.env.ANTIGRAVITY_PROJECT_ID, workspaceRoot: process.env.LARK_ANTIGRAVITY_WORKSPACE_ROOT });
+    jobs = fs.readdirSync(path.join(root, 'runs'));
+  } catch { return; } // Storage loss expires availability; retry without crashing the App Sidecar.
+  for (const id of jobs) {
     if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) continue;
     const dir = jobPath(root, id);
     try {

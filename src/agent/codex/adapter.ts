@@ -16,6 +16,7 @@ import type {
   AgentRunOptions,
 } from '../types';
 import { buildCodexArgs } from './argv';
+import { resolveCodexBinary } from './binary';
 import { CodexJsonlTranslator, type CodexFinishReason } from './jsonl';
 
 export interface CodexAdapterOptions {
@@ -68,11 +69,12 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   async checkAvailability(): Promise<AgentAvailability> {
+    const binary = resolveCodexBinary(this.binary);
     return checkAgentAvailability({
       agentId: 'codex',
       agentName: 'Codex CLI',
-      command: this.binary,
-      binaryPath: this.binary,
+      command: binary,
+      binaryPath: binary,
     });
   }
 
@@ -93,6 +95,7 @@ export class CodexAdapter implements AgentAdapter {
       throw new Error('cwd is required for CodexAdapter.run');
     }
 
+    const binary = resolveCodexBinary(this.binary);
     const args = buildCodexArgs({
       cwd: opts.cwd,
       sandbox: opts.memoryMode ? 'read-only' : opts.sandbox ?? this.sandbox,
@@ -101,6 +104,10 @@ export class CodexAdapter implements AgentAdapter {
       ignoreUserConfig: this.ignoreUserConfig,
       ignoreRules: this.ignoreRules,
     });
+    if (process.platform === 'win32' && /[/\\]codex\.exe$/i.test(binary)) {
+      // A user config may still export a removed App version to shell tools.
+      args.splice(1, 0, '-c', `shell_environment_policy.set.CODEX_CLI_PATH=${JSON.stringify(binary)}`);
+    }
     const envOverrides: NodeJS.ProcessEnv = {
       ...buildLarkChannelEnv(this.larkChannel),
       ...opts.env,
@@ -110,7 +117,7 @@ export class CodexAdapter implements AgentAdapter {
     } else if (!this.inheritCodexHome) {
       envOverrides.CODEX_HOME = join(this.profileStateDir, 'codex-home');
     }
-    const child = spawnProcess(this.binary, args, {
+    const child = spawnProcess(binary, args, {
       cwd: opts.cwd,
       env: mergeProcessEnv(process.env, envOverrides),
       stdio: ['pipe', 'pipe', 'pipe'],

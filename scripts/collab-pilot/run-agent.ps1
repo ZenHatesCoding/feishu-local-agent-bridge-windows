@@ -29,6 +29,7 @@ foreach ($name in @(
   'LARK_CHANNEL_HOME',
   'LARK_CHANNEL_PROFILE',
   'LARK_CHANNEL_CONFIG',
+  'LARK_MEMORY_HARNESS_PATCH',
   'LARKSUITE_CLI_CONFIG_DIR',
   'LARK_CHANNEL_CODEX_BIN',
   'LARK_CHANNEL_NODE_BIN',
@@ -49,6 +50,33 @@ Set-CollabEnvironment $pilot.commonEnvironment
 Set-CollabEnvironment $agentConfig.launch.environment
 foreach ($name in @($agentConfig.launch.unsetEnvironment)) {
   if ($name) { Remove-Item "Env:$name" -ErrorAction SilentlyContinue }
+}
+# Keep the codex binary fresh across codex auto-updates. codex installs into a
+# new hash version directory on every update and guts the previous one (removing
+# codex-code-mode-host.exe, which codex spawns to run shell tools). Resolve the
+# newest *complete* install, write it back to the lark-channel codex profile
+# config and this pilot manifest, and surface it as the launch env so the bridge
+# never starts against a gutted directory. Opt out with
+# LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE=1. Best-effort: never blocks a launch.
+if ($env:LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE -ne '1' -and $agentConfig.launch.environment -and $agentConfig.launch.environment.LARK_CHANNEL_CODEX_BIN) {
+  $launchArgs = @($agentConfig.launch.arguments)
+  $profileAt = [Array]::IndexOf($launchArgs, '--profile')
+  $codexProfile = if ($profileAt -ge 0 -and $profileAt + 1 -lt $launchArgs.Count) { $launchArgs[$profileAt + 1] } else { $env:LARK_CHANNEL_PROFILE }
+  $resolveArgs = @('-Quiet', '-AgentId', $Agent, '-PilotConfig', $script:CollabManifestFile)
+  if ($codexProfile) { $resolveArgs += @('-ProfileName', $codexProfile) }
+  else { $resolveArgs += @('-SkipProfileWrite') }
+  $configAt = [Array]::IndexOf($launchArgs, '--config')
+  if ($configAt -ge 0 -and $configAt + 1 -lt $launchArgs.Count) { $resolveArgs += @('-ConfigJson', (Expand-CollabValue $launchArgs[$configAt + 1])) }
+  elseif ($env:LARK_CHANNEL_CONFIG) { $resolveArgs += @('-ConfigJson', $env:LARK_CHANNEL_CONFIG) }
+  elseif ($env:LARK_CHANNEL_HOME) { $resolveArgs += @('-ConfigJson', (Join-Path $env:LARK_CHANNEL_HOME 'config.json')) }
+  try {
+    $resolvedCodexBin = & (Join-Path $PSScriptRoot 'Resolve-CodexBinary.ps1') @resolveArgs 2>$null
+    if ($resolvedCodexBin) {
+      [Environment]::SetEnvironmentVariable('LARK_CHANNEL_CODEX_BIN', $resolvedCodexBin, 'Process')
+    }
+  } catch {
+    Write-Warning "[run-agent] codex binary resolve failed; continuing with the configured path. $($_.Exception.Message)"
+  }
 }
 if ($env:LARK_CHANNEL_ANTIGRAVITY_TRANSPORT -ne 'desktop' -and [System.IO.Path]::GetFileName([string]$env:LARK_CHANNEL_ANTIGRAVITY_BIN) -ieq 'agy.exe') {
   . (Join-Path $script:CollabRepoRoot 'scripts\antigravity-proxy-env.ps1')

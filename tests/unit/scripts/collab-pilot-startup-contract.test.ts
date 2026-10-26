@@ -13,7 +13,9 @@ describe('Collaboration Pilot Windows startup contract', () => {
     expect(source).toContain("'Start-CollabPilot.ps1'");
     expect(source).toContain('Start-Sleep -Seconds $PollSeconds');
     expect(source).toContain('[int]$PollSeconds = 300');
-    expect(source).toContain('& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $repairScript');
+    expect(source).toContain("Invoke-CollabRepairStep -Name 'pilot'");
+    expect(readPilotScript('Repair.Common.ps1')).toContain('registered components preserved');
+    expect(readPilotScript('Start-CollabPilot.ps1')).toContain('other components were still checked');
     expect(source).toContain('supervisor fatal:');
     expect(source).toContain('exit 1');
   });

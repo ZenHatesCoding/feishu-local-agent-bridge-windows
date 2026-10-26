@@ -1,8 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 import { AntigravityDesktopAdapter } from '../../../src/agent/antigravity/desktop';
 const core = createRequire(import.meta.url)(resolve('adapters/antigravity-desktop/core.cjs'));
 const roots: string[] = [];
@@ -10,6 +11,44 @@ const root = () => { const dir = mkdtempSync(join(tmpdir(), 'desktop-contract-')
 function ready(dir: string) { writeFileSync(join(dir, 'heartbeat.json'), JSON.stringify({ at: Date.now(), transport: 'antigravity-app' })); }
 afterEach(() => { for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 describe('Antigravity App transport', () => {
+  it('retries Sidecar storage failures without crashing its timer', () => {
+    let tick: () => void = () => {};
+    const save = vi.fn().mockImplementationOnce(() => { throw Error('disk offline'); }).mockImplementation(() => {});
+    runInNewContext(readFileSync(resolve('adapters/antigravity-desktop/sidecar.cjs'), 'utf8'), {
+      require(name: string) {
+        if (name === './core.cjs') return { ...core, save };
+        if (name === 'node:fs') return { mkdirSync() {}, readdirSync() { return []; } };
+        return createRequire(import.meta.url)(name);
+      },
+      process: { env: { LARK_ANTIGRAVITY_DESKTOP_ROOT: '/fixture', ANTIGRAVITY_LS_ADDRESS: 'fixture' }, pid: 123 },
+      setInterval(callback: () => void) { tick = callback; },
+    });
+    expect(() => tick()).not.toThrow();
+    expect(() => tick()).not.toThrow();
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+  it('fences storage failures without throwing from lease timers or cancellation', async () => {
+    vi.useFakeTimers();
+    const dir = root(); ready(dir);
+    const run = new AntigravityDesktopAdapter(dir).run({ runId: 'io-failure', cwd: dir, prompt: 'test' });
+    const job = join(dir, 'runs/io-failure');
+    const iterator = run.events[Symbol.asyncIterator]();
+    rmSync(job, { recursive: true });
+    try {
+      expect(() => vi.advanceTimersByTime(2000)).not.toThrow();
+      expect((await iterator.next()).value).toMatchObject({ type: 'error', terminationReason: 'failed', message: expect.stringContaining('Desktop IPC failed') });
+      await expect(run.stop()).resolves.toBeUndefined();
+      await iterator.return?.();
+    } finally { vi.useRealTimers(); }
+  });
+  it('reports malformed IPC as a failed run and closes the lease', async () => {
+    const dir = root(); ready(dir);
+    const run = new AntigravityDesktopAdapter(dir).run({ runId: 'bad-result', cwd: dir, prompt: 'test' });
+    writeFileSync(join(dir, 'runs/bad-result/result.json'), '{invalid');
+    const events = []; for await (const event of run.events) events.push(event);
+    expect(events.at(-1)).toMatchObject({ type: 'error', terminationReason: 'failed' });
+    expect(await run.waitForExit(1)).toBe(true);
+  });
   it('fails explicitly when the App is offline and never falls back to CLI', async () => {
     const adapter = new AntigravityDesktopAdapter(root());
     expect(await adapter.isAvailable()).toBe(false);

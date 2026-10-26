@@ -261,9 +261,14 @@ export class MemoryStore {
       let records: unknown[] = [];
       if (events.length) {
         let cost = memoryCost({ currentItems: topic.items, records: [] }) + 100;
+        let recordCost = 0;
         for (const event of events) {
           if (cost + memoryCost(event) > this.limits.chunk) break;
+          // Small source batches leave room for a useful answer within one
+          // bounded model call. A large indivisible record is still kept whole.
+          if (records.length && recordCost + memoryCost(event) > Math.min(this.limits.state, 4000)) break;
           records.push(event); sources.push(event.id); end = event.seq; cost += memoryCost(event);
+          recordCost += memoryCost(event);
         }
         if (!sources.length) { this.recordFailure(topicId, 'source-exceeds-maintenance-budget'); return undefined; }
         if (!force && cost < 2500 && events.length < 8 && !events.some(event => /必须|不要|改为|改成|取消|纠正|handoff|constraint|instead|must not/i.test(event.content))) return undefined;
@@ -283,7 +288,7 @@ export class MemoryStore {
       // Include small original evidence for existing state as well as the new suffix.
       // Native hosts otherwise try to look up references outside this isolated job.
       const referencedEvidence: unknown[] = [];
-      let remaining = this.limits.chunk - memoryCost({ currentItems: topic.items, records }) - 100;
+      let remaining = Math.min(1500, this.limits.chunk - memoryCost({ currentItems: topic.items, records }) - 100);
       for (const id of new Set(topic.items.flatMap(item => item.sourceRefs))) {
         if (sources.includes(id)) continue;
         const evidence = this.inspect(topicId, id);
@@ -299,7 +304,11 @@ export class MemoryStore {
   }
   recordFailure(topic: string, error: string, job?: MemoryJob): void {
     error = redactMemorySecrets(error);
-    this.db.prepare('UPDATE topics SET last_error=?,retry_at=? WHERE id=?').run(error.slice(0, 300), Date.now() + 300000, topic);
+    // Identical failed inputs back off instead of burning the hourly allowance
+    // forever. New coverage/revision starts with the normal five-minute delay.
+    const failures = job ? (this.db.prepare("SELECT COUNT(*) AS count FROM jobs WHERE topic=? AND status='failed' AND json_extract(input,'$.baseRevision')=? AND json_extract(input,'$.end')=?").get(topic, job.baseRevision, job.end) as { count: number }).count : 0;
+    const delay = Math.min(21600000, 300000 * 2 ** Math.min(failures, 7));
+    this.db.prepare('UPDATE topics SET last_error=?,retry_at=? WHERE id=?').run(error.slice(0, 300), Date.now() + delay, topic);
     if (job) this.db.prepare('UPDATE jobs SET status=\'failed\',error=? WHERE id=? AND token=?').run(error.slice(0, 300), job.id, job.token);
   }
   reserveCall(job: MemoryJob): boolean {

@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Config) { $env:LARK_COLLAB_PILOT_CONFIG = [IO.Path]::GetFullPath($Config) }
 . (Join-Path $PSScriptRoot 'Pilot.Common.ps1')
+. (Join-Path $PSScriptRoot 'Repair.Common.ps1')
 
 New-Item -ItemType Directory -Force -Path $script:CollabLogDir | Out-Null
 $supervisorLog = Join-Path $script:CollabLogDir 'supervisor.log'
@@ -27,12 +28,11 @@ function Write-SupervisorLog([string]$Message) {
 }
 
 function Repair-CollabPilot {
-  # Isolate native commands and script exits from the long-lived supervisor.
-  $repairScript = Join-Path $PSScriptRoot 'Start-CollabPilot.ps1'
-  $repairOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $repairScript -Config $script:CollabManifestFile 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    throw "repair process exited with code ${LASTEXITCODE}: $($repairOutput -join ' | ')"
-  }
+  $count = @(Get-CollabLocalAgents).Count
+  $timeout = 60 + 50 * ($count + 2)
+  Invoke-CollabRepairStep -Name 'pilot' -ScriptPath (Join-Path $PSScriptRoot 'Start-CollabPilot.ps1') `
+    -ScriptArguments @('-Config', $script:CollabManifestFile) -TimeoutSeconds $timeout `
+    *> (Join-Path $script:CollabLogDir 'repair.out.log')
 }
 
 try {
