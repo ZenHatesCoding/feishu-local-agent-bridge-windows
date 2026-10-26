@@ -40,6 +40,10 @@ Configure these variables in the selected Pilot agent's launch.environment:
 For standalone launches, alternatively set antigravity.transport to desktop and antigravity.desktopRoot
 in the bridge profile. The agentKind remains antigravity. Wait for a fresh
 DesktopRoot/heartbeat.json, build the bridge, then restart only this Worker.
+IPC read/parse failures end the affected run with an explicit error. Lease-write
+failures are contained inside the timer, stop renewal and fence the run; they
+do not become unhandled exceptions that crash the entire bridge. If writing a
+cancellation file also fails, the Sidecar's lease-expiry boundary still applies.
 The App selects the model; per-run CLI model overrides are rejected explicitly.
 Memory synthesis alone uses the agentapi flash_lite tier by default to avoid inheriting
 a slow business-model setting. The installer accepts MemoryModel=flash_lite/flash/pro.

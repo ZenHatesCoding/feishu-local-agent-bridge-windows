@@ -25,6 +25,20 @@ the Bots already running on the main PC.
 The project does not install, reinstall or upgrade agents and does not store
 Feishu App Secrets in the pilot manifest.
 
+Each supervisor repair checks components independently with a 45-second limit
+per startup/status step. A failed or hung Bot does not skip the remaining Bots.
+Timeout cleanup preserves the registered Hub/Bot launcher trees. The PID table
+indicates process liveness, not whether a native model can complete a task;
+check bridge run results and, for desktop Antigravity, Sidecar activity too.
+
+For App-managed Codex installations, Pilot refreshes the specific worker's
+profile/manifest at launch, and the adapter resolves a complete installation
+again before each run. Incomplete update folders are skipped. Explicit binaries
+outside the App installation remain pinned; set
+`LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE=1` to disable discovery. For a manual
+preview use `Resolve-CodexBinary.ps1 -AgentId <id> -ProfileName <profile> -DryRun`.
+No global Codex login/config is rewritten.
+
 ## Clone And Build
 
 ```powershell

@@ -32,6 +32,16 @@ Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台�
 
 项目不会安装、重装或升级用户的 Agent，也不会把飞书 App Secret 写入部署清单。飞书凭据继续留在各 bridge 的 profile 目录中。
 
+监督进程逐个检查组件，每个启动/状态检查步骤限时 45 秒。某个 Bot 失败或卡住后仍继续
+检查其他 Bot；超时清理保护 PID 表中已登记的 Hub/Bot 启动器及其后代。PID 表只证明
+进程存活，模型是否能完成任务还需查看 bridge 运行结果；Antigravity 客户端还需核对 Sidecar 活动。
+
+使用 App 管理的 Codex 安装时，Pilot 在启动时刷新当前 Worker 对应的 profile 和清单；
+适配器在每次执行前再次解析完整安装，跳过未完成的更新目录。App 安装树以外的自定义
+可执行文件保持固定；`LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE=1` 可关闭自动发现。
+手工预览使用 `Resolve-CodexBinary.ps1 -AgentId <id> -ProfileName <profile> -DryRun`。
+不会改写全局 Codex 登录或配置。
+
 ## 从 GitHub 部署
 
 ```powershell

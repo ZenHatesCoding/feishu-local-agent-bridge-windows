@@ -22,7 +22,7 @@ const STDIN_BOOTSTRAP = [
   "let s=''",
   "process.stdin.setEncoding('utf8')",
   "process.stdin.on('data',c=>s+=c)",
-  "process.stdin.on('end',async()=>{try{const e=process.argv[1];process.argv=[process.execPath,e,'--profile','headless',s];const m=await import(pathToFileURL(e).href);if(typeof m.runCli==='function')await m.runCli()}catch(e){console.error(e);process.exitCode=1}})",
+  "process.stdin.on('end',async()=>{try{const e=process.argv[1];const memory=process.env.LARK_MEMORY_MAINTENANCE==='1';process.argv=[process.execPath,e,'--profile','headless',...(memory&&process.env.LARK_MEMORY_HARNESS_PATCH?['--patch',process.env.LARK_MEMORY_HARNESS_PATCH]:[]),...(memory?['--json']:[]),s];const m=await import(pathToFileURL(e).href);if(typeof m.runCli==='function')await m.runCli()}catch(e){console.error(e);process.exitCode=1}})",
 ].join(';');
 
 export class DeepSeekHarnessAdapter implements AgentAdapter {
@@ -73,6 +73,7 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.opts.larkChannel),
         ...opts.env,
+        LARK_MEMORY_MAINTENANCE: opts.memoryMode ? '1' : undefined,
         LARK_CHANNEL_ANTIGRAVITY_BRIDGE: undefined,
         LARK_CHANNEL_DEEPSEEK_HARNESS_BRIDGE: opts.memoryMode ? undefined : '1',
         DSH_CWD: opts.cwd,
@@ -92,7 +93,7 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
 
     return {
       runId: opts.runId,
-      events: harnessEvents(child, stderrChunks, () => runtimeError),
+      events: harnessEvents(child, stderrChunks, () => runtimeError, opts.memoryMode === true),
       async stop() {
         if (child.exitCode !== null || child.signalCode !== null) return;
         child.kill('SIGTERM');
@@ -125,6 +126,7 @@ async function* harnessEvents(
   child: HarnessChild,
   stderrChunks: Buffer[],
   getError: () => Error | null,
+  memoryMode = false,
 ): AsyncGenerator<AgentEvent> {
   if (!child.pid) {
     const err = getError();
@@ -135,6 +137,17 @@ async function* harnessEvents(
   let text = '';
   try {
     for await (const line of rl) {
+      if (memoryMode) {
+        let event: { type?: string; text?: string; phase?: string; reason?: { kind?: string; error?: { code?: string } } };
+        try { event = JSON.parse(line); } catch { continue; }
+        if (event.type === 'final' && typeof event.text === 'string') text = event.text;
+        if (event.type === 'status' && event.phase === 'turn_end' && event.reason?.kind === 'error') {
+          child.kill();
+          yield { type: 'error', message: `DeepSeek Harness maintenance failed (${event.reason.error?.code ?? 'provider-error'})`, terminationReason: 'failed' };
+          return;
+        }
+        continue; // Never export thinking or tools into memory/error records.
+      }
       const delta = `${line}\n`;
       text += delta;
       yield { type: 'text', delta };
@@ -148,7 +161,7 @@ async function* harnessEvents(
   });
   const stderr = Buffer.concat(stderrChunks).toString('utf8').trim();
   if (exitCode !== 0 && exitCode !== null) {
-    yield { type: 'error', message: `DeepSeek Harness exited with code ${exitCode}${stderr ? `: ${stderr.slice(0, 1000)}` : ''}`, terminationReason: 'failed' };
+    yield { type: 'error', message: `DeepSeek Harness exited with code ${exitCode}${!memoryMode && stderr ? `: ${stderr.slice(0, 1000)}` : ''}`, terminationReason: 'failed' };
     return;
   }
   const runtimeError = getError();
@@ -157,8 +170,9 @@ async function* harnessEvents(
     return;
   }
   if (!text.trim()) {
-    yield { type: 'error', message: `DeepSeek Harness produced no reply.${stderr ? ` stderr: ${stderr.slice(0, 1000)}` : ''}`, terminationReason: 'failed' };
+    yield { type: 'error', message: `DeepSeek Harness produced no reply.${!memoryMode && stderr ? ` stderr: ${stderr.slice(0, 1000)}` : ''}`, terminationReason: 'failed' };
     return;
   }
+  if (memoryMode) yield { type: 'text', delta: text };
   yield { type: 'done', terminationReason: 'normal' };
 }

@@ -36,14 +36,28 @@ export class AntigravityDesktopAdapter implements AgentAdapter {
     publish('lease.json', { at: Date.now() });
     const heartbeat = JSON.parse(readFileSync(join(this.root, 'heartbeat.json'), 'utf8')) as { workspaceRoot?: string };
     publish('request.json', { runId: opts.runId, nonce: randomBytes(16).toString('hex'), cwd: resolve(opts.cwd), workspaceRoot: heartbeat.workspaceRoot ?? resolve(opts.cwd), prompt: opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.identity), env, memoryMode: opts.memoryMode === true, expires: Date.now() + 86400000 });
-    let ended = false, stopped = false;
+    let ended = false, stopped = false, ioFailure: string | undefined;
     const adapter = this;
-    const lease = setInterval(() => { if (!ended) publish('lease.json', { at: Date.now() }); }, 2000); lease.unref();
-    const stop = async () => { if (ended) return; stopped = true; publish('cancel.json', { reason: 'bridge cancelled', at: Date.now() }); clearInterval(lease); ended = true; };
+    const fail = (error: unknown) => {
+      ioFailure = `Desktop IPC failed (${(error as NodeJS.ErrnoException)?.code ?? 'invalid-data'}); run fenced`;
+      clearInterval(lease);
+      // If storage is unavailable, the last lease expires on the Sidecar anyway.
+      try { publish('cancel.json', { reason: 'bridge IPC failure', at: Date.now() }); } catch { /* lease fence */ }
+    };
+    const lease = setInterval(() => {
+      if (!ended) try { publish('lease.json', { at: Date.now() }); } catch (error) { fail(error); }
+    }, 2000); lease.unref();
+    const stop = async () => {
+      if (ended) return;
+      stopped = true;
+      try { publish('cancel.json', { reason: 'bridge cancelled', at: Date.now() }); } catch (error) { fail(error); }
+      clearInterval(lease); ended = true;
+    };
     async function* events(): AsyncGenerator<AgentEvent> {
       let delivered = 0, conversation = false;
       try {
         while (!stopped) {
+          if (ioFailure) { yield { type: 'error', message: ioFailure, terminationReason: 'failed' }; return; }
           if (!await adapter.isAvailable()) { publish('cancel.json', { reason: 'desktop disconnected' }); yield { type: 'error', message: 'Antigravity App Sidecar disconnected', terminationReason: 'failed' }; return; }
           if (!conversation && existsSync(join(dir, 'conversation.json'))) { const data = JSON.parse(readFileSync(join(dir, 'conversation.json'), 'utf8')); conversation = true; yield { type: 'system', sessionId: data.conversationId }; }
           const file = join(dir, 'events.jsonl');
@@ -60,8 +74,13 @@ export class AntigravityDesktopAdapter implements AgentAdapter {
           await pause(250);
         }
         yield { type: 'done', terminationReason: 'interrupted' };
+      } catch (error) {
+        fail(error);
+        yield { type: 'error', message: ioFailure!, terminationReason: 'failed' };
       } finally {
-        if (!existsSync(join(dir, 'result.json')) && !existsSync(join(dir, 'cancel.json'))) publish('cancel.json', { reason: 'bridge event consumer exited' });
+        try {
+          if (!existsSync(join(dir, 'result.json')) && !existsSync(join(dir, 'cancel.json'))) publish('cancel.json', { reason: 'bridge event consumer exited' });
+        } catch { /* No renewal after this point; Sidecar lease expires. */ }
         ended = true; clearInterval(lease);
       }
     }

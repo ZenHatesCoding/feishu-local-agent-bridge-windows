@@ -145,6 +145,31 @@ describe('autonomous Worker topic memory', () => {
 });
 
 describe('bounded automatic consolidation', () => {
+  it('preserves pinned state automatically without accepting unauthorized model rewrites', async () => {
+    const runtime = new WorkerMemoryRuntime(root(), 'worker-a', 'tenant', async () => JSON.stringify({ items: [], summary: '有新的进展，原约束继续有效。' }));
+    try {
+      const first = runtime.store.ingest('t', { origin: '1', kind: 'message', content: '报告必须两页', actor: 'human' });
+      const topic = runtime.store.topic('t');
+      runtime.store.checkpoint(topic.id, { baseRevision: 0, through: 1, items: [item(first.id)], summary: '两页' });
+      runtime.store.ingest('t', { origin: '2', kind: 'message', content: '开始工作', actor: 'agent' });
+      expect(await runtime.maintain(topic.id, true)).toBe(true);
+      expect(runtime.store.getTopic(topic.id)).toMatchObject({ state_through: 2, items: [item(first.id)] });
+      expect(() => runtime.store.checkpoint(topic.id, { baseRevision: 2, through: 2, items: [], summary: 'drop' })).toThrow('pinned-item-dropped');
+    } finally { await runtime.close(); }
+  });
+  it('backs off repeated failures on the same coverage but resets for new coverage', () => {
+    const db = store(), topic = db.topic('t');
+    db.ingest('t', { origin: '1', kind: 'message', content: 'must keep' });
+    const first = db.claimJob(topic.id, true)!; db.recordFailure(topic.id, 'invalid-model-output', first);
+    const a = (db.status(topic.id) as { retryAt: number }).retryAt;
+    const second = db.claimJob(topic.id, true)!; db.recordFailure(topic.id, 'invalid-model-output', second);
+    const b = (db.status(topic.id) as { retryAt: number }).retryAt;
+    expect(b - a).toBeGreaterThan(290000);
+    expect(db.claimJob(topic.id)).toBeUndefined();
+    db.ingest('t', { origin: '2', kind: 'message', content: 'new user correction', actor: 'human' });
+    const third = db.claimJob(topic.id, true)!; db.recordFailure(topic.id, 'invalid-model-output', third);
+    expect((db.status(topic.id) as { retryAt: number }).retryAt).toBeLessThan(b);
+  });
   it('automatically grounds state and exposes a bounded packet across fresh runs', async () => {
     const runtime = new WorkerMemoryRuntime(root(), 'worker-a', 'tenant', async prompt => {
       const data = JSON.parse(prompt.split('<memory_data>')[1]!.split('</memory_data>')[0]!) as { records: { id: string }[] };
