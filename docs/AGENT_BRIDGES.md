@@ -156,9 +156,16 @@ only `adapters\hermes\HOOK.yaml` and `handler.py` into the explicitly configured
 Point the manifest launch command at the existing Hermes venv and
 `python.exe -m hermes_cli.main gateway run`.
 
-The Hook accepts a human group message only when Hermes was actually mentioned.
+The Hook executes a human group message only when Hermes was actually mentioned.
+Ordinary groups and topics use the same Hub protocol. The compatible gateway
+copy needs the passive admission bridge in `adapters/hermes/gateway-run.patch`:
+after group authorization and before mention filtering, it invokes
+`message:observed` without a session/model/reaction. Keep native mention gating
+enabled. This does not change the original Hermes install, credentials or model
+settings. Gateway copies must be checked for compatibility before applying the
+patch; a Hook alone cannot recover messages discarded by its host or Feishu.
 For bot-originated messages it additionally requires a pending Hub dispatch for
-the same topic. During an authorized run Hermes receives the current agent
+the same conversation. During an authorized run Hermes receives the current agent
 directory and the same Bridge-owned collaboration-marker contract as
 the Node bridges: `reply` continues the group conversation without moving work
 ownership. The Hook

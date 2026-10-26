@@ -8,6 +8,9 @@ import { log } from '../core/logger';
  * constant so it's easy to adjust if the platform renames the scope id.
  */
 export const GROUP_MSG_SCOPE = 'im:message.group_msg';
+export function canReceiveAllGroupMessages(scopes: ReadonlySet<string>): boolean {
+  return scopes.has(GROUP_MSG_SCOPE) || scopes.has('im:message.group_msg:readonly');
+}
 
 /**
  * Fetch the set of scopes currently granted to this app via
@@ -47,5 +50,5 @@ export async function hasGroupMsgScope(
 ): Promise<boolean | null> {
   const scopes = await fetchGrantedScopes(channel, appId);
   if (scopes === null) return null;
-  return scopes.has(GROUP_MSG_SCOPE);
+  return canReceiveAllGroupMessages(scopes);
 }

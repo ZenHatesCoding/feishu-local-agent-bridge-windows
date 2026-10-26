@@ -54,6 +54,10 @@ Harness Worker 可以设置 `LARK_MEMORY_HARNESS_PATCH`，指向自己的本地 
 
 ## Agent 工具
 
+普通群和话题使用同一套有界记忆：普通群 scope 是 chat ID，话题 scope 是 `chatId:threadId`。
+获准的无 @ 消息先记账，再执行回复门槛。若平台只投递 @ 事件，存在真实覆盖缺口，
+本地存储或归纳不能凭空补回未收到的内容。
+
 每轮自动注入 worker_topic_memory，包含状态、近期记录、摘要、来源 ID、挂起数量和覆盖情况。
 各宿主有自己的 SKILL.md，安装在 Worker 自有目录，记忆包提供路径，最小运行规则始终注入。
 不会覆盖用户全局 AGENTS.md、CLAUDE.md、SOUL.md 或原生记忆。

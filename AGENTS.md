@@ -9,6 +9,9 @@ agents. The human-oriented entry points are [README.md](./README.md) and
 - Share task state, not private model sessions or chain-of-thought.
 - One Feishu topic is one conversation boundary; work ownership is an explicit
   annotation inside that conversation, not a property of every message.
+- All admitted groups use the same Hub/Worker protocol. Without a topic ID,
+  the group itself is the conversation boundary (`_chat` in Hub addresses).
+  Record admitted unmentioned messages before applying reply/mention policy.
 - Agent-to-Agent work requires both a real Feishu mention and a Hub dispatch.
 - The Hub is deterministic coordination code, not an LLM.
 - Preserve the default one-PC experience: `role: all` runs the Hub and all

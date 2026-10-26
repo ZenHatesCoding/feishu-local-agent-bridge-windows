@@ -70,6 +70,11 @@ endpoints and credential references in ignored deployment files.
 
 ## Agent tools
 
+The same bounded memory applies to ordinary groups and topics. Ordinary-group
+scope is the chat ID; topic scope is `chatId:threadId`. Passive admitted messages
+are recorded before reply gating. Receiving only mention events leaves a real
+coverage gap that local storage or summarization cannot reconstruct.
+
 Every run receives worker_topic_memory containing state, recent records,
 summaries, source IDs, parked counts and coverage. Host-specific SKILL.md assets
 live in the Worker root and their path is provided. Minimal rules are always

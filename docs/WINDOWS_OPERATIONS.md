@@ -39,6 +39,14 @@ outside the App installation remain pinned; set
 preview use `Resolve-CodexBinary.ps1 -AgentId <id> -ProfileName <profile> -DryRun`.
 No global Codex login/config is rewritten.
 
+All admitted groups use Hub/Worker coordination, including ordinary groups.
+For passive history, every receiving app (and an enabled Coordinator) needs
+`im:message.group_msg` or its supported `:readonly` equivalent, even when replies
+require mentions. `im:message.group_at_msg:readonly` alone is insufficient.
+Startup logs `context.group-observation-incomplete` for a confirmed missing
+grant; process liveness does not mean history coverage is complete. Granting a
+scope does not automatically backfill previously undelivered messages.
+
 ## Clone And Build
 
 ```powershell

@@ -67,20 +67,33 @@ def _settings() -> tuple[str, str, str, str]:
     url = os.environ.get("LARK_COLLAB_HUB_URL", "").rstrip("/")
     token = os.environ.get("LARK_COLLAB_HUB_TOKEN", "")
     tenant = os.environ.get("LARK_COLLAB_TENANT_KEY", "")
-    agent = os.environ.get("LARK_COLLAB_AGENT_ID", "fool")
-    if not url or not token or not tenant:
+    agent = os.environ.get("LARK_COLLAB_AGENT_ID", "")
+    if not url or not token or not tenant or not agent:
         raise RuntimeError("collaboration Hub environment is incomplete")
     return url, token, tenant, agent
+
+
+def _conversation_thread(context: dict[str, Any]) -> str:
+    thread = str(context.get("thread_id") or "")
+    # Some Hermes versions use a message ID as a synthetic session key.
+    if thread == str(context.get("message_id") or ""):
+        thread = ""
+    return thread or "_chat"
+
+
+def _conversation_scope(context: dict[str, Any]) -> str:
+    chat = str(context.get("chat_id") or "")
+    thread = _conversation_thread(context)
+    return chat if thread == "_chat" else f"{chat}:{thread}"
 
 
 def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> None:
     """Record only what this node's Hermes gateway actually observed."""
     root = os.environ.get("LARK_COLLAB_NODE_LEDGER_ROOT", "").strip()
     chat_id = str(context.get("chat_id") or "")
-    thread_id = str(context.get("thread_id") or "")
-    if not root or not chat_id or not thread_id:
+    if not root or not chat_id:
         return
-    scope = f"{chat_id}:{thread_id}"
+    scope = _conversation_scope(context)
     message_id = str(context.get("message_id") or context.get("session_id") or "")
     identity = f"{kind}:{message_id}" if message_id else f"{kind}:{hashlib.sha256(content.encode('utf-8')).hexdigest()[:24]}"
     record = {
@@ -262,7 +275,7 @@ def _observed_human_targets(context: dict[str, Any], agent_id: str) -> list[str]
                 target = str(agent.get("id") or "").strip()
                 if target and target not in targets:
                     targets.append(target)
-    if agent_id not in targets:
+    if bool(context.get("mentioned_bot")) and agent_id not in targets:
         targets.append(agent_id)
     return targets
 
@@ -272,14 +285,16 @@ def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dic
     message = str(context.get("message_full") or context.get("message") or "(empty message)")
     is_bot = bool(context.get("is_bot"))
     if is_bot:
-        return _wait_for_dispatch(task_id, agent_id)
-    if not bool(context.get("mentioned_bot")):
+        if not bool(context.get("mentioned_bot")):
+            return None
         return _wait_for_dispatch(task_id, agent_id)
 
     # The canonical coordinator parses the complete structured mention list
     # once and creates every fan-out dispatch.  Do not reduce that list to
     # Hermes alone by writing a competing event from this callback.
     if os.environ.get("LARK_COLLAB_EVENT_SOURCE", "distributed") == "coordinator":
+        if not bool(context.get("mentioned_bot")):
+            return None
         return _wait_for_dispatch(task_id, agent_id)
 
     _, _, tenant, _ = _settings()
@@ -292,7 +307,7 @@ def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dic
         "address": {
             "tenantKey": tenant,
             "chatId": str(context.get("chat_id") or ""),
-            "threadId": str(context.get("thread_id") or ""),
+            "threadId": _conversation_thread(context),
         },
         "messageId": stable_id,
         "actor": {
@@ -302,6 +317,8 @@ def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dic
         "content": message[:100_000],
         "targetAgentIds": _observed_human_targets(context, agent_id),
     })
+    if not bool(context.get("mentioned_bot")):
+        return None
     return next(
         (item for item in result.get("dispatches", []) if item.get("targetAgentId") == agent_id),
         None,
@@ -309,17 +326,19 @@ def _submit_inbound(context: dict[str, Any], task_id: str, agent_id: str) -> dic
 
 
 def _on_start(context: dict[str, Any]) -> None:
-    if context.get("platform") != "feishu" or not context.get("thread_id"):
+    if context.get("platform") != "feishu" or context.get("chat_type") in {"p2p", "dm", "private"}:
+        return
+    if not context.get("chat_id") or (not context.get("thread_id") and context.get("chat_type") not in {"group", "forum", "topic", "topic_group"}):
         return
     _, _, tenant, agent_id = _settings()
-    task_id = _task_id(tenant, str(context.get("chat_id") or ""), str(context.get("thread_id")))
+    task_id = _task_id(tenant, str(context.get("chat_id") or ""), _conversation_thread(context))
+    message = str(context.get("message_full") or context.get("message") or "")
+    _record_local_topic(context, "message", message)
     dispatch = _submit_inbound(context, task_id, agent_id)
     if dispatch is None:
         context["cancel"] = True
         return
 
-    message = str(context.get("message_full") or context.get("message") or "")
-    _record_local_topic(context, "message", message)
     _register_artifacts(task_id, agent_id, message, "inbound")
 
     dispatch_id = str(dispatch["id"])
@@ -338,7 +357,7 @@ def _on_start(context: dict[str, Any]) -> None:
         f"{message}"
     )
     if os.environ.get("LARK_MEMORY_ENABLED") == "1":
-        scope = f"{context.get('chat_id')}:{context.get('thread_id')}"
+        scope = _conversation_scope(context)
         try:
             prepared = _memory_command("prepare", scope)
         except Exception:
@@ -374,7 +393,7 @@ def _on_end(context: dict[str, Any]) -> None:
         return
     _record_local_topic(context, "bot-result", response)
     if _MEMORY_BY_SESSION.pop(session_id, None) and os.environ.get("LARK_MEMORY_BACKGROUND") != "0":
-        scope = f"{context.get('chat_id')}:{context.get('thread_id')}"
+        scope = _conversation_scope(context)
         def maintain_memory() -> None:
             try:
                 _memory_command("maintain", scope)
@@ -399,7 +418,21 @@ def _on_end(context: dict[str, Any]) -> None:
 
 
 async def handle(event_type: str, context: dict[str, Any]) -> None:
-    if event_type == "agent:start":
+    if event_type == "message:observed":
+        await asyncio.to_thread(_on_observation, context)
+    elif event_type == "agent:start":
         await asyncio.to_thread(_on_start, context)
     elif event_type == "agent:end":
         await asyncio.to_thread(_on_end, context)
+
+
+def _on_observation(context: dict[str, Any]) -> None:
+    # The native adapter invokes this only after group admission, before its
+    # mention gate. No session, model call, typing indicator or reply is created.
+    if context.get("platform") != "feishu" or context.get("chat_type") not in {"group", "topic_group", "topic"}:
+        return
+    if not context.get("chat_id") or context.get("mentioned_bot"):
+        return
+    _, _, tenant, agent_id = _settings()
+    _record_local_topic(context, "message", str(context.get("message_full") or context.get("message") or ""))
+    _submit_inbound(context, _task_id(tenant, str(context["chat_id"]), _conversation_thread(context)), agent_id)

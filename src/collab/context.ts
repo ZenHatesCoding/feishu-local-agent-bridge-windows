@@ -1,5 +1,6 @@
 import { promptSection } from '../agent/prompt';
 import type { AgentIdentity, ContextEntry, Dispatch, SharedArtifact, TaskProjection } from './types';
+import { GROUP_CONVERSATION } from './task-id';
 
 /** A small envelope; each computer retrieves its own observed history on demand. */
 export function buildCollaborationContext(input: {
@@ -9,7 +10,8 @@ export function buildCollaborationContext(input: {
   artifacts?: SharedArtifact[];
   agents?: AgentIdentity[];
 }): string {
-  const scope = input.task.address.threadId
+  const hasTopic = Boolean(input.task.address.threadId && input.task.address.threadId !== GROUP_CONVERSATION);
+  const scope = hasTopic
     ? `${input.task.address.chatId}:${input.task.address.threadId}`
     : input.task.address.chatId;
   return promptSection('collaboration_context', {
@@ -28,7 +30,7 @@ export function buildCollaborationContext(input: {
         'Never call lark-cli, a group-member API, or use an open_id for bot-to-bot mentions. Never write @Name or @open_id inside the marker; TARGET_ID must come from mentionTargets.',
         'If yourDispatch.reason is ask, finish the requested consultation with the result and artifact paths only. Do not emit collaboration_reply, collaboration_ask or collaboration_handoff: the Bridge records the return and sends the one real @ to the current owner.',
         'Complete only the assigned objective and return structured results and artifact paths.',
-        `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>" --reply-in-thread. Do not use raw lark-cli --file in a collaboration task.`,
+        `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>"${hasTopic ? ' --reply-in-thread' : ''}. Do not use raw lark-cli --file in a collaboration task.`,
       ],
     },
     localJournal: { scope, command: 'lark-channel-bridge local-context' },

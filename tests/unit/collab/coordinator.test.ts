@@ -62,12 +62,12 @@ describe('Feishu coordinator normalization', () => {
     expect(input?.targetAgentIds).toEqual(['world', 'chariot']);
   });
 
-  it('ignores direct messages and non-topic groups', () => {
+  it('ignores direct messages and uses a group boundary for non-topic groups', () => {
     expect(coordinatorInputForMessage(fakeMessage({ chatType: 'p2p' }), {
       tenantKey: 'tenant', agents,
     })).toBeUndefined();
     expect(coordinatorInputForMessage(fakeMessage({ threadId: undefined }), {
       tenantKey: 'tenant', agents,
-    })).toBeUndefined();
+    })).toMatchObject({ address: { chatId: 'chat', threadId: '_chat' }, targetAgentIds: [] });
   });
 });

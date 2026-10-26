@@ -11,6 +11,11 @@ Feishu topic is one bounded conversation. Mentioning an agent gives it one
 authorized opportunity to reply; explicit work annotations can additionally
 assign or transfer responsibility without manual context copying.
 
+The same Hub/Worker mechanism applies to every admitted group, regardless of
+its name or whether it has multiple Bots. A topic is a boundary when present;
+otherwise the ordinary group is the boundary. Unmentioned admitted messages
+are observations, not execution requests: retain them for a later mention.
+
 The user should not need to understand the Hub, ledger, dispatch API,
 environment variables or model sessions.
 

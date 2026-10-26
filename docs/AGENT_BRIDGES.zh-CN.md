@@ -165,11 +165,16 @@ Chariot/DeepSeek 的 Agent 类型、配置和运行协议完全分离。Harness 
 Hermes 的 venv、源码、配置、会话、记忆、技能和其他 Hook 都不属于本项目部署范围。
 清单中的 `launch` 应指向现有 venv 的 `python.exe -m hermes_cli.main gateway run`。
 
-Hook 只接受真实 `@Hermes` 的人类群消息；bot 发来的消息还必须在同一话题中存在
+Hook 只执行真实 `@Hermes` 的人类群消息；bot 发来的消息还必须在同一对话中存在
 待处理的 Hub dispatch。授权运行时，Hermes 会收到当前 Agent 目录，以及与 Node
 bridge 相同的 Bridge 接管协作标记约定；`reply` 只延续群聊对话，
 不转移工作责任。Hook 会先把该 dispatch 标记为 accepted，并在运行结束时为同一个 dispatch
 记录结果，再明确标记 completed 或 failed。
+
+普通群和话题使用同一 Hub 协议。兼容网关副本需包含 `adapters/hermes/gateway-run.patch`
+中的被动观察桥：群准入成功后、@ 过滤前调用 `message:observed`，不创建会话、模型运行或表情。
+原生 @ 门槛保持启用。不会改动原始 Hermes 安装、凭据或模型设置；应用兼容补丁前必须核对
+网关副本版本。单独安装 Hook 无法补回宿主或飞书在它之前已丢弃的消息。
 
 协作群应采用 Hermes 的“群 chat ID 边界”，而不是逐个用户加白名单：设置
 `FEISHU_GROUP_POLICY=open`，保持 `FEISHU_ALLOWED_USERS` 为空，并把获准飞书群的
