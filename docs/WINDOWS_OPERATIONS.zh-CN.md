@@ -43,6 +43,11 @@ Pilot 既支持一台 Windows 电脑运行 Hub 和全部 Bot，也支持多台�
 手工预览使用 `Resolve-CodexBinary.ps1 -AgentId <id> -ProfileName <profile> -DryRun`。
 不会改写全局 Codex 登录或配置。
 
+所有获准群聊（含普通群）都使用 Hub/Worker 协作。要记录无 @ 前文，每个接收应用以及已启用的
+Coordinator 都需 `im:message.group_msg` 或平台支持的 `:readonly` 对应权限，即使回复仍要求 @。
+只有 `im:message.group_at_msg:readonly` 不够。启动时确认缺权会记录
+`context.group-observation-incomplete`；进程在线不代表历史覆盖完整。补授权不会自动补录以前未投递的消息。
+
 ## 从 GitHub 部署
 
 在 PowerShell 中执行下面的命令。下文用 `<repo>` 表示检出目录，示例使用

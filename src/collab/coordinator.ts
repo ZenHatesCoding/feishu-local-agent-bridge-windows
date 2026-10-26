@@ -6,6 +6,9 @@ import {
 } from '@larksuite/channel';
 import type { CollaborationHub } from './hub';
 import type { AgentRegistration, MessageInput } from './types';
+import { taskAddressForMessage } from './task-id';
+import { hasGroupMsgScope } from '../bot/app-scope';
+import { log } from '../core/logger';
 
 export interface FeishuCoordinatorOptions {
   tenant: 'feishu' | 'lark';
@@ -46,6 +49,9 @@ export async function startFeishuCoordinator(
     error: (err) => console.error(`[collab-coordinator] channel error: ${err?.message ?? String(err)}`),
   });
   await channel.connect();
+  void hasGroupMsgScope(channel, options.appId).then(has => {
+    if (has === false) log.warn('context', 'group-observation-incomplete', { source: 'coordinator', requiredScope: 'im:message.group_msg' });
+  }).catch(() => {});
   console.log(`Feishu coordinator connected as ${channel.botIdentity?.name ?? options.appId}`);
   return { channel, disconnect: () => channel.disconnect() };
 }
@@ -54,7 +60,7 @@ export function coordinatorInputForMessage(
   msg: NormalizedMessage,
   options: Pick<FeishuCoordinatorOptions, 'tenantKey' | 'agents'>,
 ): MessageInput | undefined {
-  if (msg.chatType === 'p2p' || !msg.threadId) return undefined;
+  if (msg.chatType === 'p2p') return undefined;
   const senderType = rawSenderType(msg);
   const actorId = senderType === 'agent'
     ? resolveAgentIdentity(msg.senderId, msg.senderName, options.agents) ?? msg.senderId
@@ -62,7 +68,7 @@ export function coordinatorInputForMessage(
   return {
     type: 'message',
     idempotencyKey: `feishu-message:${msg.messageId}`,
-    address: { tenantKey: options.tenantKey, chatId: msg.chatId, threadId: msg.threadId },
+    address: taskAddressForMessage(options.tenantKey, msg),
     messageId: msg.messageId,
     actor: {
       type: senderType,

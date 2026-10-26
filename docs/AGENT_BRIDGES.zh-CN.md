@@ -353,11 +353,16 @@ await mod.runCli();
 `hermes gateway status` 探测，所以短命启动器退出后，脱离式 Hermes 网关仍能在状态
 输出里看到。
 
-Hook 只接受真实 @Hermes 的人类群消息。bot 发来的消息还必须在同一话题中存在待处理
+Hook 只执行真实 @Hermes 的人类群消息。bot 发来的消息还必须在同一对话中存在待处理
 的 Hub dispatch。授权运行时，Hermes 会收到当前 Agent 目录，以及与 Node bridge
 相同的 `collab-delegate ask|handoff` 命令约定，所以所有已维护 bot 都能互相委派。
 Hook 先把该 dispatch 标记为 accepted，运行结束时为同一个 dispatch 记录结果，再
 明确标记 completed 或 failed。
+
+普通群和话题使用同一 Hub 协议。兼容网关副本需包含 `adapters/hermes/gateway-run.patch`
+中的被动观察桥：群准入成功后、@ 过滤前调用 `message:observed`，不创建会话、模型运行或表情。
+原生 @ 门槛保持启用。不会改动原始 Hermes 安装、凭据或模型设置；应用兼容补丁前必须核对
+网关副本版本。单独安装 Hook 无法补回宿主或飞书在它之前已丢弃的消息。
 
 协作群用 Hermes 的群聊 ID 边界，不要逐个用户加白名单：设置
 `FEISHU_GROUP_POLICY=open`，保持 `FEISHU_ALLOWED_USERS` 为空，并把获准飞书群的

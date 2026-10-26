@@ -1,7 +1,7 @@
 # Feishu Local Agent Bridge for Windows
 
 Connect Claude Code, Codex, Google Antigravity, DeepSeek Harness and Hermes to
-Feishu/Lark, either as independent bots or as a team collaborating in one topic.
+Feishu/Lark, either as independent bots or as a team collaborating in any admitted group or topic.
 
 [中文说明](./README.zh.md)
 

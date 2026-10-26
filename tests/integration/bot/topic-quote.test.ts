@@ -8,6 +8,9 @@ import { WorkspaceStore } from '../../../src/workspace/store.js';
 import { FakeAgentAdapter } from '../../helpers/fake-agent.js';
 import { createTmpProfile, type TmpProfile } from '../../helpers/tmp-profile.js';
 import { MemoryStore } from '../../../src/memory/store';
+import { CollaborationHub } from '../../../src/collab/hub';
+import { JsonlLedger } from '../../../src/collab/ledger';
+import { CollaborationHubServer } from '../../../src/collab/server';
 
 const sdkMock = vi.hoisted(() => ({
   channel: undefined as FakeLarkChannel | undefined,
@@ -69,6 +72,29 @@ afterEach(async () => {
 });
 
 describe('topic message quote handling', () => {
+  it('records quiet ordinary-group messages in the Hub before a later mention, without waking on observations', async () => {
+    const h = await createHarness({ chatMode: 'group' });
+    const hub = new CollaborationHub(new JsonlLedger(join(h.tmp.root, 'hub-ledger.jsonl')), { agents: [{ id: 'worker', displayName: 'Bridge' }] });
+    await hub.initialize();
+    const server = new CollaborationHubServer(hub, { host: '127.0.0.1', port: 0, token: 'test' });
+    const address = await server.listen(); cleanups.push(() => server.close());
+    vi.stubEnv('LARK_COLLAB_HUB_URL', `http://127.0.0.1:${address.port}`);
+    vi.stubEnv('LARK_COLLAB_HUB_TOKEN', 'test');
+    vi.stubEnv('LARK_COLLAB_AGENT_ID', 'worker'); vi.stubEnv('LARK_COLLAB_TENANT_KEY', 'tenant');
+    vi.stubEnv('LARK_COLLAB_EVENT_SOURCE', 'distributed'); vi.stubEnv('LARK_MEMORY_ENABLED', '1');
+    vi.stubEnv('LARK_MEMORY_ROOT', join(h.tmp.root, 'memory')); vi.stubEnv('LARK_MEMORY_BACKGROUND', '0');
+    vi.stubEnv('LARK_COLLAB_NODE_LEDGER_ROOT', join(h.tmp.root, 'journal'));
+    await startTestBridge(h);
+    const quiet = { ...message({ messageId: 'quiet', rootId: 'quiet', parentId: 'quiet', content: '报告必须有三页和对比表' }), mentionedBot: false, mentions: [] };
+    await h.channel.handlers.message?.(quiet);
+    expect(h.agent.runOptions).toHaveLength(0);
+    expect(h.channel.sent).toHaveLength(0); expect(h.channel.streams).toHaveLength(0);
+    await h.channel.handlers.message?.(message({ messageId: 'later', rootId: 'later', parentId: 'later', content: '@Bridge 根据前面的要求开始' }));
+    await waitFor(() => h.agent.runOptions.length === 1, 2500);
+    expect(h.agent.runOptions[0]!.prompt).toContain('报告必须有三页和对比表');
+    expect(h.agent.runOptions[0]!.prompt).toContain('<collaboration_context>');
+    expect(h.agent.runOptions[0]!.prompt).toContain('"scope":"oc_topic_chat"');
+  });
   it('automatically injects the Worker topic ledger into a fresh second run without duplicating the new message', async () => {
     const h = await createHarness();
     const memoryRoot = join(h.tmp.root, 'memory');

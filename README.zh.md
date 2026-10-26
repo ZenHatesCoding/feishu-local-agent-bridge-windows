@@ -1,7 +1,7 @@
 # Windows 飞书本地 Agent 桥接
 
 把 Claude Code、Codex、Google Antigravity、DeepSeek Harness 和 Hermes 接入
-飞书/Lark，可以各自作为独立机器人，也可以在一个话题里像团队一样协作。
+飞书/Lark，可以各自作为独立机器人，也可以在任何获准群聊或话题里像团队一样协作。
 
 [English README](./README.md)
 

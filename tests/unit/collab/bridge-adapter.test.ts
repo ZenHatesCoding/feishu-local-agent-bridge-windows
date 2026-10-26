@@ -267,12 +267,29 @@ describe('BridgeCollaborationAdapter', () => {
     expect(authorized.promptContext).toContain('Implement the accepted design');
   });
 
-  it('leaves direct messages and non-topic groups on the original bridge path', async () => {
+  it('manages ordinary groups and leaves direct messages on the original bridge path', async () => {
     const { client } = await fixture();
     const adapter = new BridgeCollaborationAdapter(client, 'world', 'tenant');
     const msg = message({ id: 'regular', senderType: 'user', senderId: 'u', content: 'hello' });
     delete (msg as { threadId?: string }).threadId;
-    expect(await adapter.intake(msg)).toEqual({ managed: false, respond: true });
+    expect(await adapter.intake(msg)).toMatchObject({ managed: true, respond: true, dispatchId: expect.any(String) });
+    expect(await adapter.intake({ ...msg, chatType: 'p2p' } as NormalizedMessage)).toEqual({ managed: false, respond: true });
+  });
+  it('retains quiet group observations for a later mention without accepting work early', async () => {
+    const { hub, client } = await fixture();
+    const observer = new BridgeCollaborationAdapter(client, 'world', 'tenant');
+    const receiver = new BridgeCollaborationAdapter(client, 'chariot', 'tenant');
+    const first = { ...message({ id: 'quiet', senderType: 'user', senderId: 'u', content: '必须交付三页，包含对比表' }), threadId: undefined, mentionedBot: false };
+    expect(await observer.intake(first, { observeOnly: true })).toMatchObject({ managed: true, respond: false });
+    expect((await client.dispatches('world')).dispatches).toHaveLength(0);
+    expect((await client.dispatches('chariot')).dispatches).toHaveLength(0);
+    const next = await receiver.intake({ ...first, messageId: 'later', mentionedBot: true, content: '根据上面要求开始' });
+    expect(next).toMatchObject({ managed: true, respond: true });
+    expect(JSON.stringify(hub.getContext(next.taskId!, 'chariot'))).toContain('必须交付三页，包含对比表');
+    expect(next.promptContext).toContain('"scope":"chat"');
+    expect(hub.getTask(next.taskId!)?.address.threadId).toBe('_chat');
+    const other = await receiver.intake({ ...first, chatId: 'other-group', messageId: 'other', mentionedBot: true, content: '另一个任务' });
+    expect(JSON.stringify(hub.getContext(other.taskId!, 'chariot'))).not.toContain('必须交付三页');
   });
 
   it('lets the silent coordinator be the only event writer', async () => {

@@ -6,8 +6,12 @@ and [README.zh.md](./README.zh.md).
 ## Product Invariants
 
 - Share task state, not private model sessions or chain-of-thought.
-- One Feishu topic is one task boundary.
-- Agent-to-agent work needs both a real Feishu mention and a Hub dispatch.
+- One Feishu topic is one conversation boundary; work ownership is an explicit
+  annotation inside that conversation, not a property of every message.
+- All admitted groups use the same Hub/Worker protocol. Without a topic ID,
+  the group itself is the conversation boundary (`_chat` in Hub addresses).
+  Record admitted unmentioned messages before applying reply/mention policy.
+- Agent-to-Agent work requires both a real Feishu mention and a Hub dispatch.
 - The Hub is deterministic coordination code, not an LLM.
 - Keep the default one-PC experience working: `role: all` runs the Hub and all
   local Bots. Remote workers are additive. They must not make single-PC use

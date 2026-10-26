@@ -2,6 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 describe('collaboration design and Windows operations contract', () => {
+  it('applies the same conversation protocol to all admitted groups', async () => {
+    const [en, zh] = await Promise.all(['DESIGN.md', 'DESIGN.zh-CN.md'].map(name => readFile(new URL(`../../../docs/${name}`, import.meta.url), 'utf8')));
+    expect(en).toContain('All admitted groups use this protocol');
+    expect(zh).toContain('所有获准群聊都走同一协议');
+    for (const doc of [en, zh]) expect(doc).toContain('`_chat`');
+  });
   it('preserves the control-plane and context-isolation principles', async () => {
     const design = await readFile(
       new URL('../../../docs/DESIGN.zh-CN.md', import.meta.url),

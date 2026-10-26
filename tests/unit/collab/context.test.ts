@@ -12,6 +12,12 @@ const dispatch: Dispatch = {
 };
 
 describe('collaboration context', () => {
+  it('uses the ordinary group ledger scope and keeps artifacts at group level', () => {
+    const context = buildCollaborationContext({ task: { ...task, address: { ...task.address, threadId: '_chat' } }, dispatch, entries: [] });
+    expect(context).toContain('"scope":"chat"');
+    expect(context).not.toContain('chat:_chat');
+    expect(context).not.toContain('--reply-in-thread');
+  });
   it('supplies the current dispatch and local query entry point without historical content', () => {
     const entries: ContextEntry[] = [{
       sequence: 1, recordedAt: '2026-09-01T00:00:00.000Z',

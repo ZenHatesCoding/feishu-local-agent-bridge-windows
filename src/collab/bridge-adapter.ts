@@ -5,7 +5,7 @@ import type { AgentIdentity, Dispatch } from './types';
 import type { AgentRegistration } from './types';
 import type { NormalizedAttachment } from '../media/attachment';
 import { snapshotArtifact } from './artifact-store';
-import { taskIdFor } from './task-id';
+import { taskIdFor, taskAddressForMessage } from './task-id';
 import { parseAgentRoster, resolveMentionedAgents } from './agent-roster';
 
 export interface BridgeCollaborationDecision {
@@ -104,11 +104,13 @@ export class BridgeCollaborationAdapter {
     }).then(() => undefined);
   }
 
-  async intake(msg: NormalizedMessage): Promise<BridgeCollaborationDecision> {
-    if (msg.chatType === 'p2p' || !msg.threadId) return { managed: false, respond: true };
+  async intake(msg: NormalizedMessage, options: { observeOnly?: boolean } = {}): Promise<BridgeCollaborationDecision> {
+    if (msg.chatType === 'p2p') return { managed: false, respond: !options.observeOnly };
+    const address = taskAddressForMessage(this.tenantKey, msg);
     const actorType = senderTypeOf(msg);
     if (this.eventSource === 'coordinator') {
-      const taskId = taskIdFor({ tenantKey: this.tenantKey, chatId: msg.chatId, threadId: msg.threadId });
+      const taskId = taskIdFor(address);
+      if (options.observeOnly) return { managed: true, respond: false, taskId, reason: 'coordinator owns passive observation' };
       const dispatch = await this.waitForDispatch(taskId);
       if (!dispatch) {
         return { managed: true, respond: false, taskId, reason: 'coordinator has no authorized dispatch' };
@@ -118,7 +120,7 @@ export class BridgeCollaborationAdapter {
     const result = await this.client.submit({
       type: 'message',
       idempotencyKey: `feishu-message:${msg.messageId}`,
-      address: { tenantKey: this.tenantKey, chatId: msg.chatId, threadId: msg.threadId },
+      address,
       messageId: msg.messageId,
       actor: {
         type: actorType,
@@ -128,6 +130,8 @@ export class BridgeCollaborationAdapter {
       content: msg.content || '(empty message)',
       targetAgentIds: actorType === 'human' ? this.observedHumanTargets(msg) : [],
     });
+
+    if (options.observeOnly) return { managed: true, respond: false, taskId: result.task.id, reason: 'observed without execution' };
 
     let dispatch = result.dispatches.find((item) => item.targetAgentId === this.agentId);
     if (!dispatch && actorType === 'agent') {

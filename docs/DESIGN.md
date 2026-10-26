@@ -18,6 +18,15 @@ receives the current dispatch and objective, and queries its own local journal
 when it needs earlier records. It never gets World's private chain-of-thought,
 secrets or unrelated run logs.
 
+All admitted groups use this protocol. Topic addresses retain their existing
+tenant/chat/thread identity. An ordinary group uses tenant/chat/`_chat`; this
+reserved boundary is internal protocol data, never a Feishu thread ID. Local
+memory and ledger scope for an ordinary group remains just its chat ID.
+Admitted observations reach the local ledger and Hub before reply gating;
+no mention means no model execution. A later mention receives the same bounded
+worker memory used in topics. Other groups/topics remain isolated. The Hub
+envelope stays small; this does not reintroduce unbounded history injection.
+
 ## Why Four Bots In One Group Are Not Enough
 
 Four independent bridges each know only the messages they received and their own

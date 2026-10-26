@@ -6,6 +6,7 @@ import type {
   SendOptions,
 } from '@larksuite/channel';
 import { createLarkChannel } from '@larksuite/channel';
+import { hasGroupMsgScope } from './app-scope';
 import { dirname, join } from 'node:path';
 import { antigravityCapability, claudeCapability, codexCapability, deepSeekHarnessCapability, effectiveReplyMode } from '../agent/capability';
 import {
@@ -454,6 +455,15 @@ export async function startChannel(deps: StartChannelDeps): Promise<BridgeChanne
   });
 
   await channel.connect();
+  if (collaboration || localTopicLedger.memory) {
+    void hasGroupMsgScope(channel, cfg.accounts.app.id).then(has => {
+      if (has === false) log.warn('context', 'group-observation-incomplete', {
+        profile: controls.profile,
+        reason: 'Missing all-group-message receive permission; unmentioned group history cannot reach the ledger',
+        requiredScope: 'im:message.group_msg',
+      });
+    }).catch(() => {});
+  }
   const ownerRefresh = createOwnerRefreshController({
     controls,
     source: channel,
@@ -672,6 +682,9 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     getRequireMentionInGroup(controls.cfg) &&
     !msg.mentionedBot
   ) {
+    // Quiet messages are observations, not execution requests. They still
+    // belong in the same Hub conversation as a later explicit mention.
+    await collaboration?.intake(msg, { observeOnly: true });
     log.info('intake', 'skip-no-mention', { scope, chatType: msg.chatType });
     return;
   }
