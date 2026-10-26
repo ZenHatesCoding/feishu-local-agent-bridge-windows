@@ -26,3 +26,26 @@ it.skipIf(process.platform !== 'win32')('refreshes only the requested worker/pro
     expect(run().stdout.trim()).toBe(pin);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 20000);
+
+it.skipIf(process.platform !== 'win32')('binds launcher resolver options as named PowerShell parameters', () => {
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'launcher resolver ')));
+  try {
+    writeFileSync(join(dir, 'Resolve-CodexBinary.ps1'), `param([switch]$Quiet,[Parameter(Mandatory=$true)][string]$AgentId,[string]$PilotConfig,[string]$ProfileName,[string]$ConfigJson)
+if (!$Quiet -or $AgentId -ne 'worker' -or $ProfileName -ne 'custom' -or $ConfigJson -ne 'profile with spaces.json') { throw 'Wrong resolver options' }
+'resolved.exe'`);
+    const launcher = readFileSync('scripts/collab-pilot/run-agent.ps1', 'utf8');
+    const block = launcher.slice(launcher.indexOf("if ($env:LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE"), launcher.indexOf("if ($env:LARK_CHANNEL_ANTIGRAVITY_TRANSPORT"));
+    const script = `$ErrorActionPreference='Stop'
+$PSScriptRoot='${dir.replace(/'/g, "''")}'
+$Agent='worker'; $script:CollabManifestFile='manifest.json'
+$agentConfig=@{launch=@{environment=@{LARK_CHANNEL_CODEX_BIN='old.exe'};arguments=@('--profile','custom','--config','profile with spaces.json')}}
+function Expand-CollabValue($value) { $value }
+${block}
+if ($env:LARK_CHANNEL_CODEX_BIN -ne 'resolved.exe') { throw 'Launcher did not resolve Codex' }`;
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8', timeout: 10000, windowsHide: true,
+      env: { ...process.env, LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE: '0' },
+    });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

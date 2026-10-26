@@ -62,13 +62,13 @@ if ($env:LARK_CHANNEL_CODEX_BIN_DISABLE_RESOLVE -ne '1' -and $agentConfig.launch
   $launchArgs = @($agentConfig.launch.arguments)
   $profileAt = [Array]::IndexOf($launchArgs, '--profile')
   $codexProfile = if ($profileAt -ge 0 -and $profileAt + 1 -lt $launchArgs.Count) { $launchArgs[$profileAt + 1] } else { $env:LARK_CHANNEL_PROFILE }
-  $resolveArgs = @('-Quiet', '-AgentId', $Agent, '-PilotConfig', $script:CollabManifestFile)
-  if ($codexProfile) { $resolveArgs += @('-ProfileName', $codexProfile) }
-  else { $resolveArgs += @('-SkipProfileWrite') }
+  $resolveArgs = @{ Quiet = $true; AgentId = $Agent; PilotConfig = $script:CollabManifestFile }
+  if ($codexProfile) { $resolveArgs.ProfileName = $codexProfile }
+  else { $resolveArgs.SkipProfileWrite = $true }
   $configAt = [Array]::IndexOf($launchArgs, '--config')
-  if ($configAt -ge 0 -and $configAt + 1 -lt $launchArgs.Count) { $resolveArgs += @('-ConfigJson', (Expand-CollabValue $launchArgs[$configAt + 1])) }
-  elseif ($env:LARK_CHANNEL_CONFIG) { $resolveArgs += @('-ConfigJson', $env:LARK_CHANNEL_CONFIG) }
-  elseif ($env:LARK_CHANNEL_HOME) { $resolveArgs += @('-ConfigJson', (Join-Path $env:LARK_CHANNEL_HOME 'config.json')) }
+  if ($configAt -ge 0 -and $configAt + 1 -lt $launchArgs.Count) { $resolveArgs.ConfigJson = Expand-CollabValue $launchArgs[$configAt + 1] }
+  elseif ($env:LARK_CHANNEL_CONFIG) { $resolveArgs.ConfigJson = $env:LARK_CHANNEL_CONFIG }
+  elseif ($env:LARK_CHANNEL_HOME) { $resolveArgs.ConfigJson = Join-Path $env:LARK_CHANNEL_HOME 'config.json' }
   try {
     $resolvedCodexBin = & (Join-Path $PSScriptRoot 'Resolve-CodexBinary.ps1') @resolveArgs 2>$null
     if ($resolvedCodexBin) {
