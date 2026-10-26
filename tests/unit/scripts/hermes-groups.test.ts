@@ -5,10 +5,18 @@ const available = spawnSync(python, ['--version'], { timeout: 3000, windowsHide:
 
 it.skipIf(!available)('gives Hermes the same group/topic boundaries and passive observation contract', () => {
   const result = spawnSync(python, ['-c', String.raw`
-import importlib.util, os
+import importlib.util, os, tempfile, pathlib, json
 spec=importlib.util.spec_from_file_location('hook', 'adapters/hermes/handler.py')
 h=importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
 os.environ.update(LARK_COLLAB_HUB_URL='http://unused',LARK_COLLAB_HUB_TOKEN='test',LARK_COLLAB_TENANT_KEY='tenant',LARK_COLLAB_AGENT_ID='worker',LARK_COLLAB_EVENT_SOURCE='distributed',LARK_MEMORY_ENABLED='0')
+with tempfile.TemporaryDirectory() as ledger:
+    os.environ['LARK_COLLAB_NODE_LEDGER_ROOT']=ledger
+    c={'chat_id':'g','message_id':'quiet','thread_id':'','user_id':'u'}
+    h._record_local_topic(c,'message','earlier requirements')
+    h._record_local_topic({**c,'message_id':'topic','thread_id':'omt_t'},'message','topic record')
+    rows=[json.loads(line) for p in pathlib.Path(ledger).rglob('*.jsonl') for line in p.read_text(encoding='utf-8').splitlines()]
+    assert {r['scope'] for r in rows}=={'g','g:omt_t'}
+os.environ.pop('LARK_COLLAB_NODE_LEDGER_ROOT',None)
 calls=[]; records=[]
 def request(path, **kw):
     calls.append((path,kw))
