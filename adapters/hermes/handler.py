@@ -99,6 +99,7 @@ def _record_local_topic(context: dict[str, Any], kind: str, content: str) -> Non
     if not root or not chat_id:
         return
     scope = _conversation_scope(context)
+    thread_id = _conversation_thread(context)
     message_id = str(context.get("message_id") or context.get("session_id") or "")
     identity = f"{kind}:{message_id}" if message_id else f"{kind}:{hashlib.sha256(content.encode('utf-8')).hexdigest()[:24]}"
     record = {
