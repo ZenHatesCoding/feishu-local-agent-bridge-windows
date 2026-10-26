@@ -68,6 +68,11 @@ Only public PLANNER_RESPONSE text is returned after a successful, fully idle Sto
 event. Tool/model lifecycle events produce coarse activity. Reasoning, tool
 arguments, unrelated sessions and client authentication tokens are not exported.
 Heartbeat freshness is availability, not fabricated agent progress.
+The Sidecar exits when its original App language-server parent no longer exists.
+This prevents an orphan left by an App update from publishing a competing
+heartbeat or claiming new work with an obsolete client address. When diagnosing
+an update, verify one live-parent Sidecar for this Worker and actual tool execution;
+a fresh heartbeat alone does not prove that the client API is reachable.
 
 Cancellation fences replies, denies further tools and terminates verified
 wrapper-owned Windows process trees. PostInvocation terminates a cancelled loop.

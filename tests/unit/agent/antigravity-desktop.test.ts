@@ -11,6 +11,29 @@ const root = () => { const dir = mkdtempSync(join(tmpdir(), 'desktop-contract-')
 function ready(dir: string) { writeFileSync(join(dir, 'heartbeat.json'), JSON.stringify({ at: Date.now(), transport: 'antigravity-app' })); }
 afterEach(() => { for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 describe('Antigravity App transport', () => {
+  it('stops an orphan Sidecar before publishing heartbeat or claiming jobs', () => {
+    let tick: () => void = () => {};
+    const save = vi.fn();
+    const jobs = vi.fn(() => []);
+    const exit = vi.fn();
+    const kill = vi.fn().mockImplementationOnce(() => {}).mockImplementationOnce(() => { throw Object.assign(Error('parent exited'), { code: 'ESRCH' }); });
+    runInNewContext(readFileSync(resolve('adapters/antigravity-desktop/sidecar.cjs'), 'utf8'), {
+      require(name: string) {
+        if (name === './core.cjs') return { ...core, save };
+        if (name === 'node:fs') return { mkdirSync() {}, readdirSync: jobs };
+        return createRequire(import.meta.url)(name);
+      },
+      process: { env: { LARK_ANTIGRAVITY_DESKTOP_ROOT: '/fixture', ANTIGRAVITY_LS_ADDRESS: 'fixture' }, pid: 123, ppid: 122, kill, exit },
+      setInterval(callback: () => void) { tick = callback; },
+    });
+    tick();
+    expect(save).toHaveBeenCalledTimes(1);
+    tick();
+    expect(kill).toHaveBeenLastCalledWith(122, 0);
+    expect(exit).toHaveBeenCalledWith(0);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(jobs).toHaveBeenCalledTimes(1);
+  });
   it('retries Sidecar storage failures without crashing its timer', () => {
     let tick: () => void = () => {};
     const save = vi.fn().mockImplementationOnce(() => { throw Error('disk offline'); }).mockImplementation(() => {});

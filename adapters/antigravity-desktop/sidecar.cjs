@@ -4,6 +4,12 @@ const root = process.env.LARK_ANTIGRAVITY_DESKTOP_ROOT;
 if (!root || !process.env.ANTIGRAVITY_LS_ADDRESS) throw Error('Desktop Sidecar environment is required');
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 const active = new Set();
+const appParentPid = process.ppid;
+function appParentAlive() {
+  if (!Number.isInteger(appParentPid) || appParentPid <= 1) return true;
+  try { process.kill(appParentPid, 0); return true; }
+  catch (error) { return error.code !== 'ESRCH'; }
+}
 function api(args) {
   return new Promise((resolve, reject) => {
     // This is the App-provided agentapi executable, not agy headless.
@@ -55,6 +61,9 @@ async function start(id) {
   finally { active.delete(id); }
 }
 setInterval(() => {
+  // An App update can leave its old Sidecar behind with a dead language-server
+  // address. It must not race the replacement Sidecar for jobs or heartbeat.
+  if (!appParentAlive()) { process.exit(0); return; }
   let jobs;
   try {
     save(path.join(root, 'heartbeat.json'), { at: Date.now(), pid: process.pid, transport: 'antigravity-app', projectId: process.env.ANTIGRAVITY_PROJECT_ID, workspaceRoot: process.env.LARK_ANTIGRAVITY_WORKSPACE_ROOT });
