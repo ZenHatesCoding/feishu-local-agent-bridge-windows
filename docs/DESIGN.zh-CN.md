@@ -360,9 +360,8 @@ dispatch 才在父 dispatch 的基础上加 1。因此，同一个长期话题�
 
 仍保留因果深度上限，是为了阻止错误提示或模型行为造成 Agent 之间无限互相唤醒；
 它不限制业务任务的总轮数。`maxCausalDepth`（默认 8）只约束 `handoff` 和 `ask`；
-群聊寒暄式的 `reply` 由另一个上限 `maxConversationTurns`（默认 32）约束，按轮数
-而不是按委派深度封顶；`return`、`complete` 和 `repair` 不做深度检查，因为它们不
-延长因果链。每个 Agent 动作必须携带触发当前运行的父 dispatch，Hub 会校验父项属于
+`reply`、`ask` 和 `handoff` 还受独立的 `maxConversationTurns`（默认 32）约束，
+计数包含咨询回报；最终 `return` 仍可送达。每个 Agent 动作必须携带触发当前运行的父 dispatch，Hub 会校验父项属于
 同一任务、目标确实是该 Agent 且状态为 `accepted`。dispatch 结束时由 bridge 明确
 写成 `completed` 或 `failed`，而不是一直停留在已接受状态。同一动作的幂等键也包含
 父 dispatch，所以不同人工轮次中的相同自然语言不会被误判成旧请求。
