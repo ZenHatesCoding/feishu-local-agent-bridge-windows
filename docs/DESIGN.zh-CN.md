@@ -151,7 +151,10 @@ bot 响应。
 
 Agent 需要委派时，只在最终回答中输出一个 `collaboration_reply`、`collaboration_ask` 或
 `collaboration_handoff` 标记。Bridge 而不是模型负责消费标记、写入带父 dispatch 的
-动作、解析目标当前身份，并在同一话题发送唯一的真实 mention。提示词只提供 Hub 已在
+动作、解析目标当前身份，并在同一话题为该动作发送一次真实 mention。同一最终回答可包含
+多个完整标记，Bridge 按顺序逐个派发，并从可见正文中移除全部标记。并行子任务使用
+多条 `ask`，不改变负责人；`handoff` 仍然转移责任。每个目标保持独立授权及失败提示。
+提示词只提供 Hub 已在
 当前飞书群观察到的 roster；其中没有 `open_id`、shell 命令或全局 bot 名单。roster 未
 出现某个名字只表示未知，不能据此判断该 bot 不在群里。面向群聊的协作文本会移除裸
 飞书 ID；投递失败会在话题中明确报告，不再只写日志。

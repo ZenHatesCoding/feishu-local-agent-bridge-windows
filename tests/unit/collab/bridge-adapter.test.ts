@@ -22,6 +22,7 @@ async function fixture() {
     agents: [
       { id: 'world', displayName: 'World' },
       { id: 'chariot', displayName: 'Chariot' },
+      { id: 'justice', displayName: 'Justice' },
     ],
   });
   await hub.initialize();
@@ -55,6 +56,28 @@ function message(input: {
 }
 
 describe('BridgeCollaborationAdapter', () => {
+  it('extracts both parallel consultations and strips every control marker', () => {
+    const parsed = extractCollaborationHandoff('Plan\n<collaboration_ask target="chariot">Write</collaboration_ask>\n<collaboration_ask target="justice">Draw</collaboration_ask>');
+    expect(parsed.visibleContent).toBe('Plan');
+    expect(parsed.ask).toEqual({ targetAgentId: 'chariot', content: 'Write' });
+    expect(parsed.additionalActions).toHaveLength(1);
+    expect(parsed.additionalActions![0]!.ask).toEqual({ targetAgentId: 'justice', content: 'Draw' });
+  });
+
+  it('dispatches both parsed consultations without changing the owner', async () => {
+    const { hub, client } = await fixture();
+    for (const id of ['world', 'chariot', 'justice']) hub.registerAgentIdentity(id, `ou_${id}`, {});
+    const world = new BridgeCollaborationAdapter(client, 'world', 'tenant');
+    const assigned = await world.intake(message({ id: 'parallel', senderType: 'user', senderId: 'user', content: 'Plan' }));
+    const parsed = extractCollaborationHandoff('Plan\n<collaboration_ask target="chariot">Write</collaboration_ask>\n<collaboration_ask target="justice">Draw</collaboration_ask>');
+    for (const action of [parsed, ...(parsed.additionalActions ?? [])]) {
+      await world.createAsk({ taskId: assigned.taskId!, dispatchId: assigned.dispatchId!, runId: 'parallel', ...action.ask! });
+    }
+    expect(hub.listDispatches('chariot')).toContainEqual(expect.objectContaining({ reason: 'ask', objective: 'Write', status: 'pending' }));
+    expect(hub.listDispatches('justice')).toContainEqual(expect.objectContaining({ reason: 'ask', objective: 'Draw', status: 'pending' }));
+    await world.finishRun(assigned.taskId!, parsed.visibleContent, 'parallel', assigned.dispatchId!, true);
+    expect(hub.getTask(assigned.taskId!)?.ownerAgentId).toBe('world');
+  });
   it('extracts a bridge-owned handoff without exposing its control marker', () => {
     expect(extractCollaborationHandoff('Finding\n<collaboration_handoff target="chariot">Please rebut point 2</collaboration_handoff>'))
       .toEqual({ visibleContent: 'Finding', handoff: { targetAgentId: 'chariot', content: 'Please rebut point 2' } });

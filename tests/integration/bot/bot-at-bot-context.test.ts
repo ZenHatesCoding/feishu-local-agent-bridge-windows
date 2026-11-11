@@ -7,6 +7,9 @@ import { SessionStore } from '../../../src/session/store.js';
 import { WorkspaceStore } from '../../../src/workspace/store.js';
 import { FakeAgentAdapter } from '../../helpers/fake-agent.js';
 import { createTmpProfile, type TmpProfile } from '../../helpers/tmp-profile.js';
+import { CollaborationHub } from '../../../src/collab/hub.js';
+import { JsonlLedger } from '../../../src/collab/ledger.js';
+import { CollaborationHubServer } from '../../../src/collab/server.js';
 
 const sdkMock = vi.hoisted(() => ({
   channel: undefined as FakeLarkChannel | undefined,
@@ -68,9 +71,38 @@ afterEach(async () => {
   sdkMock.channel = undefined;
   sdkMock.createLarkChannel.mockClear();
   await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
+  vi.unstubAllEnvs();
 });
 
 describe('bot identity injection into the agent adapter', () => {
+  it('sends two real mentions for two consultation markers in one final answer', async () => {
+    const h = await createHarness();
+    const hub = new CollaborationHub(new JsonlLedger(join(h.tmp.profile, 'hub.jsonl')), {
+      agents: ['world', 'chariot', 'justice'].map(id => ({ id, displayName: id })),
+    });
+    await hub.initialize();
+    hub.registerAgentIdentity('chariot', 'ou_chariot', {});
+    hub.registerAgentIdentity('justice', 'ou_justice', {});
+    const server = new CollaborationHubServer(hub, { host: '127.0.0.1', port: 0, token: 'test' });
+    const address = await server.listen();
+    cleanups.push(() => server.close());
+    vi.stubEnv('LARK_COLLAB_HUB_URL', `http://127.0.0.1:${address.port}`);
+    vi.stubEnv('LARK_COLLAB_HUB_TOKEN', 'test');
+    vi.stubEnv('LARK_COLLAB_AGENT_ID', 'world');
+    vi.stubEnv('LARK_COLLAB_TENANT_KEY', 'test');
+    h.agent = new FakeAgentAdapter({ events: [
+      { type: 'text', delta: 'Plan\n<collaboration_ask target="chariot">Write</collaboration_ask>\n<collaboration_ask target="justice">Draw</collaboration_ask>' },
+      { type: 'done', terminationReason: 'normal' },
+    ] });
+    const send = vi.spyOn(h.channel, 'send');
+    await startTestBridge(h);
+    await h.channel.handlers.message?.(message({ messageId: 'om_parallel', content: 'Plan', rawSenderType: 'user' }));
+    await waitFor(() => hub.listDispatches('justice').length === 1 && send.mock.calls.some(call => JSON.stringify(call[2]).includes('ou_justice')));
+    expect(hub.listDispatches('chariot')).toHaveLength(1);
+    expect(send.mock.calls.filter(call => JSON.stringify(call[2]).includes('ou_chariot'))).toHaveLength(1);
+    expect(send.mock.calls.filter(call => JSON.stringify(call[2]).includes('ou_justice'))).toHaveLength(1);
+    expect(hub.getTask(hub.listDispatches('justice')[0]!.taskId)?.ownerAgentId).toBe('world');
+  });
   it('passes channel.botIdentity to the adapter after connect', async () => {
     const h = await createHarness();
 

@@ -112,7 +112,12 @@ new work and makes failed runs auditable instead of leaving them accepted.
 An Agent delegates by placing one `collaboration_reply`, `collaboration_ask` or
 `collaboration_handoff` marker in its final answer. The Bridge, rather than the
 model, consumes that marker, records the causal action, resolves the target's
-current identity, and sends the one real mention in the same topic. The prompt
+current identity, and sends the one real mention in the same topic. A final answer
+may contain multiple complete markers: the Bridge dispatches each in order and
+removes all of them from visible text. Use separate `ask` markers for parallel
+subtasks without changing ownership; `handoff` still transfers ownership. Each
+target retains its own dispatch authorization and delivery failure report.
+The prompt
 contains only the Hub roster observed for that Feishu group; it never exposes
 an `open_id`, a shell command, or a global bot list. Absence from that roster
 means unknown, not absent from the group. Raw Feishu IDs are removed from

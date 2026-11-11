@@ -1176,58 +1176,60 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       }, sendOpts);
       return;
     }
-    if (extracted.handoff && !ignoreControlMarker) {
-      try {
-        const target = await collaboration.createHandoff({
-          taskId: collaborationRun.taskId,
-          dispatchId: collaborationRun.dispatchId,
-          targetAgentId: extracted.handoff.targetAgentId,
-          content: extracted.handoff.content,
-          runId,
-        });
-        await channel.send(chatId, { markdown: target.content }, {
-          ...sendOpts,
-          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
-        });
-      } catch (err) {
-        log.fail('collab-handoff', err);
-        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.handoff.targetAgentId, err);
+    for (const action of [extracted, ...(extracted.additionalActions ?? [])]) {
+      if (action.handoff && !ignoreControlMarker) {
+        try {
+          const target = await collaboration.createHandoff({
+            taskId: collaborationRun.taskId,
+            dispatchId: collaborationRun.dispatchId,
+            targetAgentId: action.handoff.targetAgentId,
+            content: action.handoff.content,
+            runId,
+          });
+          await channel.send(chatId, { markdown: target.content }, {
+            ...sendOpts,
+            mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+          });
+        } catch (err) {
+          log.fail('collab-handoff', err);
+          await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, action.handoff.targetAgentId, err);
+        }
       }
-    }
-    if (extracted.reply && !ignoreControlMarker) {
-      try {
-        const target = await collaboration.createReply({
-          taskId: collaborationRun.taskId,
-          dispatchId: collaborationRun.dispatchId,
-          targetAgentId: extracted.reply.targetAgentId,
-          content: extracted.reply.content,
-          runId,
-        });
-        await channel.send(chatId, { markdown: target.content }, {
-          ...sendOpts,
-          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
-        });
-      } catch (err) {
-        log.fail('collab-reply', err);
-        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.reply.targetAgentId, err);
+      if (action.reply && !ignoreControlMarker) {
+        try {
+          const target = await collaboration.createReply({
+            taskId: collaborationRun.taskId,
+            dispatchId: collaborationRun.dispatchId,
+            targetAgentId: action.reply.targetAgentId,
+            content: action.reply.content,
+            runId,
+          });
+          await channel.send(chatId, { markdown: target.content }, {
+            ...sendOpts,
+            mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+          });
+        } catch (err) {
+          log.fail('collab-reply', err);
+          await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, action.reply.targetAgentId, err);
+        }
       }
-    }
-    if (extracted.ask && !ignoreControlMarker) {
-      try {
-        const target = await collaboration.createAsk({
-          taskId: collaborationRun.taskId,
-          dispatchId: collaborationRun.dispatchId,
-          targetAgentId: extracted.ask.targetAgentId,
-          content: extracted.ask.content,
-          runId,
-        });
-        await channel.send(chatId, { markdown: target.content }, {
-          ...sendOpts,
-          mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
-        });
-      } catch (err) {
-        log.fail('collab-ask', err);
-        await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, extracted.ask.targetAgentId, err);
+      if (action.ask && !ignoreControlMarker) {
+        try {
+          const target = await collaboration.createAsk({
+            taskId: collaborationRun.taskId,
+            dispatchId: collaborationRun.dispatchId,
+            targetAgentId: action.ask.targetAgentId,
+            content: action.ask.content,
+            runId,
+          });
+          await channel.send(chatId, { markdown: target.content }, {
+            ...sendOpts,
+            mentions: [{ key: target.openId, openId: target.openId, name: target.displayName, isBot: true }],
+          });
+        } catch (err) {
+          log.fail('collab-ask', err);
+          await sendCollaborationDeliveryFailure(channel, chatId, sendOpts, action.ask.targetAgentId, err);
+        }
       }
     }
     const finalization = await collaboration.finishRun(
