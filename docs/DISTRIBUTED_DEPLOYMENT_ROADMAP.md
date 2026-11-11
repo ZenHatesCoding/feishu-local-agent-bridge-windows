@@ -22,6 +22,20 @@ credential rotation, request limits and audit remain planned.
 
 ## Capability Status And Target
 
+### Active branch acceptance tracking
+
+`develop/hub` and `develop/worker` carry active fixes; `release/hub` and
+`release/worker` are separate deployment baselines, not aliases for development.
+Recent development includes multi-marker dispatch (one authorization/mention per
+target), App Sidecar orphan fencing, bounded supervisor repairs, and Worker topic
+memory. Delegation nesting is separate from autonomous round trips; memory
+preparation uses explicit bounded retrieval without waiting for synthesis.
+See [Design](./DESIGN.md), [Worker memory](./WORKER_MEMORY.md), and
+[App Worker](./ANTIGRAVITY_DESKTOP.md) for the maintained contracts.
+Automated tests and a local restart do not promote a release or establish real
+second-PC acceptance. Release promotion must explicitly carry the corresponding
+code, paired operations docs and acceptance evidence; archives remain frozen.
+
 | Capability | Status | Correct target |
 | --- | --- | --- |
 | Bots send/receive in one Feishu group | Implemented | Every Bridge connects to Feishu independently |
@@ -279,7 +293,13 @@ absolute path may be a node cache path, never shared truth.
 
 ## Context, Memory And Token Scaling
 
-Three different things grow, and only the prompt is bounded today:
+The Hub retains its append-only coordination ledger and in-memory protocol indexes.
+Each Worker now owns a separate SQLite observation ledger and bounded topic-memory
+projection: sourced task state, hierarchical summaries, recent originals and
+budgeted retrieval. Consolidation runs on batched observations during idle periods,
+never on the business preparation critical path. Original observations remain
+available through source references; failed maintenance retains them and reports
+memory debt instead of silently omitting history.
 
 - **Hub ledger:** JSONL is appended for every submit and ack, the Hub replays all
   of it on start, and the task, dispatch and idempotency indexes stay in memory.
@@ -338,8 +358,8 @@ provides transactions and uniqueness constraints.
 Worker topic memory now lands part of that projection: each Worker owns a separate
 SQLite observation ledger and a bounded topic-memory projection — sourced task
 state, hierarchical summaries, recent originals and budgeted retrieval.
-Consolidation runs automatically on new observations, before an oversized
-projection and during idle periods. Original observations remain available
+Consolidation runs on batched observations during idle periods, never on the
+business preparation critical path. Original observations remain available
 through source references; failed maintenance retains them and reports memory
 debt instead of silently omitting history. See
 [Worker memory operations](./WORKER_MEMORY.md) and the

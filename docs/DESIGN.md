@@ -126,12 +126,14 @@ A human mention can assign work directly. An agent must first record a
 structured `reply`, `handoff` or `ask`, then visibly mention the target in the
 same topic. A text-only mention without pending authorization is ignored. Each
 dispatch is consumed once, is tied to the active dispatch that caused it, and
-has an idempotency key. The loop guard applies to the depth of that causal chain,
-not to the lifetime number of delegations in a topic. Every new human assignment
-starts a new root at depth 1, so a long-lived topic never becomes unusable
-because it has accumulated legitimate work. The causal-depth ceiling only
-stops unbounded Agent-to-Agent recursion; autonomous chat turns are bounded
-separately by `maxConversationTurns`.
+has an idempotency key. The loop guard applies to the depth of that causal
+chain—not to the lifetime number of delegations in a topic. Consultation returns
+close their delegation frame; they do not increase nesting. Autonomous round trips
+are separately bounded by `maxConversationTurns` for reply, ask and handoff chains.
+Every new human
+assignment starts a new root at depth 1, so a long-lived topic never becomes
+unusable merely because it has accumulated legitimate work. The causal-depth
+ceiling only stops unbounded Agent-to-Agent recursion.
 
 When one human message mentions several bots, Feishu delivers that same message
 through each bot application's independent event connection. The Hub merges
@@ -270,6 +272,40 @@ idempotency key, a task ID and a timestamp, and content-bearing events also carr
 a visibility class. Current owner, participants and dispatch status are
 projections replayed from those events, so the four bots do not each keep a copy
 of the truth that can conflict.
+
+The Hub ledger remains the append-only control-plane fact source. Each Worker
+owns a separate observation ledger and bounded topic-memory projection.
+Topics use chatId:threadId; ordinary groups use chatId. Only messages, downloaded
+attachments and visible results actually observed by that Worker are recorded.
+Memory is not synchronized between Workers, and local paths are not cross-node
+Artifact locators.
+
+Pilot enables SQLite memory by default. The Worker injects sourced current state,
+summary cards and recent originals, with cumulative limits for further retrieval.
+Automatic consolidation preserves sources and blocks silent history loss when
+maintenance fails. Bound commands enforce instance, topic and run fences.
+See [Worker memory operations](./WORKER_MEMORY.md).
+Standard bridges start fresh native work; Hermes retains ownership of native
+sessions. Hub cold storage and Hermes-native session compaction remain separate.
+
+## Causal Depth, Not Topic Age
+
+`hop` is the depth of nested work delegation, not a message counter. `ask` and
+`handoff` add a level; a consultation return restores its parent's level, and
+ordinary replies do not deepen nesting. Independent autonomous-turn accounting
+still counts every causal message, including returns, and prevents a new reply,
+ask or handoff beyond `maxConversationTurns`; a final return remains deliverable.
+Depth is derived from ancestry, including historical ledgers with old hop values;
+no ledger rewrite or session reset is required. Every new human assignment
+creates a root at depth 1; only an ask/handoff child adds a delegation frame. A topic
+may therefore host any number of legitimate human turns without becoming
+permanently unusable. `maxCausalDepth` limits only recursive wake-up chains.
+Legacy `maxHops` is accepted for manifest migration, but new configuration uses
+the causal name.
+
+A child action must reference an accepted dispatch for the same task whose
+target is the acting agent. Bridges close every accepted dispatch as
+`completed` or `failed`, so stale and failed runs cannot silently remain active.
 
 ## Visibility
 

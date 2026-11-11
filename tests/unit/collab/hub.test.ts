@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -160,7 +160,36 @@ describe('CollaborationHub', () => {
       actorAgentId: 'world', causedByDispatchId: root.id, targetAgentId: 'justice', content: 'What do you think?',
     });
     expect(reply.task.ownerAgentId).toBe('world');
-    expect(reply.dispatches[0]).toMatchObject({ targetAgentId: 'justice', reason: 'reply', hop: 2 });
+    expect(reply.dispatches).toMatchObject([{ targetAgentId: 'justice', reason: 'reply', hop: 1 }]);
+  });
+
+  it('bounds autonomous chat turns independently from work delegation depth', async () => {
+    const { hub } = await fixture();
+    const root = await hub.submit(humanMessage());
+    await hub.acknowledge(root.dispatches[0]!.id, 'world', 'accepted', 'accept-root-bound');
+    const first = await hub.submit({
+      type: 'reply', idempotencyKey: 'reply-bound-1', taskId: root.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.dispatches[0]!.id,
+      targetAgentId: 'justice', content: 'Continue',
+    });
+    expect(first.dispatches[0]!.hop).toBe(1);
+  });
+
+  it('records a handed-off run final answer without dispatching it back to the new owner', async () => {
+    const { hub } = await fixture();
+    const assigned = await hub.submit(humanMessage());
+    const root = assigned.dispatches[0]!;
+    await hub.acknowledge(root.id, 'world', 'accepted', 'accept-root');
+    await hub.submit({
+      type: 'handoff', idempotencyKey: 'handoff-root', taskId: assigned.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.id, targetAgentId: 'chariot', content: 'Take over',
+    });
+    const finalized = await hub.submit({
+      type: 'return', idempotencyKey: 'finalize-root', taskId: assigned.task.id,
+      actorAgentId: 'world', causedByDispatchId: root.id, content: 'Here is the final answer too',
+    });
+    expect(finalized.dispatches).toEqual([]);
+    expect(JSON.stringify(hub.getContext(assigned.task.id, 'chariot'))).toContain('Here is the final answer too');
   });
 
   it('enforces context visibility and rejects secrets', async () => {
@@ -328,7 +357,7 @@ describe('CollaborationHub', () => {
     }
   });
 
-  it('limits only a true causal delegation chain', async () => {
+  it('closes the delegation frame when a consultation returns', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'collab-causal-depth-'));
     const hub = new CollaborationHub(new JsonlLedger(join(dir, 'ledger.jsonl')), {
       agents,
@@ -349,11 +378,60 @@ describe('CollaborationHub', () => {
       actorAgentId: 'justice', causedByDispatchId: review.id, content: 'Reviewed',
     });
     const ownerReturn = returned.dispatches[0]!;
-    expect(ownerReturn.hop).toBe(3);
+    expect(ownerReturn.hop).toBe(1);
     await hub.acknowledge(ownerReturn.id, 'world', 'accepted', 'accept-owner-return');
-    await expect(hub.submit({
+    const next = await hub.submit({
       type: 'ask', idempotencyKey: 'too-deep', taskId: assigned.task.id,
       actorAgentId: 'world', causedByDispatchId: ownerReturn.id, targetAgentId: 'chariot', content: 'Continue recursively',
-    })).rejects.toThrow('maximum causal delegation depth exceeded (3)');
+    });
+    expect(next.dispatches[0]!.hop).toBe(2);
+  });
+
+  it('allows repeated consultation rounds but still bounds total autonomous turns across replay', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'collab-rounds-'));
+    const path = join(dir, 'ledger.jsonl');
+    const options = { agents, maxCausalDepth: 2, maxConversationTurns: 10 };
+    let hub = new CollaborationHub(new JsonlLedger(path), options);
+    await hub.initialize();
+    const assigned = await hub.submit(humanMessage());
+    let parent = assigned.dispatches[0]!;
+    for (let round = 0; round < 5; round++) {
+      await hub.acknowledge(parent.id, 'world', 'accepted', `owner-${round}`);
+      const asked = await hub.submit({ type: 'ask', idempotencyKey: `ask-${round}`, taskId: assigned.task.id, actorAgentId: 'world', causedByDispatchId: parent.id, targetAgentId: 'justice', content: `Revise ${round}` });
+      const child = asked.dispatches[0]!;
+      expect(child.hop).toBe(2);
+      await hub.acknowledge(child.id, 'justice', 'accepted', `child-${round}`);
+      const returned = await hub.submit({ type: 'return', idempotencyKey: `return-${round}`, taskId: assigned.task.id, actorAgentId: 'justice', causedByDispatchId: child.id, content: `Result ${round}` });
+      parent = returned.dispatches[0]!;
+      expect(parent.hop).toBe(1);
+      if (round === 1) {
+        // Historical releases counted every hop. New accounting must use the
+        // parent graph rather than inherit those stored counters on replay.
+        const ledger = (await readFile(path, 'utf8')).trim().split('\n').map(line => {
+          const records = JSON.parse(line);
+          for (const record of records) if (record.event.kind === 'dispatch') record.event.hop = 99;
+          return JSON.stringify(records);
+        }).join('\n') + '\n';
+        await writeFile(path, ledger);
+      }
+      hub = new CollaborationHub(new JsonlLedger(path), options);
+      await hub.initialize();
+    }
+    await hub.acknowledge(parent.id, 'world', 'accepted', 'last-owner');
+    await expect(hub.submit({ type: 'ask', idempotencyKey: 'stop-loop', taskId: assigned.task.id, actorAgentId: 'world', causedByDispatchId: parent.id, targetAgentId: 'justice', content: 'Again' })).rejects.toThrow('maximum autonomous conversation turns exceeded');
+    const fresh = await hub.submit(humanMessage({ idempotencyKey: 'new-human', messageId: 'new-human' }));
+    expect(fresh.dispatches[0]!.hop).toBe(1);
+  });
+
+  it('still rejects genuinely nested transfers at the delegation ceiling', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'collab-nesting-'));
+    const hub = new CollaborationHub(new JsonlLedger(join(dir, 'ledger.jsonl')), { agents, maxCausalDepth: 2 });
+    await hub.initialize();
+    const assigned = await hub.submit(humanMessage());
+    const parent = assigned.dispatches[0]!;
+    await hub.acknowledge(parent.id, 'world', 'accepted', 'root');
+    const handed = await hub.submit({ type: 'handoff', idempotencyKey: 'transfer', taskId: assigned.task.id, actorAgentId: 'world', causedByDispatchId: parent.id, targetAgentId: 'justice', content: 'Own this' });
+    await hub.acknowledge(handed.dispatches[0]!.id, 'justice', 'accepted', 'new-owner');
+    await expect(hub.submit({ type: 'ask', idempotencyKey: 'nested', taskId: assigned.task.id, actorAgentId: 'justice', causedByDispatchId: handed.dispatches[0]!.id, targetAgentId: 'chariot', content: 'Deeper' })).rejects.toThrow('maximum causal delegation depth exceeded');
   });
 });

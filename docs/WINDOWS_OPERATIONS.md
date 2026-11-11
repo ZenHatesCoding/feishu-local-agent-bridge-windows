@@ -90,6 +90,12 @@ Two things are structurally required: `schemaVersion` and an `agents[]` list
 with at least one enabled entry. Everything else has a default, so older
 manifests keep working without edits.
 
+`hub.maxCausalDepth` limits nested work delegation (`ask` / `handoff`); returning
+a consultation closes that level. `hub.maxConversationTurns` independently bounds
+autonomous causal messages (including consultation round trips), not topic age.
+Human instructions start fresh roots. Existing ledger ancestry is retained.
+The Pilot manifest schema is version 2; omitted values retain their defaults.
+
 Top-level fields:
 
 | Field | Default when omitted | Meaning |

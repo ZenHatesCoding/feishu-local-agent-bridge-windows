@@ -128,7 +128,7 @@ notepad .\.runtime\pilot.local.json
 - `original.stop/start` 可选。配置后，切换到协作 bridge 前会停止旧监听器；回退时可恢复旧监听器，避免同一个飞书 App 同时被两份进程消费。
 - 停止命令在“原 bridge 本来就没运行”时可能返回非零，可对 `original.stop` 设置 `"ignoreExitCode": true`；恢复命令不建议忽略失败。
 - `hermesHook` 仅用于 Hermes。启用后只复制本项目 Hook 到指定 Hermes Home，停止时只删除该 Hook，不修改源码、venv、配置、记忆或技能。
-- `hub.maxCausalDepth` 限制单条 Agent 委派因果链的深度，不限制一个话题的累计工作轮数。旧 `maxHops` 仅用于读取旧清单；新配置应使用 `maxCausalDepth`。`hub.leaseMinutes` 默认 `30`，`hub.maxConversationTurns` 默认 `32`。
+- `hub.maxCausalDepth` 限制嵌套委派，咨询回报关闭对应层级；`hub.maxConversationTurns` 独立限制包含咨询往返的自主消息数，默认 `32`。人工指令建立新根。旧 `maxHops` 兼容读取，旧账本按父子关系重新推导深度。
 - `hub.bindHost` 优先于旧的 `hub.host`；监听端口默认 `17321`。
 
 路径在使用前会先做展开：先替换 `${REPO_ROOT}`、`${STATE_DIR}`、`${USERPROFILE}`、

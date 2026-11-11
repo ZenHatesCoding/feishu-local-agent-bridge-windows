@@ -221,8 +221,9 @@ unmentioned message does not wake the agent.
 2. Capture `inputFence`. Later arrivals belong to a later preparation.
 3. Read a consistent state revision, summary coverage, unprocessed events,
    corrections and Artifact metadata.
-4. Assemble a bounded raw tail when sufficient; otherwise perform bounded necessary
-   maintenance or enter an explicit degraded state.
+4. Assemble bounded whole originals, prioritizing human corrections and recent
+   results. Report unexpanded ranges explicitly and provide bound retrieval;
+   preparation never waits for model-backed maintenance.
 5. Supply the memory packet, tool entry points and budget before starting work.
 
 Deduplicate the current message, dispatch and recent ledger entries by origin ID,
@@ -230,8 +231,9 @@ preserving the user's actual current instruction in its priority location.
 
 ### 7.3 Checkpoint during execution
 
-After meaningful decisions, corrections, verification or stage completion, the
-agent submits structured changes and sources. Tools stage a candidate and cannot
+For an important correction, the agent may optionally submit structured changes
+and sources; routine persistence is runtime-owned, not a per-turn obligation.
+Tools stage a candidate and cannot
 target another instance/database, advance beyond inputFence, or perform Hub
 handoff/complete actions.
 
@@ -353,9 +355,10 @@ Retain old state/debt; do not present a substring fallback as semantic success.
 
 ### 9.3 Scheduling and failure
 
-Business checkpoints normally update state; idle work fills historical summaries.
-Foreground preparation and small necessary consolidation take precedence over
-unrelated maintenance. Limit maintenance concurrency, input/output, timeouts,
+Runtime ingestion captures business inputs/results; optional checkpoints correct
+state, and idle work fills historical summaries. Foreground preparation does not
+await consolidation. Small updates are batched; optional condensation must yield
+to pending originals and reserve most call capacity for them. Limit maintenance concurrency, input/output, timeouts,
 calls and cost per instance. Exhaustion leaves visible debt, not infinite retries.
 
 If bounded raw context covers missing consolidation, normal work continues. If
@@ -456,7 +459,8 @@ updates/removal affect only those assets, never overwrite user instructions,
 native memory or logins globally.
 
 Skills explain current-state reading, conflict verification, facts versus hypotheses,
-ID-based updates, stage checkpoints, consolidation and failed-write handling.
+ID-based updates, optional checkpoints and failed-write handling. They do not
+instruct business agents to perform recurring consolidation or checkpoint rituals.
 Runtime supplies mandatory loading/triggers. Agents need not know their bot nicknames.
 
 New hosts implement capabilities, binding, tools, maintenance, installation/removal

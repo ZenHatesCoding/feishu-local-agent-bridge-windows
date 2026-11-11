@@ -148,7 +148,7 @@ export type LedgerEvent =
       objective: string;
       sourceSequence: number;
       parentDispatchId?: string;
-      /** Depth in the current causal dispatch chain. Human assignments start at 1. */
+      /** Nested delegation depth. Returns close ask frames; human roots start at 1. */
       hop: number;
     }
   | {
@@ -177,7 +177,7 @@ export interface Dispatch {
   objective: string;
   sourceSequence: number;
   parentDispatchId?: string;
-  /** Depth in the current causal dispatch chain. Human assignments start at 1. */
+  /** Nested delegation depth, independent of the autonomous-message ceiling. */
   hop: number;
   status: 'pending' | 'accepted' | 'completed' | 'failed';
 }
