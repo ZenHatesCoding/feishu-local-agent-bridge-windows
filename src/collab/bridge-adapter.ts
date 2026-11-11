@@ -49,7 +49,22 @@ export interface MalformedCollaborationIntent {
   content: string;
 }
 
-export function extractCollaborationHandoff(content: string): {
+export function extractCollaborationHandoff(content: string): ReturnType<typeof extractSingleCollaborationIntent> & {
+  additionalActions?: ReturnType<typeof extractSingleCollaborationIntent>[];
+} {
+  const first = extractSingleCollaborationIntent(content);
+  let remaining = first.visibleContent;
+  const additionalActions: ReturnType<typeof extractSingleCollaborationIntent>[] = [];
+  while (true) {
+    const next = extractSingleCollaborationIntent(remaining);
+    if (!(next.handoff || next.reply || next.ask)) break;
+    additionalActions.push(next);
+    remaining = next.visibleContent;
+  }
+  return { ...first, visibleContent: remaining, ...(additionalActions.length ? { additionalActions } : {}) };
+}
+
+function extractSingleCollaborationIntent(content: string): {
   visibleContent: string;
   handoff?: CollaborationHandoffIntent;
   reply?: CollaborationReplyIntent;

@@ -29,6 +29,7 @@ export function buildCollaborationContext(input: {
         'For explicit work transfer or consultation, run: collab-delegate.cmd handoff|ask --target TARGET_ID --content TEXT.',
         'Never use a bare lark-cli message or text-only @ to delegate: it cannot authorize work.',
         'If yourDispatch.reason is ask, finish the requested consultation with the result and artifact paths only. Do not run collab-delegate.cmd or emit collaboration_reply, collaboration_ask or collaboration_handoff to wake the owner: the Bridge records the return and sends the one real @ to the current owner.',
+        'Final-answer collaboration markers may contain one complete ask marker per target for parallel consultation; each is dispatched and mentioned separately without changing ownership.',
         'Complete only the assigned objective and return structured results and artifact paths.',
         `For every task file you create and send, run: collab-artifact.cmd publish --task ${input.task.id} --actor ${input.dispatch.targetAgentId} --path "<absolute-or-relative-path>" --reply-to "<latest bridge_context.messageIds value>"${hasTopic ? ' --reply-in-thread' : ''}. Do not use raw lark-cli --file in a collaboration task.`,
       ],

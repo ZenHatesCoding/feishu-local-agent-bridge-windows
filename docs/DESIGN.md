@@ -153,6 +153,11 @@ to open. A new human message in the same topic is still journaled and can carry
 a fresh assignment, which is how a long-lived topic continues after one finished
 piece of work.
 
+A final answer can contain multiple complete collaboration markers. The Bridge
+processes each in order, creates each dispatch and real mention, and removes all
+markers from visible text. Use separate ask markers for parallel subtasks without
+transferring ownership; delivery failures remain target-specific.
+
 Agent-originated delegation uses one entry point for both keys. It accepts a
 stable Hub agent ID, records the causal `reply`, `ask` or `handoff`, resolves the
 target bot's current Feishu `open_id` from the runtime identity registry, and
