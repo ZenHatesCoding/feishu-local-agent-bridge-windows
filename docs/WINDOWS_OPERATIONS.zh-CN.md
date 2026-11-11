@@ -125,7 +125,7 @@ Coordinator 创建的 dispatch。
 - `enabled: false` 可保留尚未准备好的 Agent，不会加入 Hub 或被启动。
 - `runOnThisNode: false` 表示 Agent 会登记到中央 Hub，但不在这台机器启动，适合预先
   登记另一台电脑上的 Bot；省略时保持原有行为，在本机启动。
-- `hub.maxCausalDepth` 限制单条显式工作（`ask` / `handoff`）因果链的深度，不限制一个话题的累计工作轮数。`hub.maxConversationTurns` 则限制同一段对话中 Agent 自主互回的轮数。新清单必须设置二者，Pilot 清单版本为 2。
+- `hub.maxCausalDepth` 限制嵌套工作委派（`ask` / `handoff`），咨询回报关闭对应层级。`hub.maxConversationTurns` 独立限制自主因果消息数（包含咨询往返），不是话题年龄。人工指令建立新根；旧账本父子关系保留。新清单必须设置二者，Pilot 清单版本为 2。
 
 路径支持 `%USERPROFILE%`、`%PATH%`、`${REPO_ROOT}`、`${STATE_DIR}`、`${LOCALAPPDATA}`。JSON 中 Windows 反斜杠需要写成 `\\`。
 

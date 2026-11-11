@@ -92,7 +92,10 @@ structured `handoff`, `ask` or `return`, then visibly mention the target in the
 same topic. A text-only mention without pending authorization is ignored. Each
 dispatch is consumed once, is tied to the active dispatch that caused it, and
 has an idempotency key. The loop guard applies to the depth of that causal
-chain—not to the lifetime number of delegations in a topic. Every new human
+chain—not to the lifetime number of delegations in a topic. Consultation returns
+close their delegation frame; they do not increase nesting. Autonomous round trips
+are separately bounded by `maxConversationTurns` for reply, ask and handoff chains.
+Every new human
 assignment starts a new root at depth 1, so a long-lived topic never becomes
 unusable merely because it has accumulated legitimate work. The causal-depth
 ceiling only stops unbounded Agent-to-Agent recursion.
@@ -206,8 +209,14 @@ sessions. Hub cold storage and Hermes-native session compaction remain separate.
 
 ## Causal Depth, Not Topic Age
 
-`hop` is the depth of the current delegation chain. Every new human assignment
-creates a root at depth 1; only an Agent-to-Agent child increments it. A topic
+`hop` is the depth of nested work delegation, not a message counter. `ask` and
+`handoff` add a level; a consultation return restores its parent's level, and
+ordinary replies do not deepen nesting. Independent autonomous-turn accounting
+still counts every causal message, including returns, and prevents a new reply,
+ask or handoff beyond `maxConversationTurns`; a final return remains deliverable.
+Depth is derived from ancestry, including historical ledgers with old hop values;
+no ledger rewrite or session reset is required. Every new human assignment
+creates a root at depth 1; only an ask/handoff child adds a delegation frame. A topic
 may therefore host any number of legitimate human turns without becoming
 permanently unusable. `maxCausalDepth` limits only recursive wake-up chains.
 Legacy `maxHops` is accepted for manifest migration, but new configuration uses

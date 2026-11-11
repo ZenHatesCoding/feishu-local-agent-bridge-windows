@@ -106,9 +106,11 @@ commands switch between collaboration and an existing independent bridge.
 `ignoreExitCode` is useful only for an idempotent stop command. Only Hermes
 uses `hermesHook`.
 
-`hub.maxCausalDepth` limits one explicit work (`ask` / `handoff`) causal chain,
-not the lifetime number of turns in a topic. `hub.maxConversationTurns` bounds
-autonomous Agent-to-Agent reply turns in one conversation. New manifests must
+`hub.maxCausalDepth` limits nested work delegation (`ask` / `handoff`); returning
+a consultation closes that level. `hub.maxConversationTurns` independently bounds
+autonomous causal messages (including consultation round trips), not topic age.
+Human instructions start fresh roots. Existing ledger ancestry is retained.
+New manifests must
 set both values; the Pilot manifest schema is version 2.
 
 Paths support `%USERPROFILE%`, `%PATH%`, `${REPO_ROOT}`, `${STATE_DIR}` and

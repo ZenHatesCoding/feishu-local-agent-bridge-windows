@@ -107,8 +107,9 @@ export class MemoryStore {
     return this.db.prepare('SELECT * FROM events WHERE topic=? AND seq>? AND seq<=? ORDER BY seq LIMIT ?')
       .all(topic, after, through, Math.min(Math.max(limit, 1), 200)).map(decodeEvent);
   }
-  tail(topic: string, limit = 12): MemoryEvent[] {
-    return this.db.prepare('SELECT * FROM events WHERE topic=? ORDER BY seq DESC LIMIT ?').all(topic, Math.min(Math.max(limit, 1), 50)).map(decodeEvent).reverse();
+  tail(topic: string, limit = 12, through = Number.MAX_SAFE_INTEGER, after = 0, humanOnly = false): MemoryEvent[] {
+    return this.db.prepare(`SELECT * FROM events WHERE topic=? AND seq<=? AND seq>? ${humanOnly ? "AND actor='human'" : ''} ORDER BY seq DESC LIMIT ?`)
+      .all(topic, through, after, Math.min(Math.max(limit, 1), 200)).map(decodeEvent).reverse();
   }
   private index(topic: string, id: string, text: string): void {
     this.db.prepare('INSERT INTO search_index(topic,id,text) VALUES(?,?,?)').run(topic, id, indexText(text));
@@ -271,8 +272,12 @@ export class MemoryStore {
           recordCost += memoryCost(event);
         }
         if (!sources.length) { this.recordFailure(topicId, 'source-exceeds-maintenance-budget'); return undefined; }
-        if (!force && cost < 2500 && events.length < 8 && !events.some(event => /必须|不要|改为|改成|取消|纠正|handoff|constraint|instead|must not/i.test(event.content))) return undefined;
+        if (!force && events.length < 8 && memoryCost(events) < Math.min(8000, this.limits.chunk / 2)) return undefined;
       } else {
+        // Summary-of-summary work is optional. Never consume the calls reserved
+        // for new observations (including observations in other topics).
+        if (quota.count >= Math.max(1, Math.floor(this.limits.maxCalls / 4))) return undefined;
+        if (this.db.prepare('SELECT id FROM topics WHERE state_through<next_seq-1 LIMIT 1').get()) return undefined;
         const active = this.activeSummaries(topicId).reverse();
         let contiguous: SummaryRow[] = [];
         for (const node of active) {

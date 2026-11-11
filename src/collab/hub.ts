@@ -305,11 +305,12 @@ export class CollaborationHub {
     if (input.type === 'repair' && this.hasRepairFromParent(task.id, input.actorAgentId, parent.id)) {
       throw new Error('a malformed collaboration marker may be repaired only once per run');
     }
-    const nextHop = parent.hop + 1;
+    const parentDepth = this.delegationDepth(parent);
+    const nextHop = parentDepth + (input.type === 'ask' || input.type === 'handoff' ? 1 : 0);
     if ((input.type === 'handoff' || input.type === 'ask') && nextHop > this.maxCausalDepth) {
       throw new Error(`maximum causal delegation depth exceeded (${this.maxCausalDepth})`);
     }
-    if (input.type === 'reply' && nextHop > this.maxConversationTurns) {
+    if (['reply', 'ask', 'handoff'].includes(input.type) && this.autonomousTurns(parent) + 1 > this.maxConversationTurns) {
       throw new Error(`maximum autonomous conversation turns exceeded (${this.maxConversationTurns})`);
     }
     if (input.type === 'complete' && activeOwner !== input.actorAgentId) {
@@ -359,7 +360,8 @@ export class CollaborationHub {
         'return',
         input.content,
         action.sequence,
-        nextHop,
+        // Returning a consultation closes its delegation frame, not a new one.
+        parent.parentDispatchId ? this.delegationDepth(this.dispatches.get(parent.parentDispatchId)!) : Math.max(1, parentDepth - 1),
         parent.id,
       ));
     } else if (input.type === 'complete') {
@@ -368,6 +370,32 @@ export class CollaborationHub {
       }));
     }
     return records;
+  }
+
+  private autonomousTurns(dispatch: Dispatch): number {
+    let count = 1;
+    let current: Dispatch | undefined = dispatch;
+    while (current?.parentDispatchId) {
+      count++;
+      current = this.dispatches.get(current.parentDispatchId);
+    }
+    return count;
+  }
+
+  // Derive from ancestry, including old ledgers whose hop counted every message.
+  private delegationDepth(dispatch: Dispatch): number {
+    let depth = 1;
+    let current: Dispatch | undefined = dispatch;
+    while (current?.parentDispatchId) {
+      const parent: Dispatch | undefined = this.dispatches.get(current.parentDispatchId);
+      if (current.reason === 'return' && parent?.reason === 'ask') {
+        current = parent.parentDispatchId ? this.dispatches.get(parent.parentDispatchId) : undefined;
+        continue;
+      }
+      if (current.reason === 'ask' || current.reason === 'handoff') depth++;
+      current = parent;
+    }
+    return depth;
   }
 
   private hasHandoffFromParent(taskId: string, actorAgentId: string, parentDispatchId: string): boolean {

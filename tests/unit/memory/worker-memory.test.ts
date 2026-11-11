@@ -196,14 +196,50 @@ describe('bounded automatic consolidation', () => {
       expect(runtime.store.status(topic.id)).toMatchObject({ revision: 0, lastError: expect.any(String) });
     } finally { await runtime.close(); }
   });
-  it('refuses to execute with silently omitted unprocessed history', async () => {
+  it('executes with explicit retrievable omissions, without synthesizing or advancing coverage', async () => {
     const runtime = new WorkerMemoryRuntime(root(), 'worker-a', 'tenant');
     try {
       runtime.store.ingest('t', { origin: '1', kind: 'message', content: '大量旧要求'.repeat(600) });
-      await expect(runtime.prepare('t')).rejects.toThrow('history-needs-maintenance');
+      const prepared = await runtime.prepare('t');
+      expect(prepared.prompt).toContain('omittedRecords');
+      expect(prepared.prompt).toContain('bounded-retrieval');
+      expect(runtime.store.topic('t').state_through).toBe(0);
+      expect(memoryCost(prepared.prompt) + runtime.store.limits.retrieval).toBeLessThanOrEqual(12000);
       expect(runtime.store.events(runtime.store.topic('t').id).length).toBeGreaterThan(0);
     } finally { await runtime.close(); }
   });
+  it('does not wait for maintenance of another topic before preparing business work', async () => {
+    let release!: (value: string) => void;
+    const runtime = new WorkerMemoryRuntime(root(), 'worker-a', 'tenant', () => new Promise(resolve => { release = resolve; }));
+    const event = runtime.store.ingest('maintenance', { origin: 'one', kind: 'message', content: 'old work' });
+    const pending = runtime.maintain(runtime.store.topic('maintenance').id, true);
+    try {
+      runtime.store.ingest('business', { origin: 'human', kind: 'message', actor: 'human', content: '最新纠正：现在交付' });
+      const prepared = await runtime.prepare('business');
+      expect(prepared.prompt).toContain('最新纠正：现在交付');
+    } finally {
+      release(JSON.stringify({ items: [], summary: `saved ${event.id}` }));
+      await pending;
+      await runtime.close();
+    }
+  });
+
+  it('prepares despite exhausted maintenance quota and preserves old sources for lookup', async () => {
+    let calls = 0;
+    const runtime = new WorkerMemoryRuntime(root(), 'worker-a', 'tenant', async () => { calls++; return 'invalid'; }, { maxCalls: 1 });
+    try {
+      const first = runtime.store.ingest('t', { origin: 'old', kind: 'message', content: '旧资料'.repeat(3000), actor: 'agent' });
+      await runtime.maintain(runtime.store.topic('t').id, true);
+      const latest = runtime.store.ingest('t', { origin: 'human', kind: 'message', content: '用户最新更正必须优先', actor: 'human' });
+      const prepared = await runtime.prepare('t');
+      expect(calls).toBe(1);
+      expect(prepared.prompt).toContain(latest.content);
+      expect(prepared.prompt).toContain('omittedRecords');
+      expect(runtime.store.inspect(runtime.store.topic('t').id, first.id)).toMatchObject({ id: first.id });
+      expect(runtime.store.topic('t').state_through).toBe(0);
+    } finally { await runtime.close(); }
+  });
+
   it('uses source lineage when condensing and retains children for expansion', () => {
     const db = store(), topic = db.topic('t');
     for (let seq = 1; seq <= 4; seq++) {

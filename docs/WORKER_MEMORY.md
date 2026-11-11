@@ -10,8 +10,8 @@ summaries and source links. Feishu topics span fresh model sessions; model, name
 and cwd do not define identity. The Hub neither synthesizes nor stores local
 memory and grants no colocated-Worker filesystem privileges.
 
-Implemented mechanisms include automatic loading, checkpoints, background and
-foreground consolidation, hierarchical provenance, expansion, cumulative retrieval,
+Implemented mechanisms include automatic loading, optional checkpoints, background
+consolidation, hierarchical provenance, expansion, cumulative retrieval,
 pinned constraints, parked work, retries, revisions and legacy import. Local
 automation and host verification do not constitute second-machine Feishu acceptance;
 older Workers must update to the same code version.
@@ -50,10 +50,18 @@ wrappers, never Chinese characters divided by four. Defaults reserve roughly
 3000/4000/3000/2000 for state/summaries/recent/cumulative retrieval. Wrappers count;
 optional summaries may be omitted. Effective critical constraints are not truncated.
 
-Background-disabled instances skip idle/post-result synthesis; foreground may
-still consolidate to cover history. Maintenance uses the existing model/login,
+Business preparation never waits for model-backed consolidation or starts it inline.
+It prioritizes human corrections and recent whole records, borrowing unused summary
+capacity within the total budget. `historySelection` reports selected IDs and the
+unexpanded range/count; originals remain available through bound retrieval. The
+coverage cursor never advances merely because records were omitted from a prompt.
+Background-disabled instances retain these reads without performing synthesis.
+Maintenance uses the existing model/login,
 defaults to eight persisted model calls/hour and one structural repair per job,
-and starts failure backoff at five minutes without losing originals. Repeated
+and starts failure backoff at five minutes without losing originals. Small updates
+are batched (eight records or about 8 KB). Optional summary condensation uses at
+most the first quarter of the hourly allowance and is skipped while any topic has
+unprocessed originals, reserving the remaining calls for new observations. Repeated
 failures for identical coverage/revision back off exponentially up to six hours.
 Maintenance uses small, whole source batches; it never truncates a source to
 pretend coverage. Unchanged pinned state is retained by code; a model may omit
@@ -75,7 +83,7 @@ scope is the chat ID; topic scope is `chatId:threadId`. Passive admitted message
 are recorded before reply gating. Receiving only mention events leaves a real
 coverage gap that local storage or summarization cannot reconstruct.
 
-Every run receives worker_topic_memory containing state, recent records,
+Every run receives worker_topic_memory containing state, selected recent records,
 summaries, source IDs, parked counts and coverage. Host-specific SKILL.md assets
 live in the Worker root and their path is provided. Minimal rules are always
 injected. Global user instructions and native memory are not overwritten.
@@ -94,7 +102,9 @@ local-context read/search calls forward to the same controlled views. Search
 returns cards before expansion; pagination/cumulative budgets survive subprocesses.
 Long originals are bounded parts with a complete text blob.
 
-Checkpoint structure:
+Checkpoints are optional for important corrections, not a per-turn delivery step.
+Automatic ingestion/result capture and background maintenance own persistence.
+Never advance a checkpoint past unread history. Checkpoint structure:
 
 ```json
 {
@@ -122,9 +132,11 @@ never enters Feishu/Hub action parsing. Claude/Hermes disable tools; Codex uses 
 read-only sandbox; agy/Harness retain host permission boundaries, not OS-isolation
 guarantees. Maintenance omits collaboration credentials and business Bridge prompts.
 
-Execution continues when the raw tail covers unconsolidated history. Otherwise
-consolidate first, then explicitly block dependent work if coverage remains
-insufficient. Node marks the accepted dispatch failed and retains the message.
+Consolidation debt or an exhausted maintenance quota does not block an accepted
+business run. Unexpanded history is explicit, not a fabricated complete summary.
+The agent retrieves relevant omitted evidence and pauses only a judgment that
+actually depends on unavailable history. Invalid critical state or storage/binding
+failure still fails explicitly; this is not a bypass of scope or evidence checks.
 Native tool loops and session compression remain host responsibilities.
 
 ## Diagnosis, migration and recovery
