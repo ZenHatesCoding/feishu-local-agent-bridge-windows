@@ -75,8 +75,39 @@ afterEach(async () => {
 });
 
 describe('bot identity injection into the agent adapter', () => {
+  it('fences a racing old result when native input receipt fails and never retries the task', async () => {
+    const h = await createHarness();
+    let finish!: () => void;
+    const finished = new Promise<void>(resolve => { finish = resolve; });
+    const steer = vi.fn(async () => { throw Error('receipt uncertain'); });
+    const stop = vi.fn(async () => { finish(); });
+    const run = vi.spyOn(h.agent, 'run').mockImplementation(opts => ({
+      runId: opts.runId, steer, stop, async waitForExit() { return true; },
+      events: (async function* () { yield { type: 'activity' as const }; await finished; yield { type: 'text' as const, delta: 'STALE_RESULT' }; yield { type: 'done' as const }; })(),
+    }));
+    const rendered: string[] = [];
+    vi.spyOn(h.channel, 'stream').mockImplementation(async (_chat, input) => {
+      if (isMarkdownStreamInput(input)) await input.markdown({ async setContent(text) { rendered.push(text); } });
+    });
+    const send = vi.spyOn(h.channel, 'send');
+    await startTestBridge(h);
+    await h.channel.handlers.message?.(message({ messageId: 'first', content: 'Original', rawSenderType: 'user' }));
+    await waitFor(() => run.mock.calls.length === 1);
+    await h.channel.handlers.message?.(message({ messageId: 'failed-update', content: 'Correction', rawSenderType: 'user' }));
+    await waitFor(() => rendered.some(text => text.includes('old result fenced')));
+    expect(rendered.at(-1)).not.toContain('STALE_RESULT');
+    expect(stop).toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(send.mock.calls)).toContain('未自动重发');
+  });
   it('delivers a second human mention into the active run instead of starting another run', async () => {
     const h = await createHarness();
+    const hub = new CollaborationHub(new JsonlLedger(join(h.tmp.profile, 'live-hub.jsonl')), { agents: [{ id: 'world', displayName: 'Agent' }] });
+    await hub.initialize(); hub.registerAgentIdentity('world', 'ou_bot', {});
+    const server = new CollaborationHubServer(hub, { host: '127.0.0.1', port: 0, token: 'test' });
+    const address = await server.listen(); cleanups.push(() => server.close());
+    vi.stubEnv('LARK_COLLAB_HUB_URL', `http://127.0.0.1:${address.port}`);
+    vi.stubEnv('LARK_COLLAB_HUB_TOKEN', 'test'); vi.stubEnv('LARK_COLLAB_AGENT_ID', 'world'); vi.stubEnv('LARK_COLLAB_TENANT_KEY', 'test');
     let finish!: () => void;
     const finished = new Promise<void>(resolve => { finish = resolve; });
     const steer = vi.fn(async () => {});
@@ -99,6 +130,8 @@ describe('bot identity injection into the agent adapter', () => {
     expect(steer).toHaveBeenCalledTimes(1);
     finish();
     await waitFor(() => exited.mock.calls.length > 0);
+    await waitFor(() => hub.listDispatches('world').some(dispatch => dispatch.status === 'completed'));
+    expect(hub.listDispatches('world').map(dispatch => dispatch.status)).toEqual(['failed', 'completed']);
   });
   it('sends two real mentions for two consultation markers in one final answer', async () => {
     const h = await createHarness();

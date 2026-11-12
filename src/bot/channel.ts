@@ -987,7 +987,7 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         if (collaborationRun && (!authority?.dispatchId || authority.taskId !== collaborationRun.taskId)) throw Error('Task update authorization does not match the active task');
         try {
           await execution.run.steer!(`${authority?.promptContext ?? ''}\n<current_task_update>\nThis updates the active task, not a separate queued job. Preserve usable work; latest instructions override conflicting earlier instructions. Do not publish superseded results.\n${text}\n</current_task_update>`);
-        } catch (error) { await execution.stop().catch(() => {}); throw error; }
+        } catch (error) { handle.inputUpdateFailed = true; await execution.stop().catch(() => {}); throw error; }
         if (collaborationRun && authority?.dispatchId) {
           if (collaborationRun.dispatchId) supersededDispatches.add(collaborationRun.dispatchId);
           Object.assign(collaborationRun, { dispatchId: authority.dispatchId, dispatchReason: authority.dispatchReason, promptContext: authority.promptContext });
@@ -1151,6 +1151,11 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
     runId = execution.runId,
     originalVisibleContent?: string,
   ): Promise<{ ownerMention?: MentionInfo } | undefined> => {
+    await handle.inputBarrier;
+    if (collaboration && collaborationRun) for (const dispatchId of supersededDispatches) {
+      await collaboration.finishRun(collaborationRun.taskId, '', `superseded:${execution.runId}:${dispatchId}`, dispatchId, false).catch(error => log.fail('collab-finalize', error));
+    }
+    supersededDispatches.clear();
     if (!collaboration || !collaborationRun?.dispatchId) return;
     const extracted = extractCollaborationHandoff(renderText(finalAnswerOnlyState(state)));
     // A consulted Bot returns one result to the owner.  It must not create a
@@ -1443,9 +1448,6 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
       collaborationFinalState = finalState;
     }
     await handle.inputBarrier;
-    if (collaboration && collaborationRun) for (const dispatchId of supersededDispatches) {
-      await collaboration.finishRun(collaborationRun.taskId, '', `superseded:${execution.runId}:${dispatchId}`, dispatchId, false).catch(error => log.fail('collab-finalize', error));
-    }
     let ownerMention: MentionInfo | undefined;
     if (collaborationFinalState) {
       await localTopicLedger.recordBotResult(
@@ -1754,6 +1756,8 @@ async function processAgentStream(
       state = finalizeIfRunning(state);
     }
   }
+  await handle.inputBarrier;
+  if (handle.inputUpdateFailed) state = { ...initialState, blocks: [], reasoning: { content: '', active: false }, terminal: 'error', errorMsg: 'Task update acknowledgement unavailable; old result fenced.' };
   log.info('card', 'final', { scope, terminal: state.terminal, interrupted: handle.interrupted });
   reportMetric('run_e2e_ms', Date.now() - runStart, { terminal: state.terminal });
   await flush(state);
