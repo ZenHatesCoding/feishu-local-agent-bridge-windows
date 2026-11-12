@@ -83,7 +83,7 @@ describe('bot identity injection into the agent adapter', () => {
     const stop = vi.fn(async () => { finish(); });
     const run = vi.spyOn(h.agent, 'run').mockImplementation(opts => ({
       runId: opts.runId, steer, stop, async waitForExit() { return true; },
-      events: (async function* () { yield { type: 'activity' as const }; await finished; yield { type: 'text' as const, delta: 'STALE_RESULT' }; yield { type: 'done' as const }; })(),
+      events: (async function* () { yield { type: 'activity' as const }; await finished; yield { type: 'text' as const, delta: 'STALE_RESULT' }; yield { type: 'done' as const, terminationReason: 'normal' as const }; })(),
     }));
     const rendered: string[] = [];
     vi.spyOn(h.channel, 'stream').mockImplementation(async (_chat, input) => {
