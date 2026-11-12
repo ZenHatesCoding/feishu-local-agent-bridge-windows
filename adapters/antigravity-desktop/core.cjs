@@ -71,6 +71,11 @@ function hook(root, event, input) {
   }
   if (event === 'PostInvocation' && stop) return { terminationBehavior: 'terminate' };
   if (event === 'Stop') {
+    const fence = path.join(dir, 'update-fence.json');
+    const seen = path.join(dir, 'update-seen.json');
+    if (fs.existsSync(fence) && (!fs.existsSync(seen) || json(seen).id !== json(fence).id)) {
+      emit(dir, { type: 'activity', summary: 'desktop awaiting updated input invocation' }); return {};
+    }
     const primary = path.join(dir, 'conversation.json');
     if (fs.existsSync(primary) && json(primary).conversationId !== input.conversationId) {
       emit(dir, { type: 'activity', summary: 'desktop subagent lifecycle' }); return {};
@@ -84,6 +89,10 @@ function hook(root, event, input) {
         : { type: 'error', reason: stop ? 'interrupted' : 'failed', message: stop ? 'Desktop run cancelled' : `Desktop stopped: ${input.terminationReason || 'unknown'}${input.error ? ': ' + String(input.error).slice(0, 500) : ''}` });
     }
     return {};
+  }
+  if (event === 'PreInvocation') {
+    const fence = path.join(dir, 'update-fence.json');
+    if (fs.existsSync(fence)) save(path.join(dir, 'update-seen.json'), json(fence));
   }
   if (event === 'PreInvocation' || event === 'PostToolUse') emit(dir, { type: 'activity', summary: event === 'PreInvocation' ? 'desktop model invocation' : 'desktop tool completed' });
   return {};

@@ -303,6 +303,15 @@ proxy for `agy.exe`; it does not reinstall the agent, modify authentication
 state, or leak proxy variables to other agents. Connectivity, bridge health and
 authentication are separate diagnostic dimensions.
 
+## Updating an active task
+
+Within the same conversation and Agent instance, an authorized text correction
+can enter the active native run rather than create a second queued job. The Hub
+still owns admission and task identity; the bridge serializes native receipts
+and finalizes against the latest accepted dispatch. This does not share private
+sessions across Agents. Transport support, queue exceptions, uncertain delivery
+and cancellation limits are maintained in [Agent bridges](./AGENT_BRIDGES.md#active-task-text-updates).
+
 ## Deployment Shape
 
 `release/hub` builds every maintained adapter for the central deployment;

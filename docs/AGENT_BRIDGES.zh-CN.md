@@ -57,6 +57,38 @@ bot 绑定，命令会在该隔离工作区内按 `bot-only` 自动修复并重�
 Agent 不得拿自身 `.artifacts` 暂存目录冒充交付，也不得仅凭别的命令报错就让用户
 重启 Bridge 或运行 doctor；只有该发布命令重试后仍失败，才能报告它的准确错误。
 
+## 执行中的任务文本更新
+
+| Agent / transport | 支持 | 原生机制 |
+| --- | --- | --- |
+| Codex app-server（默认业务调用） | 是 | 同一 thread／turn 的 `turn/steer` |
+| DeepSeek Harness 标准 headless runner | 是 | 按次 Cordis 桥接插件调用同一 Agent 的 `steer` |
+| Antigravity App Sidecar | 是 | 对绑定 conversation 调用 `agentapi send-message` |
+| Claude Code | 否 | 保持原有排队 |
+| Antigravity agy CLI | 否 | 原有单次调用不变 |
+| Hermes Hook | 不属于本次桥接能力 | 原生 gateway 行为不变 |
+
+同一准入群／话题、同一逻辑 Agent 实例中，已授权的纯文本后续消息更新当前运行，
+不另起进程、不共享跨话题会话。协作模式仍须取得该 Agent 的已接受 Hub dispatch。
+更新串行处理、按消息 ID 去重；最终委派及结果报告使用最新 dispatch。被替代的
+dispatch 以 failed 收尾，不重复发结果或唤醒负责人。已运行工具保留最初的已接受
+dispatch 环境直至收尾，不修改 OS 权限，也不引入新的授权路径。
+
+带附件、明确顺序要求（如“做完…再…”）、fanout 分配和 Agent 咨询回报仍排队。
+斜杠命令保持原有处理。活动 handle 建立前、运行完成后到达的消息仍按普通调度。
+原生确认仅表示接收，不保证模型遵从，也不代表 shell、渲染或上传已立即停止。
+确认缺失／不确定时请求停止旧运行并明确报告；不会静默重试可能已被接受的输入。
+
+记忆整理保持单次调用。Codex 的 `ignoreUserConfig` 集成及 adapter 的
+`liveUpdates: false` 保留兼容 exec 模式，不支持 steer。DSH 要求标准 headless
+runner 和原生 Agent/status API；临时插件不改写用户 profile。Antigravity 必须
+同时更新 bridge、Sidecar 和 Hook 资产，仅更新 Node bridge 不够；收尾栅栏要求最新
+输入后先出现模型调用，再发布最终结果。CLI 模式不继承 App 能力。
+
+参考：[Codex app-server](https://learn.chatgpt.com/docs/app-server)、
+[Antigravity Sidecars](https://antigravity.google/docs/sidecars)。
+原生传输验证不等于真实第二台电脑的飞书验收。
+
 ## Claude Code
 
 前置：`claude --version` 和交互登录可用。

@@ -50,6 +50,8 @@ function closeStreamingText(blocks: Block[]): Block[] {
 
 export function reduce(state: RunState, evt: AgentEvent): RunState {
   switch (evt.type) {
+    case 'input_updated':
+      return { ...initialState, blocks: [], reasoning: { content: '', active: false } };
     case 'activity':
       return state;
 

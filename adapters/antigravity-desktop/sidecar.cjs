@@ -4,6 +4,35 @@ const root = process.env.LARK_ANTIGRAVITY_DESKTOP_ROOT;
 if (!root || !process.env.ANTIGRAVITY_LS_ADDRESS) throw Error('Desktop Sidecar environment is required');
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 const active = new Set();
+const updating = new Set();
+async function update(id, dir, request) {
+  if (updating.has(id) || cancelled(dir, request)) return;
+  const inbox = path.join(dir, 'updates');
+  if (!fs.existsSync(inbox) || !fs.existsSync(path.join(dir, 'conversation.json'))) return;
+  updating.add(id);
+  try {
+    for (const file of fs.readdirSync(inbox).filter(name => name.endsWith('.json')).sort()) {
+      const input = json(path.join(inbox, file));
+      const ack = path.join(inbox, file + '.ack');
+      if (fs.existsSync(ack)) continue;
+      try {
+        if (input.nonce !== request.nonce || typeof input.text !== 'string' || !input.text.trim()) throw Error('Invalid input binding');
+        if (cancelled(dir, request)) throw Error('Desktop run is no longer active');
+        const claimed = path.join(inbox, file + '.claimed');
+        if (fs.existsSync(claimed)) throw Error('Desktop update outcome uncertain after restart; refusing duplicate submission');
+        save(claimed, { at: Date.now() });
+        save(path.join(dir, 'update-fence.json'), { id: file });
+        const conversation = json(path.join(dir, 'conversation.json')).conversationId;
+        await api(['send-message', conversation, input.text]);
+        save(ack, { accepted: true });
+      } catch (error) {
+        save(ack, { accepted: false, error: error.message });
+        save(path.join(dir, 'result.json'), { type: 'error', reason: 'failed', message: 'Desktop input update failed: ' + error.message });
+        break;
+      }
+    }
+  } finally { updating.delete(id); }
+}
 const appParentPid = process.ppid;
 function appParentAlive() {
   if (!Number.isInteger(appParentPid) || appParentPid <= 1) return true;
@@ -78,7 +107,10 @@ setInterval(() => {
       const lease = path.join(dir, 'lease.json');
       if (fs.existsSync(lease) && Date.now() - json(lease).at > 20000 && !fs.existsSync(path.join(dir, 'result.json'))) save(path.join(dir, 'cancel.json'), { reason: 'bridge lease expired' });
       if (cancelled(dir, request)) killTools(dir, id);
-      else if (!fs.existsSync(path.join(dir, 'result.json'))) void start(id);
+      else if (!fs.existsSync(path.join(dir, 'result.json'))) {
+        void update(id, dir, request).catch(() => {});
+        void start(id);
+      }
     } catch { /* Partial atomic publication is retried next tick. */ }
   }
 }, 1000);

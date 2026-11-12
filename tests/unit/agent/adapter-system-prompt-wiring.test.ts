@@ -85,7 +85,7 @@ describe('ClaudeAdapter system prompt wiring', () => {
 
 describe('CodexAdapter system prompt wiring', () => {
   function codexAdapter(): CodexAdapter {
-    return new CodexAdapter({
+    return new CodexAdapter({ liveUpdates: false,
       binary: '/usr/local/bin/codex',
       profileStateDir: '/tmp/codex-profile',
     });
@@ -153,9 +153,10 @@ describe('DeepSeekHarnessAdapter system prompt wiring', () => {
 
     const args = spawnMock.spawnProcess.mock.calls[0]?.[1] as string[];
     expect(args[0]).toBe('-e');
-    expect(args.at(-1)).toBe('C:/deepseek-harness/dist/cli.js');
+    expect(args[2]).toBe('C:/deepseek-harness/dist/cli.js');
     expect(args).not.toContain(expect.stringContaining('long prompt'));
-    expect(await readAll(child.stdin)).toBe(prefixBridgeSystemPrompt(prompt, undefined));
+    child.stdin.end();
+    expect(JSON.parse(await readAll(child.stdin)).prompt).toBe(prefixBridgeSystemPrompt(prompt, undefined));
   });
 });
 

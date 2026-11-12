@@ -75,6 +75,31 @@ afterEach(async () => {
 });
 
 describe('bot identity injection into the agent adapter', () => {
+  it('delivers a second human mention into the active run instead of starting another run', async () => {
+    const h = await createHarness();
+    let finish!: () => void;
+    const finished = new Promise<void>(resolve => { finish = resolve; });
+    const steer = vi.fn(async () => {});
+    const exited = vi.fn();
+    const run = vi.spyOn(h.agent, 'run').mockImplementation(opts => ({
+      runId: opts.runId, steer,
+      events: (async function* () { yield { type: 'activity' as const }; await finished; yield { type: 'text' as const, delta: 'NEW_RESULT' }; yield { type: 'done' as const, terminationReason: 'normal' as const }; })(),
+      async stop() { finish(); }, async waitForExit() { exited(); return true; },
+    }));
+    const send = vi.spyOn(h.channel, 'send');
+    await startTestBridge(h);
+    await h.channel.handlers.message?.(message({ messageId: 'first', content: 'Original task', rawSenderType: 'user' }));
+    await waitFor(() => run.mock.calls.length === 1);
+    await h.channel.handlers.message?.(message({ messageId: 'correction', content: 'Actually use the new direction', rawSenderType: 'user' }));
+    expect(steer).toHaveBeenCalledTimes(1);
+    expect(steer.mock.calls[0]).toBeDefined();
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(send.mock.calls)).toContain('已将这条补充');
+    await h.channel.handlers.message?.(message({ messageId: 'correction', content: 'Actually use the new direction', rawSenderType: 'user' }));
+    expect(steer).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => exited.mock.calls.length > 0);
+  });
   it('sends two real mentions for two consultation markers in one final answer', async () => {
     const h = await createHarness();
     const hub = new CollaborationHub(new JsonlLedger(join(h.tmp.profile, 'hub.jsonl')), {

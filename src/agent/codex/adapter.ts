@@ -18,8 +18,11 @@ import type {
 import { buildCodexArgs } from './argv';
 import { resolveCodexBinary } from './binary';
 import { CodexJsonlTranslator, type CodexFinishReason } from './jsonl';
+import { startCodexAppServer } from './app-server';
 
 export interface CodexAdapterOptions {
+  /** Compatibility mode for explicit exec integrations without an app-server. */
+  liveUpdates?: boolean;
   binary: string;
   profileStateDir: string;
   codexHome?: string;
@@ -46,9 +49,11 @@ export class CodexAdapter implements AgentAdapter {
   private readonly sandbox: SandboxMode;
   private readonly defaultStopGraceMs: number;
   private readonly larkChannel: LarkChannelEnvContext | undefined;
+  private readonly liveUpdates: boolean;
   private botIdentity: AgentBotIdentity | undefined;
 
   constructor(opts: CodexAdapterOptions) {
+    this.liveUpdates = opts.liveUpdates !== false;
     this.binary = opts.binary;
     this.profileStateDir = opts.profileStateDir;
     this.codexHome = opts.codexHome;
@@ -116,6 +121,9 @@ export class CodexAdapter implements AgentAdapter {
       envOverrides.CODEX_HOME = this.codexHome;
     } else if (!this.inheritCodexHome) {
       envOverrides.CODEX_HOME = join(this.profileStateDir, 'codex-home');
+    }
+    if (!opts.memoryMode && !this.ignoreUserConfig && this.liveUpdates) {
+      return startCodexAppServer(binary, { ...opts, sandbox: opts.sandbox ?? this.sandbox, prompt: prefixBridgeSystemPrompt(opts.prompt, this.botIdentity) }, mergeProcessEnv(process.env, envOverrides), this.ignoreRules);
     }
     const child = spawnProcess(binary, args, {
       cwd: opts.cwd,

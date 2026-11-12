@@ -48,7 +48,7 @@ describe('CodexAdapter process contract', () => {
     cleanup.push(fake.dir);
     const cwd = await realpath(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       sandbox: 'read-only',
@@ -98,7 +98,7 @@ describe('CodexAdapter process contract', () => {
     const larkCliConfigDir = join(rootDir, 'profiles', 'codex-dev', 'lark-cli');
     const larkCliSourceConfigFile = join(rootDir, 'profiles', 'codex-dev', 'lark-cli-source', 'config.json');
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       larkChannel: {
@@ -135,7 +135,7 @@ describe('CodexAdapter process contract', () => {
     });
     cleanup.push(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
     }).run({
@@ -157,7 +157,7 @@ describe('CodexAdapter process contract', () => {
     const cwd = await realpath(fake.dir);
     const image = join(fake.dir, 'image.png');
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       sandbox: 'workspace-write',
@@ -190,7 +190,7 @@ describe('CodexAdapter process contract', () => {
     cleanup.push(fake.dir);
     const cwd = await realpath(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       sandbox: 'danger-full-access',
@@ -214,7 +214,7 @@ describe('CodexAdapter process contract', () => {
     const cwd = await realpath(fake.dir);
     const codexHome = join(fake.dir, 'custom-codex-home');
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       codexHome,
@@ -236,7 +236,7 @@ describe('CodexAdapter process contract', () => {
     });
     cleanup.push(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       inheritCodexHome: false,
@@ -258,7 +258,7 @@ describe('CodexAdapter process contract', () => {
     cleanup.push(fake.dir);
     const cwd = await realpath(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       ignoreUserConfig: false,
@@ -281,7 +281,7 @@ describe('CodexAdapter process contract', () => {
     });
     cleanup.push(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       ignoreUserConfig: true,
@@ -304,7 +304,7 @@ describe('CodexAdapter process contract', () => {
     });
     cleanup.push(fake.dir);
 
-    const run = new CodexAdapter({ binary: fake.path, profileStateDir: fake.dir }).run({
+    const run = new CodexAdapter({ liveUpdates: false, binary: fake.path, profileStateDir: fake.dir }).run({
       runId: 'run-fail',
       prompt: 'fail',
       cwd: await realpath(fake.dir),
@@ -334,7 +334,7 @@ describe('CodexAdapter process contract', () => {
     });
     cleanup.push(fake.dir);
 
-    const run = new CodexAdapter({ binary: fake.path, profileStateDir: fake.dir }).run({
+    const run = new CodexAdapter({ liveUpdates: false, binary: fake.path, profileStateDir: fake.dir }).run({
       runId: 'run-retry',
       prompt: 'retry',
       cwd: await realpath(fake.dir),
@@ -357,14 +357,14 @@ describe('CodexAdapter process contract', () => {
         exitCode: 1,
       });
       cleanup.push(fake.dir);
-      run = new CodexAdapter({ binary: fake.path, profileStateDir: fake.dir }).run({
+      run = new CodexAdapter({ liveUpdates: false, binary: fake.path, profileStateDir: fake.dir }).run({
         runId: 'run-missing',
         prompt: 'hi',
         cwd: await realpath(fake.dir),
       });
     } else {
       const missing = join(tmpdir(), `missing-codex-${Date.now()}`);
-      run = new CodexAdapter({ binary: missing, profileStateDir: tmpdir() }).run({
+      run = new CodexAdapter({ liveUpdates: false, binary: missing, profileStateDir: tmpdir() }).run({
         runId: 'run-missing',
         prompt: 'hi',
         cwd: tmpdir(),
@@ -387,7 +387,7 @@ describe('CodexAdapter process contract', () => {
     });
     cleanup.push(fake.dir);
 
-    const run = new CodexAdapter({
+    const run = new CodexAdapter({ liveUpdates: false,
       binary: fake.path,
       profileStateDir: fake.dir,
       stopGraceMs: 20,
@@ -413,7 +413,7 @@ describe('CodexAdapter process contract', () => {
 
   it('requires cwd to be resolved by policy before spawning', () => {
     expect(() =>
-      new CodexAdapter({ binary: 'unused', profileStateDir: tmpdir() }).run({
+      new CodexAdapter({ liveUpdates: false, binary: 'unused', profileStateDir: tmpdir() }).run({
         runId: 'run-no-cwd',
         prompt: 'hi',
       }),

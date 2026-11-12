@@ -718,8 +718,10 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     return;
   }
 
+  let updateAuthority: Awaited<ReturnType<BridgeCollaborationAdapter['intake']>> | undefined;
   if (collaboration) {
     const decision = await collaboration.intake(msg);
+    updateAuthority = decision;
     log.info('collab', decision.respond ? 'routed' : 'recorded-only', {
       scope,
       taskId: decision.taskId,
@@ -737,6 +739,24 @@ async function intakeMessage(deps: IntakeDeps): Promise<void> {
     }
   }
 
+  const active = activeRuns.get(scope);
+  const rawSender = (msg.raw as { sender?: { sender_type?: string } } | undefined)?.sender?.sender_type;
+  const isBotReturn = (rawSender === 'app' || rawSender === 'bot') && updateAuthority?.dispatchReason === 'return';
+  const explicitlyQueued = /^\s*\/queue\b|做完.{0,20}再|另外(?:再)?(?:做|开)(?:一个|一份)/i.test(msg.content);
+  if (active?.updateInput && (!active.updateTaskId || active.updateTaskId === updateAuthority?.taskId) && !isBotReturn && !explicitlyQueued && msg.resources.length === 0 && updateAuthority?.dispatchReason !== 'fanout') {
+    try {
+      await active.updateInput(msg.content, updateAuthority, msg.messageId);
+      collaborationRuns.delete(msg.messageId);
+    } catch (error) {
+      log.warn('run', 'input-update-failed', { scope, error: error instanceof Error ? error.message : 'unavailable' });
+      if (collaboration && updateAuthority?.dispatchId && updateAuthority.taskId) await collaboration.finishRun(updateAuthority.taskId, '', `update-failed:${msg.messageId}`, updateAuthority.dispatchId, false).catch(() => {});
+      collaborationRuns.delete(msg.messageId);
+      await channel.send(msg.chatId, { markdown: '当前任务的原生更新未获确认，已请求停止旧运行；未自动重发，以免重复执行。已有成果保留，请确认状态后继续。' }, { replyTo: msg.messageId, ...(msg.threadId ? { replyInThread: true } : {}) });
+      return;
+    }
+    await channel.send(msg.chatId, { markdown: '已将这条补充／修正送入当前任务，保留已有成果继续执行。' }, { replyTo: msg.messageId, ...(msg.threadId ? { replyInThread: true } : {}) });
+    return;
+  }
   const size = pending.push(scope, msg);
   log.info('intake', 'queued', { scope, queueSize: size, debounceMs: DEBOUNCE_MS });
 }
@@ -957,6 +977,28 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
   const { execution, cwdRealpath: cwd } = flow;
   activePolicyFingerprints.set(scope, flow.policy.policyFingerprint);
   const handle = execution.handle;
+  const supersededDispatches = new Set<string>();
+  const acceptedInputs = new Map<string, Promise<void>>();
+  if (execution.run.steer) {
+    handle.updateTaskId = collaborationRun?.taskId;
+    handle.updateInput = (text, authority, messageId) => {
+      const inputId = messageId ?? authority?.dispatchId;
+      if (inputId && acceptedInputs.has(inputId)) return acceptedInputs.get(inputId)!;
+      const next = (handle.inputBarrier ?? Promise.resolve()).then(async () => {
+        if (collaborationRun && (!authority?.dispatchId || authority.taskId !== collaborationRun.taskId)) throw Error('Task update authorization does not match the active task');
+        try {
+          await execution.run.steer!(`${authority?.promptContext ?? ''}\n<current_task_update>\nThis updates the active task, not a separate queued job. Preserve usable work; latest instructions override conflicting earlier instructions. Do not publish superseded results.\n${text}\n</current_task_update>`);
+        } catch (error) { await execution.stop().catch(() => {}); throw error; }
+        if (collaborationRun && authority?.dispatchId) {
+          if (collaborationRun.dispatchId) supersededDispatches.add(collaborationRun.dispatchId);
+          Object.assign(collaborationRun, { dispatchId: authority.dispatchId, dispatchReason: authority.dispatchReason, promptContext: authority.promptContext });
+        }
+      });
+      handle.inputBarrier = next.catch(() => {});
+      if (inputId) acceptedInputs.set(inputId, next);
+      return next;
+    };
+  }
   const eventStream = execution.subscribe();
   if (flow.resumeFrom) {
     log.info('session', 'resume', { sessionId: flow.resumeFrom, cwd });
@@ -1412,6 +1454,10 @@ async function runAgentBatch(deps: RunBatchDeps): Promise<void> {
         sendStandaloneProgress,
       );
       collaborationFinalState = finalState;
+    }
+    await handle.inputBarrier;
+    if (collaboration && collaborationRun) for (const dispatchId of supersededDispatches) {
+      await collaboration.finishRun(collaborationRun.taskId, '', `superseded:${execution.runId}:${dispatchId}`, dispatchId, false).catch(error => log.fail('collab-finalize', error));
     }
     let ownerMention: MentionInfo | undefined;
     if (collaborationFinalState) {

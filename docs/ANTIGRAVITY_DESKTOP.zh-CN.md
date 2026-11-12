@@ -73,6 +73,11 @@ Sidecar 原始的 App language-server 父进程消失后，Sidecar 会自行退�
 
 ## 运维与回退
 
+执行中纯文本更新通过 `agentapi send-message` 进入已绑定 conversation。输入与确认
+是每轮私有、nonce 绑定的串行 IPC。Stop 栅栏要求更新后先出现模型调用，再发布结果。
+接收不代表立即取消工具。安装匹配的 Sidecar 与 Hook 资产，只重启具名 Sidecar，
+不重置登录、不重发已接受的工作。支持矩阵见 [Agent 桥接](./AGENT_BRIDGES.zh-CN.md)。
+
 DesktopRoot 保存私有请求、绑定、生命周期事件和结果。保持 Git 忽略和 Worker 用户/ACL 边界。
 不要发布原始客户端日志或请求文件，其中可能含凭据和敏感任务内容。
 

@@ -4,6 +4,7 @@ import type { ClaudePermissionMode, CodexSandboxMode } from '../config/permissio
 export type { ClaudePermissionMode } from '../config/permissions';
 
 export type AgentEvent =
+  | { type: 'input_updated' }
   | { type: 'system'; sessionId?: string; threadId?: string; cwd?: string; model?: string }
   | { type: 'activity'; summary?: string }
   | { type: 'text'; delta: string }
@@ -53,6 +54,8 @@ export interface AgentRunOptions {
 }
 
 export interface AgentRun {
+  /** Resolves only after the native active conversation accepted the update. */
+  steer?(text: string): Promise<void>;
   readonly runId: string;
   readonly events: AsyncIterable<AgentEvent>;
   stop(): Promise<void>;
