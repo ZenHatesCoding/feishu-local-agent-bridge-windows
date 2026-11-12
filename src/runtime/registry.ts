@@ -5,8 +5,7 @@ import {
   fsyncSync,
   mkdirSync,
   openSync,
-  readFileSync,
-  renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -18,6 +17,7 @@ import { paths } from '../config/paths';
 import type { AgentKind } from '../config/profile-schema';
 import type { TenantBrand } from '../config/schema';
 import { writeFileAtomic } from '../platform/atomic-write';
+import { readFileWithRetrySync, renameFileWithRetrySync } from '../platform/atomic-json';
 import { checkRuntimeLock } from './locks';
 
 /**
@@ -91,18 +91,17 @@ async function writeAtomic(entries: ProcessEntry[], path: string): Promise<void>
 }
 
 function writeAtomicSync(entries: ProcessEntry[], path: string): void {
-  const tmp = `${path}.tmp-${process.pid}`;
+  const tmp = `${path}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
   const body = `${JSON.stringify({ entries } satisfies RegistryFile, null, 2)}\n`;
   mkdirSync(dirname(path), { recursive: true });
-  const fd = openSync(tmp, 'w', 0o600);
   try {
-    writeFileSync(fd, body, 'utf8');
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
+    const fd = openSync(tmp, 'wx', 0o600);
+    try { writeFileSync(fd, body, 'utf8'); fsyncSync(fd); }
+    finally { closeSync(fd); }
+    renameFileWithRetrySync(tmp, path);
+    fsyncDirSync(dirname(path));
   }
-  renameSync(tmp, path);
-  fsyncDirSync(dirname(path));
+  finally { try { rmSync(tmp, { force: true }); } catch { /* Preserve original failure. */ } }
 }
 
 /** Generate a short, human-typable id. Collisions are caller's problem;
@@ -366,13 +365,13 @@ function readRaw(path: string): RegistryFile {
 
 function readRegistryFile(path: string): RegistryFile | undefined {
   try {
-    const text = readFileSync(path, 'utf8');
+    const text = readFileWithRetrySync(path);
     const parsed = JSON.parse(text) as Partial<RegistryFile>;
-    if (!parsed || !Array.isArray(parsed.entries)) return { entries: [] };
+    if (!parsed || !Array.isArray(parsed.entries)) throw Error('Invalid process registry; refusing to assume no running processes');
     return { entries: parsed.entries.filter(isValidEntry) };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    return { entries: [] };
+    throw err;
   }
 }
 

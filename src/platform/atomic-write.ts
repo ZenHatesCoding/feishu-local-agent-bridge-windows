@@ -1,15 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { chmod, mkdir, open, rm } from 'node:fs/promises';
+import { chmod, mkdir, open, rm, rename as nativeRename } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import { promisify } from 'node:util';
-import gracefulFs from 'graceful-fs';
-
-const gracefulRename = promisify(gracefulFs.rename);
 
 export interface AtomicWriteOptions {
   mode?: number;
   maxRenameAttempts?: number;
   retryDelayMs?: number;
+  maxRenameMs?: number;
   rename?: (
     from: string,
     to: string,
@@ -17,7 +14,7 @@ export interface AtomicWriteOptions {
   ) => Promise<void>;
 }
 
-const DEFAULT_RENAME_ATTEMPTS = 5;
+const DEFAULT_RENAME_ATTEMPTS = 41;
 const DEFAULT_RETRY_DELAY_MS = 25;
 
 export async function writeFileAtomic(
@@ -43,7 +40,7 @@ export async function writeFileAtomic(
       await handle.close();
     }
     await chmod(tmp, opts.mode ?? 0o600);
-    await renameWithRetry(tmp, path, opts);
+    await renameFileWithRetry(tmp, path, opts);
     await fsyncDir(dirname(path));
   } catch (err) {
     await rm(tmp, { force: true }).catch(() => {});
@@ -51,23 +48,24 @@ export async function writeFileAtomic(
   }
 }
 
-async function renameWithRetry(
+export async function renameFileWithRetry(
   from: string,
   to: string,
-  opts: AtomicWriteOptions,
+  opts: AtomicWriteOptions = {},
 ): Promise<void> {
   const maxAttempts = opts.maxRenameAttempts ?? DEFAULT_RENAME_ATTEMPTS;
   const delayMs = opts.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   const rename = opts.rename ?? ((src, dest, fallback) => fallback(src, dest));
+  const deadline = Date.now() + (opts.maxRenameMs ?? 1000);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await rename(from, to, gracefulRename);
+      await rename(from, to, nativeRename);
       return;
     } catch (err) {
       lastErr = err;
-      if (!isTransientRenameError(err) || attempt === maxAttempts) break;
-      await sleep(delayMs * attempt);
+      if (!isTransientRenameError(err) || attempt === maxAttempts || Date.now() >= deadline) break;
+      await sleep(Math.min(delayMs, Math.max(0, deadline - Date.now())));
     }
   }
   throw lastErr;
@@ -75,7 +73,7 @@ async function renameWithRetry(
 
 export function isTransientRenameError(err: unknown): boolean {
   const code = (err as NodeJS.ErrnoException | undefined)?.code;
-  return code === 'EPERM' || code === 'EBUSY';
+  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES';
 }
 
 function isIgnorableWindowsFsyncError(err: unknown): boolean {

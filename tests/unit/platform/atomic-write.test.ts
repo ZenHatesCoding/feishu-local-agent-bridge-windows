@@ -12,7 +12,7 @@ describe('atomic write retry', () => {
     await Promise.all(cleanups.splice(0).map((cleanup) => cleanup()));
   });
 
-  it('retries transient Windows rename failures and removes temp files', async () => {
+  it.each(['EPERM', 'EACCES', 'EBUSY'])('retries transient Windows %s and removes temp files', async code => {
     const root = await tmpRoot();
     const file = join(root, 'config.json');
     let attempts = 0;
@@ -23,7 +23,7 @@ describe('atomic write retry', () => {
         attempts++;
         if (attempts < 3) {
           const err = new Error('busy') as NodeJS.ErrnoException;
-          err.code = attempts === 1 ? 'EPERM' : 'EBUSY';
+          err.code = code;
           throw err;
         }
         await fallbackRename(from, to);
@@ -53,6 +53,25 @@ describe('atomic write retry', () => {
     ).rejects.toThrow('busy');
 
     expect((await readdir(root)).filter((name) => name.includes('.tmp-'))).toEqual([]);
+  });
+
+  it('does not retry permanent storage errors or damage the previous state', async () => {
+    const root = await tmpRoot(), file = join(root, 'state.json');
+    await writeFileAtomic(file, 'previous');
+    let attempts = 0;
+    await expect(writeFileAtomic(file, 'next', { rename: async () => { attempts++; throw Object.assign(Error('storage failed'), { code: 'EIO' }); } })).rejects.toThrow('storage failed');
+    expect(attempts).toBe(1);
+    expect(await readFile(file, 'utf8')).toBe('previous');
+    expect(await readdir(root)).toEqual(['state.json']);
+  });
+
+  it('bounds transient failures by time even when the attempt budget is large', async () => {
+    const root = await tmpRoot(), file = join(root, 'state.json');
+    const started = Date.now(); let attempts = 0;
+    await expect(writeFileAtomic(file, 'next', { maxRenameAttempts: 1000, maxRenameMs: 60, retryDelayMs: 10, rename: async () => { attempts++; throw Object.assign(Error('locked'), { code: 'EPERM' }); } })).rejects.toThrow('locked');
+    expect(attempts).toBeGreaterThan(1);
+    expect(attempts).toBeLessThan(1000);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });
 
