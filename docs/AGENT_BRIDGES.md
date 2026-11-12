@@ -130,6 +130,10 @@ still returns an exact error after the retry.
 
 ## Active-task text updates
 
+Status: implemented on `develop/hub` and `develop/worker`. Release promotion and
+real second-PC Feishu acceptance are separate steps; older release checkouts do
+not acquire this capability merely by updating their Agent clients.
+
 | Agent / transport | Supported | Native mechanism |
 | --- | --- | --- |
 | Codex app-server (default business calls) | Yes | Same thread/turn, `turn/steer` |

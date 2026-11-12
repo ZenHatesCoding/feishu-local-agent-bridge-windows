@@ -115,6 +115,9 @@ Agent 不得拿自身 `.artifacts` 暂存目录冒充交付；只有该发布命
 
 ## 执行中的任务文本更新
 
+状态：已在 `develop/hub`、`develop/worker` 实现。发布分支晋级及真实第二台电脑的
+飞书验收是独立步骤；旧发布分支不会仅因更新 Agent 客户端就获得此能力。
+
 | Agent / transport | 支持 | 原生机制 |
 | --- | --- | --- |
 | Codex app-server（默认业务调用） | 是 | 同一 thread／turn 的 `turn/steer` |
