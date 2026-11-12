@@ -312,6 +312,29 @@ and finalizes against the latest accepted dispatch. This does not share private
 sessions across Agents. Transport support, queue exceptions, uncertain delivery
 and cancellation limits are maintained in [Agent bridges](./AGENT_BRIDGES.md#active-task-text-updates).
 
+## Local storage failures and execution boundaries
+
+The Agent transport and shared persistence have different failure boundaries:
+
+| Path | Design and failure consequence |
+| --- | --- |
+| Codex app-server, DeepSeek Harness, Claude Code | Native execution communicates over process pipes; it does not renew an App IPC file lease. DSH/Claude still create startup files and all bridges use shared persistence. |
+| Antigravity App | Requests, results and leases cross a Sidecar/Hook file boundary. A sustained storage failure makes execution ownership uncertain and must fence the run. |
+| Hermes Hook | Hub coordination uses HTTP and its own gateway lifecycle; it does not use the App file lease. This is not a guarantee about Hermes-internal storage. |
+| Session state, workspace state and session catalog | Serialized atomic writes with bounded replacement retry. Background persistence failure is reported without cancelling native execution; memory state remains, but restart recovery may be stale. |
+| Process registry | Atomic replacement, including synchronous shutdown writes, with bounded retry. Transient reads retry; unreadable or malformed registry data is an error, never an empty fleet. Unknown ownership/locks remain errors; do not start a duplicate process to hide them. |
+| Media cache and Artifact snapshots (including Hermes Hook snapshots) | Retry publication of the already-downloaded/copied file with writer-owned temporary files, never replay the Agent task. Persistent failure fails that file delivery rather than claiming success. |
+
+Shared online file publication retries `EPERM`, `EACCES` and `EBUSY` for up to
+one second; permanent failures propagate immediately. Each writer owns a unique
+temporary file and cleans it on failure. Existing targets remain valid until a
+successful replacement. The shared async helper uses native rename so nested
+library retries cannot silently exceed this budget. Offline profile-directory
+migration/archive operations retain their explicit migration/rollback contracts;
+they are not active-task lease renewal. These protections do not retry arbitrary
+disk writes, bypass persistent permissions, guarantee crash durability, or make
+the Hub ledger/SQLite/model provider infallible.
+
 ## Deployment Shape
 
 `release/hub` builds every maintained adapter for the central deployment;

@@ -1,6 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { copyFile, mkdir, rename, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, rm, stat } from 'node:fs/promises';
+import { renameFileWithRetry } from '../platform/atomic-write';
 import { basename, extname, join } from 'node:path';
 import type { SharedArtifact } from './types';
 
@@ -30,10 +31,10 @@ export async function snapshotArtifact(input: SnapshotArtifactInput): Promise<Ma
     if (!existing.isFile() || existing.size !== sourceStat.size) throw new Error('artifact snapshot mismatch');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    const tempPath = `${localPath}.tmp-${process.pid}-${Date.now()}`;
+    const tempPath = `${localPath}.tmp-${process.pid}-${randomUUID()}`;
     try {
       await copyFile(input.sourcePath, tempPath);
-      await rename(tempPath, localPath);
+      await renameFileWithRetry(tempPath, localPath);
     } finally {
       await rm(tempPath, { force: true }).catch(() => {});
     }

@@ -8,6 +8,7 @@ allows this hook to enrich ``message_full`` and cancel unauthorized bot wakes.
 from __future__ import annotations
 
 import hashlib
+import errno
 import json
 import os
 import datetime
@@ -170,6 +171,19 @@ def _paths_in_text(text: str) -> list[str]:
     return paths
 
 
+def _replace_with_retry(source: str, target: str) -> None:
+    deadline = time.monotonic() + 1.0
+    while True:
+        try:
+            os.replace(source, target)
+            return
+        except OSError as error:
+            if (error.errno not in (errno.EPERM, errno.EACCES, errno.EBUSY)
+                    and getattr(error, "winerror", None) not in (5, 32, 33)) or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.025)
+
+
 def _snapshot_artifact(task_id: str, path: str) -> dict[str, Any]:
     digest = hashlib.sha256()
     with open(path, "rb") as source:
@@ -186,10 +200,11 @@ def _snapshot_artifact(task_id: str, path: str) -> dict[str, Any]:
     os.makedirs(artifact_dir, exist_ok=True)
     local_path = os.path.join(artifact_dir, name)
     if not os.path.isfile(local_path):
-        temp_path = f"{local_path}.tmp-{os.getpid()}"
+        fd, temp_path = tempfile.mkstemp(prefix=".artifact-", suffix=".tmp", dir=artifact_dir)
+        os.close(fd)
         try:
             shutil.copy2(path, temp_path)
-            os.replace(temp_path, local_path)
+            _replace_with_retry(temp_path, local_path)
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)

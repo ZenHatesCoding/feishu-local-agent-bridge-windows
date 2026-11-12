@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { renameFileWithRetry } from '../platform/atomic-write';
 import { join } from 'node:path';
 import type { LarkChannel, ResourceDescriptor } from '@larksuite/channel';
 import { paths } from '../config/paths';
@@ -100,10 +101,12 @@ export class MediaCache {
     const absPath = join(this.rootDir, `${hash}.${ext}`);
     try {
       await stat(absPath);
-      await rm(tmpPath, { force: true });
       log.info('media', 'cache-hit', { path: absPath });
-    } catch {
-      await rename(tmpPath, absPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      await renameFileWithRetry(tmpPath, absPath);
+    } finally {
+      await rm(tmpPath, { force: true }).catch(() => {});
     }
     const candidate: AttachmentCandidate = {
       absPath,

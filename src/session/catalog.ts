@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { open, readFile, rename, mkdir } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { writeFileAtomic } from '../platform/atomic-write';
 import { paths } from '../config/paths';
 import { log } from '../core/logger';
 import type { AgentCapabilityId } from '../agent/capability';
@@ -184,27 +183,8 @@ export class SessionCatalog {
   }
 
   private async persist(): Promise<void> {
-    await mkdir(dirname(this.path), { recursive: true });
-    const tmp = `${this.path}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
     const payload = `${JSON.stringify(this.entries(), null, 2)}\n`;
-    const fh = await open(tmp, 'w', 0o600);
-    try {
-      await fh.writeFile(payload, 'utf8');
-      await fh.sync();
-    } finally {
-      await fh.close();
-    }
-    await rename(tmp, this.path);
-    try {
-      const dir = await open(dirname(this.path), 'r');
-      try {
-        await dir.sync();
-      } finally {
-        await dir.close();
-      }
-    } catch {
-      // Directory fsync is not available on every platform.
-    }
+    await writeFileAtomic(this.path, payload, { mode: 0o600 });
   }
 }
 

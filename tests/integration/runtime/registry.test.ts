@@ -24,6 +24,13 @@ afterEach(async () => {
 });
 
 describe('process registry', () => {
+  it.each(['{broken', '{}'])('does not treat unreadable registry structure as an empty fleet: %s', async body => {
+    const root = await makeRoot(), registryFile = join(root, 'registry', 'processes.json');
+    await mkdir(dirname(registryFile), { recursive: true }); await writeFile(registryFile, body);
+    expect(() => readAndPrune(registryFile)).toThrow();
+    await expect(register({ appId: 'cli_test', tenant: 'feishu', configPath: join(root, 'config.json'), version: 'test', profileName: 'test', agentKind: 'codex', registryFile })).rejects.toThrow();
+    expect(await readFile(registryFile, 'utf8')).toBe(body);
+  });
   it('read path does not prune or rewrite stale entries', async () => {
     const root = await makeRoot();
     const registryFile = join(root, 'registry', 'processes.json');
