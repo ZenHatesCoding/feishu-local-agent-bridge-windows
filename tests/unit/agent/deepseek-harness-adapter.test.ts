@@ -6,6 +6,18 @@ import { DeepSeekHarnessAdapter } from '../../../src/agent/deepseek-harness/adap
 import type { AgentEvent } from '../../../src/agent/types.js';
 
 describe('DeepSeek Harness entry compatibility', () => {
+  it('accepts live updates even when control acknowledgement follows a diagnostic without a newline', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'harness-live-'));
+    try {
+      const entry = join(dir, 'entry.mjs');
+      await writeFile(entry, `export async function runCli(){globalThis.__larkHarnessLive.send=({id,text})=>{process.stderr.write('diagnostic LARK_LIVE '+JSON.stringify({id})+'\\n');console.log(text);globalThis.__larkHarnessLive.close()};for(const m of globalThis.__larkHarnessLive.pending.splice(0))globalThis.__larkHarnessLive.send(m)}`);
+      const run = new DeepSeekHarnessAdapter({ binary: process.execPath, entry }).run({ runId: 'live', cwd: dir, prompt: 'OLD' });
+      await run.steer!('NEW');
+      const events: AgentEvent[] = []; for await (const e of run.events) events.push(e);
+      expect(events).toContainEqual({ type: 'text', delta: 'NEW\n' });
+      expect(events.at(-1)).toMatchObject({ type: 'done' });
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
   async function run(source: string, memoryMode = false) {
     const dir = await mkdtemp(join(tmpdir(), 'harness-entry-'));
     try {
@@ -50,7 +62,7 @@ describe('DeepSeek Harness entry compatibility', () => {
     try {
       const events = await run(`export async function runCli(){if(process.argv[4]!=='--patch'||process.argv[5]!=='memory-only.yml'||process.argv[6]!=='--json')throw Error('patch argv');console.log(JSON.stringify({type:'final',text:'OK'}))}`, true);
       expect(events.at(-1)).toMatchObject({ type: 'done' });
-      expect((await run(`export async function runCli(){if(process.argv.includes('--patch'))throw Error('business changed');console.log('BUSINESS_OK')}`))[0]).toMatchObject({ type: 'text', delta: 'BUSINESS_OK\n' });
+      expect((await run(`export async function runCli(){if(process.argv.includes('memory-only.yml'))throw Error('business changed');console.log('BUSINESS_OK')}`))[0]).toMatchObject({ type: 'text', delta: 'BUSINESS_OK\n' });
     } finally {
       if (previous === undefined) delete process.env.LARK_MEMORY_HARNESS_PATCH;
       else process.env.LARK_MEMORY_HARNESS_PATCH = previous;

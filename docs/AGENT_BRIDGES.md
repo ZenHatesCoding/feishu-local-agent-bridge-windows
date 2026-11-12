@@ -128,6 +128,46 @@ must not substitute their native `.artifacts` staging directory, and must not
 tell the user to restart/doctor the Bridge unless this delivery command itself
 still returns an exact error after the retry.
 
+## Active-task text updates
+
+| Agent / transport | Supported | Native mechanism |
+| --- | --- | --- |
+| Codex app-server (default business calls) | Yes | Same thread/turn, `turn/steer` |
+| DeepSeek Harness standard headless runner | Yes | Per-run Cordis bridge plugin calls the same Agent's `steer` |
+| Antigravity App Sidecar | Yes | `agentapi send-message` to the bound conversation |
+| Claude Code | No | Existing queue unchanged |
+| Antigravity agy CLI | No | Existing one-shot transport unchanged |
+| Hermes Hook | Outside this bridge feature | Native gateway behavior unchanged |
+
+An authorized text-only follow-up in the same admitted chat/topic and logical
+Agent instance updates the active run; no new process or shared cross-topic
+session is created. Collaboration mode still requires that Agent's accepted Hub
+dispatch. Updates are serialized and deduplicated by message ID. Final delegation
+and result reporting use the latest dispatch. Superseded dispatches close as
+failed without duplicate results or owner wake-ups. Already-running tools retain
+their initial accepted dispatch environment until finalization; this feature does
+not mutate OS permissions or introduce new authority.
+
+Attachments, explicit sequencing (such as "做完…再…"), fanout assignments and Agent
+consultation returns retain the queue. Slash commands keep their existing
+handling. Messages arriving before the active handle exists or after completion
+use ordinary scheduling. Native acknowledgement means admission, not guaranteed
+model compliance or instant cancellation of shell/render/upload operations.
+Missing/uncertain acknowledgement requests stopping the old run and reports
+uncertainty; potentially accepted inputs are never silently retried.
+
+Memory synthesis remains one-shot. Codex `ignoreUserConfig` integrations and
+adapter `liveUpdates: false` use compatibility exec mode without steering. DSH
+requires the standard headless runner and native Agent/status API; its temporary
+plugin does not rewrite user profiles. Antigravity requires matching bridge,
+Sidecar and Hook assets; updating only the Node bridge is insufficient. Its Stop
+fence waits for a model invocation after the latest input before publishing the
+final result. CLI mode does not inherit this capability.
+
+References: [Codex app-server](https://learn.chatgpt.com/docs/app-server),
+[Antigravity Sidecars](https://antigravity.google/docs/sidecars).
+Native transport verification is not second-PC Feishu acceptance.
+
 ## Claude Code
 
 Prerequisite: an interactive Claude Code login that works on its own, so

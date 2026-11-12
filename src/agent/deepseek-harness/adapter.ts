@@ -4,6 +4,9 @@ import { delimiter } from 'node:path';
 import { mergeProcessEnv, spawnProcess, type SpawnedProcessByStdio } from '../../platform/spawn';
 import { SpawnFailed } from '../../runtime/errors';
 import { prefixBridgeSystemPrompt } from '../bridge-system-prompt';
+import { harnessLiveAssets } from './live';
+import { randomUUID } from 'node:crypto';
+import { rmSync } from 'node:fs';
 import { buildLarkChannelEnv, type LarkChannelEnvContext } from '../lark-channel-env';
 import { checkAgentAvailability, type AgentAvailability } from '../preflight';
 import type { AgentAdapter, AgentBotIdentity, AgentEvent, AgentRun, AgentRunOptions } from '../types';
@@ -68,7 +71,8 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
   run(opts: AgentRunOptions): AgentRun {
     if (!opts.cwd) throw new Error('cwd is required for DeepSeekHarnessAdapter.run');
     const prompt = opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.botIdentity);
-    const child = spawnProcess(this.opts.binary, ['-e', STDIN_BOOTSTRAP, this.opts.entry], {
+    const live = opts.memoryMode ? undefined : harnessLiveAssets();
+    const child = spawnProcess(this.opts.binary, ['-e', live?.bootstrap ?? STDIN_BOOTSTRAP, this.opts.entry, ...(live ? [live.patch] : [])], {
       cwd: opts.cwd,
       env: mergeProcessEnv(process.env, {
         ...buildLarkChannelEnv(this.opts.larkChannel),
@@ -83,17 +87,33 @@ export class DeepSeekHarnessAdapter implements AgentAdapter {
       }),
       stdio: ['pipe', 'pipe', 'pipe'],
     }) as HarnessChild;
-    child.stdin.end(prompt);
+    if (live) child.stdin.write(JSON.stringify({ prompt }) + '\n');
+    else child.stdin.end(prompt);
 
     const stderrChunks: Buffer[] = [];
     let runtimeError: Error | null = null;
-    child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+    const pending = new Map<string, { resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();
+    const stderrLines = createInterface({ input: child.stderr, crlfDelay: Infinity });
+    stderrLines.on('line', line => {
+      if (line.includes('LARK_LIVE ')) {
+        try { const ack = JSON.parse(line.slice(line.lastIndexOf('LARK_LIVE ') + 10)); const p = pending.get(ack.id); if (p) { clearTimeout(p.timer); pending.delete(ack.id); ack.error ? p.reject(Error(ack.error)) : p.resolve(); } } catch { /* Not a control frame. */ }
+      } else stderrChunks.push(Buffer.from(line + '\n'));
+    });
+    child.stdin.on('error', () => {});
+    child.once('close', () => { for (const p of pending.values()) { clearTimeout(p.timer); p.reject(Error('Harness exited')); } pending.clear(); if (live) rmSync(live.root, { recursive: true, force: true }); });
     child.on('error', (err) => { runtimeError = err; });
     const stopGraceMs = opts.stopGraceMs ?? this.defaultStopGraceMs;
 
     return {
       runId: opts.runId,
       events: harnessEvents(child, stderrChunks, () => runtimeError, opts.memoryMode === true),
+      ...(live ? { steer: (text: string): Promise<void> => new Promise((resolve, reject) => {
+        if (child.exitCode !== null || child.signalCode !== null) { reject(Error('Harness turn has ended')); return; }
+        const id = randomUUID();
+        const timer = setTimeout(() => { pending.delete(id); reject(Error('Harness input acknowledgement timed out')); }, 15000);
+        pending.set(id, { resolve, reject, timer });
+        child.stdin.write(JSON.stringify({ id, text }) + '\n');
+      }) } : {}),
       async stop() {
         if (child.exitCode !== null || child.signalCode !== null) return;
         child.kill('SIGTERM');

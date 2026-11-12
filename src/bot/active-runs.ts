@@ -1,6 +1,10 @@
 import type { AgentRun } from '../agent/types';
+import type { BridgeCollaborationDecision } from '../collab/bridge-adapter';
 
 export interface RunHandle {
+  updateInput?: (text: string, authority?: BridgeCollaborationDecision, messageId?: string) => Promise<void>;
+  inputBarrier?: Promise<void>;
+  updateTaskId?: string;
   run: AgentRun;
   interrupted: boolean;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -11,6 +11,42 @@ const root = () => { const dir = mkdtempSync(join(tmpdir(), 'desktop-contract-')
 function ready(dir: string) { writeFileSync(join(dir, 'heartbeat.json'), JSON.stringify({ at: Date.now(), transport: 'antigravity-app' })); }
 afterEach(() => { for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 describe('Antigravity App transport', () => {
+  it('does not replay an update claimed before a Sidecar restart', async () => {
+    const dir = root(); ready(dir);
+    const run = new AntigravityDesktopAdapter(dir).run({ runId: 'claimed-input', cwd: dir, prompt: 'OLD' });
+    const job = join(dir, 'runs/claimed-input'), inbox = join(job, 'updates');
+    mkdirSync(inbox);
+    const request = JSON.parse(readFileSync(join(job, 'request.json'), 'utf8'));
+    core.save(join(job, 'conversation.json'), { conversationId: '12345678-1234-1234-1234-123456789abc' });
+    core.save(join(inbox, '1.json'), { nonce: request.nonce, text: 'NEW' });
+    core.save(join(inbox, '1.json.claimed'), { at: Date.now() });
+    const spawn = vi.fn(); let tick!: () => void;
+    runInNewContext(readFileSync(resolve('adapters/antigravity-desktop/sidecar.cjs'), 'utf8'), {
+      require(name: string) { return name === 'node:child_process' ? { spawn } : createRequire(import.meta.url)(name === './core.cjs' ? resolve('adapters/antigravity-desktop/core.cjs') : name); },
+      process: { env: { LARK_ANTIGRAVITY_DESKTOP_ROOT: dir, LARK_ANTIGRAVITY_WORKSPACE_ROOT: dir, ANTIGRAVITY_LS_ADDRESS: 'fixture' }, pid: 123 },
+      setInterval(callback: () => void) { tick = callback; },
+    });
+    tick();
+    expect(core.json(join(inbox, '1.json.ack'))).toMatchObject({ accepted: false, error: expect.stringContaining('uncertain after restart') });
+    expect(spawn).not.toHaveBeenCalled();
+    await run.stop();
+    const iterator = run.events[Symbol.asyncIterator](); await iterator.next(); await iterator.return?.();
+  });
+  it('binds a text update to the active request and waits for its native receipt', async () => {
+    const dir = root(); ready(dir);
+    const run = new AntigravityDesktopAdapter(dir).run({ runId: 'live-input', cwd: dir, prompt: 'OLD' });
+    const waiting = run.steer!('NEW');
+    await Promise.resolve();
+    const inbox = join(dir, 'runs/live-input/updates');
+    const file = readdirSync(inbox).find(name => name.endsWith('.json'))!;
+    const input = JSON.parse(readFileSync(join(inbox, file), 'utf8'));
+    expect(input.text).toBe('NEW');
+    expect(input.nonce).toBe(JSON.parse(readFileSync(join(dir, 'runs/live-input/request.json'), 'utf8')).nonce);
+    writeFileSync(join(inbox, file + '.ack'), JSON.stringify({ accepted: true }));
+    await waiting;
+    await run.stop();
+    const iterator = run.events[Symbol.asyncIterator](); await iterator.next(); await iterator.return?.();
+  });
   it('stops an orphan Sidecar before publishing heartbeat or claiming jobs', () => {
     let tick: () => void = () => {};
     const save = vi.fn();
@@ -145,6 +181,18 @@ describe('App named hooks', () => {
     expect(result.overwrite.CommandLine).not.toContain('LARK_COLLAB_HUB_TOKEN');
     core.save(join(f.job, 'lease.json'), { at: Date.now() - 30000 });
     expect(core.hook(f.dir, 'PreToolUse', f.input).decision).toBe('deny');
+  });
+  it('fences the old Stop until the updated input reaches a model invocation', () => {
+    const f = fixture(), transcript = join(f.job, 'transcript.jsonl');
+    writeFileSync(transcript, JSON.stringify({ type: 'PLANNER_RESPONSE', content: 'OLD' }));
+    core.save(join(f.job, 'update-fence.json'), { id: 'update-1' });
+    const input = { ...f.input, transcriptPath: transcript, terminationReason: 'model_stop', fullyIdle: true };
+    core.hook(f.dir, 'Stop', input);
+    expect(() => readFileSync(join(f.job, 'result.json'))).toThrow();
+    core.hook(f.dir, 'PreInvocation', f.input);
+    writeFileSync(transcript, JSON.stringify({ type: 'PLANNER_RESPONSE', content: 'NEW' }));
+    core.hook(f.dir, 'Stop', input);
+    expect(core.json(join(f.job, 'result.json')).text).toBe('NEW');
   });
   it('ignores reasoning and waits for background work before publishing a final answer', () => {
     const f = fixture(), transcript = join(f.job, 'transcript.jsonl');

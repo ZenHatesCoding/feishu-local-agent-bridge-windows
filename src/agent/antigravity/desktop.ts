@@ -36,7 +36,7 @@ export class AntigravityDesktopAdapter implements AgentAdapter {
     publish('lease.json', { at: Date.now() });
     const heartbeat = JSON.parse(readFileSync(join(this.root, 'heartbeat.json'), 'utf8')) as { workspaceRoot?: string };
     publish('request.json', { runId: opts.runId, nonce: randomBytes(16).toString('hex'), cwd: resolve(opts.cwd), workspaceRoot: heartbeat.workspaceRoot ?? resolve(opts.cwd), prompt: opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.identity), env, memoryMode: opts.memoryMode === true, expires: Date.now() + 86400000 });
-    let ended = false, stopped = false, ioFailure: string | undefined;
+    let ended = false, stopped = false, ioFailure: string | undefined, pendingUpdates = 0;
     const adapter = this;
     const fail = (error: unknown) => {
       ioFailure = `Desktop IPC failed (${(error as NodeJS.ErrnoException)?.code ?? 'invalid-data'}); run fenced`;
@@ -66,6 +66,7 @@ export class AntigravityDesktopAdapter implements AgentAdapter {
             for (; delivered < lines.length - 1; delivered++) { const event = JSON.parse(lines[delivered]!); if (event.type === 'activity') yield { type: 'activity', summary: event.summary }; }
           }
           if (existsSync(join(dir, 'result.json'))) {
+            if (pendingUpdates) { await pause(50); continue; }
             const result = JSON.parse(readFileSync(join(dir, 'result.json'), 'utf8'));
             if (result.type === 'done') { yield { type: 'text', delta: result.text }; yield { type: 'done', sessionId: result.conversationId, terminationReason: 'normal' }; }
             else yield { type: 'error', message: result.message, terminationReason: result.reason === 'interrupted' ? 'interrupted' : 'failed' };
@@ -84,6 +85,30 @@ export class AntigravityDesktopAdapter implements AgentAdapter {
         ended = true; clearInterval(lease);
       }
     }
-    return { runId: opts.runId, events: events(), stop, async waitForExit(ms) { const end = Date.now() + ms; while (!ended && Date.now() < end) await pause(25); return ended; } };
+    let updateSerial = Promise.resolve();
+    const steer = (text: string): Promise<void> => {
+      pendingUpdates++;
+      const next = updateSerial.then(async () => {
+        if (ended || stopped || existsSync(join(dir, 'result.json'))) throw Error('Desktop run has ended');
+        const inbox = join(dir, 'updates'); mkdirSync(inbox, { recursive: true });
+        const id = `${Date.now()}-${randomBytes(8).toString('hex')}.json`;
+        const request = JSON.parse(readFileSync(join(dir, 'request.json'), 'utf8')) as { nonce: string };
+        publish('update-fence.json', { id });
+        writeFileSync(join(inbox, id), JSON.stringify({ nonce: request.nonce, text }), { mode: 0o600, flag: 'wx' });
+        const deadline = Date.now() + 20000;
+        while (Date.now() < deadline && !ended && !stopped) {
+          if (existsSync(join(inbox, id + '.ack'))) {
+            const ack = JSON.parse(readFileSync(join(inbox, id + '.ack'), 'utf8'));
+            if (!ack.accepted) throw Error(ack.error ?? 'Desktop update rejected');
+            return;
+          }
+          await pause(50);
+        }
+        throw Error('Desktop update acknowledgement unavailable; outcome uncertain');
+      }).finally(() => { pendingUpdates--; });
+      updateSerial = next.catch(() => {});
+      return next;
+    };
+    return { runId: opts.runId, events: events(), ...(!opts.memoryMode ? { steer } : {}), stop, async waitForExit(ms) { const end = Date.now() + ms; while (!ended && Date.now() < end) await pause(25); return ended; } };
   }
 }

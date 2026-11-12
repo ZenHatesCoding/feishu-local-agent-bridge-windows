@@ -87,6 +87,13 @@ runs from continuing tools. Client disconnects fail explicitly.
 
 ## Operations and rollback
 
+Live text updates use `agentapi send-message` on the existing bound conversation.
+Requests and acknowledgements are private per-run IPC, nonce-bound and serialized.
+A Stop fence requires a post-update model invocation before final publication.
+Admission does not instantly cancel tools. Install matching Sidecar and Hook assets
+and restart only the named Sidecar; do not reset login or replay accepted work.
+See the [Agent transport support matrix](./AGENT_BRIDGES.md).
+
 DesktopRoot contains private requests, bindings, lifecycle events and results.
 Keep it out of Git and use the Worker's OS account/ACLs. Do not publish raw App
 logs or request files: they can contain credentials or sensitive task data.
