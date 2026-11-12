@@ -3,7 +3,22 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const ID = /^[a-zA-Z0-9_-]{1,100}$/;
 function json(file) { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); }
-function save(file, value) { fs.mkdirSync(path.dirname(file), { recursive: true }); const temp = file + '.' + process.pid + '.tmp'; fs.writeFileSync(temp, JSON.stringify(value), { mode: 0o600 }); fs.renameSync(temp, file); }
+const saveSleeper = new Int32Array(new SharedArrayBuffer(4));
+function save(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const temp = file + '.' + process.pid + '.' + require('node:crypto').randomUUID() + '.tmp';
+  try {
+    fs.writeFileSync(temp, JSON.stringify(value), { mode: 0o600, flag: 'wx' });
+    const deadline = Date.now() + 1000;
+    for (;;) {
+      try { fs.renameSync(temp, file); return; }
+      catch (error) {
+        if (!['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || Date.now() >= deadline) throw error;
+        Atomics.wait(saveSleeper, 0, 0, 25);
+      }
+    }
+  } finally { try { fs.rmSync(temp, { force: true }); } catch { /* Preserve original failure. */ } }
+}
 function jobPath(root, id) { if (!ID.test(id)) throw Error('Invalid desktop run ID'); return path.join(root, 'runs', id); }
 function emit(dir, event) { fs.appendFileSync(path.join(dir, 'events.jsonl'), JSON.stringify(event) + '\n', { mode: 0o600 }); }
 function cancelled(dir, request) {

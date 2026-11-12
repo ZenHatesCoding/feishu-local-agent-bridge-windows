@@ -73,6 +73,12 @@ Sidecar 原始的 App language-server 父进程消失后，Sidecar 会自行退�
 
 ## 运维与回退
 
+IPC JSON 使用独立临时文件并原子替换。对 `EPERM`、`EACCES`、`EBUSY`，bridge、
+Sidecar 和 Hook 在一秒内重试替换：Windows 的读取句柄可能短暂禁止删除／替换，
+即使普通读取仍然成功。重试期间保留完整旧 JSON。其他错误或持续超过该上限的占用
+仍按失败关闭，取消运行或让租约过期；文件替换重试不会重新提交 Agent 请求。
+需要同时部署 bridge 与 Sidecar／Hook 资产才能生效。
+
 执行中纯文本更新通过 `agentapi send-message` 进入已绑定 conversation。输入与确认
 是每轮私有、nonce 绑定的串行 IPC。Stop 栅栏要求更新后先出现模型调用，再发布结果。
 接收不代表立即取消工具。安装匹配的 Sidecar 与 Hook 资产，只重启具名 Sidecar，

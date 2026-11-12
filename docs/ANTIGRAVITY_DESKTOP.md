@@ -87,6 +87,14 @@ runs from continuing tools. Client disconnects fail explicitly.
 
 ## Operations and rollback
 
+IPC JSON publication uses a unique temporary file and atomic replacement. The
+bridge, Sidecar and Hooks retry replacement for up to one second on `EPERM`,
+`EACCES` or `EBUSY`: Windows readers can briefly deny deletion/replacement even
+when ordinary reads succeed. The old JSON stays intact during retries. Other
+errors, or contention beyond that bound, still fail closed and expire/cancel the
+run; retrying a file replacement never resubmits an Agent request. Deploy both
+the bridge and Sidecar/Hook assets to apply this protection.
+
 Live text updates use `agentapi send-message` on the existing bound conversation.
 Requests and acknowledgements are private per-run IPC, nonce-bound and serialized.
 A Stop fence requires a post-update model invocation before final publication.

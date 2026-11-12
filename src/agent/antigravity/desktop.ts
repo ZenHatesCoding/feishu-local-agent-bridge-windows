@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { publishAtomicJson } from '../../platform/atomic-json';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { AgentAdapter, AgentBotIdentity, AgentEvent, AgentRun, AgentRunOptions } from '../types';
@@ -32,7 +33,7 @@ export class AntigravityDesktopAdapter implements AgentAdapter {
     for (const [key, value] of Object.entries(process.env)) if (/^LARK_(?:COLLAB_|CHANNEL_|MEMORY_)|^LARKSUITE_CLI_|^PATH$/i.test(key)) env[key] = value;
     Object.assign(env, buildLarkChannelEnv(this.larkChannel), opts.env);
     for (const key of Object.keys(env)) if (env[key] === undefined) delete env[key];
-    const publish = (name: string, value: unknown) => { const file = join(dir, name); writeFileSync(file + '.tmp', JSON.stringify(value), { mode: 0o600 }); renameSync(file + '.tmp', file); };
+    const publish = (name: string, value: unknown) => publishAtomicJson(join(dir, name), value);
     publish('lease.json', { at: Date.now() });
     const heartbeat = JSON.parse(readFileSync(join(this.root, 'heartbeat.json'), 'utf8')) as { workspaceRoot?: string };
     publish('request.json', { runId: opts.runId, nonce: randomBytes(16).toString('hex'), cwd: resolve(opts.cwd), workspaceRoot: heartbeat.workspaceRoot ?? resolve(opts.cwd), prompt: opts.memoryMode ? opts.prompt : prefixBridgeSystemPrompt(opts.prompt, this.identity), env, memoryMode: opts.memoryMode === true, expires: Date.now() + 86400000 });
