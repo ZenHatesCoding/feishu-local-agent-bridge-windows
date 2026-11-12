@@ -4,6 +4,7 @@ import type { BridgeCollaborationDecision } from '../collab/bridge-adapter';
 export interface RunHandle {
   updateInput?: (text: string, authority?: BridgeCollaborationDecision, messageId?: string) => Promise<void>;
   inputBarrier?: Promise<void>;
+  inputUpdateFailed?: boolean;
   updateTaskId?: string;
   run: AgentRun;
   interrupted: boolean;
